@@ -7,10 +7,12 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import {
   Eye,
+  ClipboardList,
   Layers,
   MessageSquare,
   Move,
@@ -20,6 +22,7 @@ import {
   Settings,
   Type,
   X,
+  Zap,
 } from "../../icons/SystemIcons";
 import {
   formatCssColor,
@@ -46,20 +49,51 @@ import {
 import { fontFamilyFromAssetPath, importedFontFaceCss, type ImportedFontAsset } from "./fontAssets";
 import { resolveFloatingPanelPosition, type FloatingPosition } from "./floatingPanel";
 import { IMAGE_EXT } from "../../utils/mediaTypes";
+import {
+  buildDefaultMotionDraft,
+  buildMotionCurveModel,
+  clampMotionDraftToTimeline,
+  DEFAULT_CUSTOM_MOTION_BEZIER,
+  detectMotionOwnership,
+  formatMotionBezierEase,
+  getMotionEaseLabel,
+  isMotionBezierEase,
+  MOTION_EASE_OPTIONS,
+  normalizeMotionEase,
+  parseMotionBezierEase,
+  parseMotionDraft,
+  sampleMotionEase,
+  type MotionBezierEase,
+  type MotionCurveModel,
+  type MotionCurveTrack,
+  type MotionDirection,
+  type MotionDraft,
+  type MotionEase,
+  type MotionKeyframes,
+  type MotionKeyframeRange,
+  type MotionOwnershipReport,
+  type MotionOwnershipState,
+  type MotionPreset,
+} from "./motionEditing";
 
 interface PropertyPanelProps {
+  mode?: "design" | "motion";
   projectId: string;
   assets: string[];
   element: DomEditSelection | null;
+  motionMaxDuration?: number;
   copiedAgentPrompt: boolean;
+  copiedElementLocator?: boolean;
   onClearSelection: () => void;
   onSetStyle: (prop: string, value: string) => void;
+  onSetMotion: (motion: MotionDraft | null) => void;
   onSetText: (value: string, fieldKey?: string) => void;
   onSetTextFieldStyle: (fieldKey: string, property: string, value: string) => void;
   onAddTextField: (afterFieldKey?: string) => string | Promise<string | null> | null;
   onRemoveTextField: (fieldKey: string) => void;
   onDetachFromLayout: () => void;
   onAskAgent: () => void;
+  onCopyElementLocator: () => void | Promise<void>;
   onCopyAgentInstruction: (instruction: string) => void | Promise<void>;
   onImportAssets?: (files: FileList) => Promise<string[]>;
   fontAssets?: ImportedFontAsset[];
@@ -98,6 +132,18 @@ const DEFAULT_FONT_FAMILIES = [
   "sans-serif",
   "serif",
   "monospace",
+];
+const MOTION_PRESET_OPTIONS: Array<{ label: string; value: MotionPreset }> = [
+  { label: "Fade Up", value: "fade-up" },
+  { label: "Slide", value: "slide" },
+  { label: "Pop", value: "pop" },
+];
+const MOTION_DIRECTION_OPTIONS: MotionDirection[] = ["up", "down", "left", "right"];
+const CUSTOM_EASE_VALUE = "__custom-bezier__";
+const CUSTOM_EASE_PRESETS: Array<{ label: string; value: MotionBezierEase }> = [
+  { label: "Soft", value: DEFAULT_CUSTOM_MOTION_BEZIER },
+  { label: "Snap", value: { x1: 0.2, y1: 0.9, x2: 0.24, y2: 1 } },
+  { label: "Overshoot", value: { x1: 0.2, y1: 1.35, x2: 0.34, y2: 1 } },
 ];
 
 interface LocalFontData {
@@ -165,6 +211,21 @@ function formatNumericValue(value: number): string {
   return Number.isInteger(rounded)
     ? `${rounded}`
     : rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function roundPanelNumber(value: number): number {
+  const normalized = Math.abs(value) < 0.0001 ? 0 : value;
+  return Math.round(normalized * 1000) / 1000;
+}
+
+function trySetElementPointerCapture(element: Element, pointerId: number) {
+  if (!(element instanceof HTMLElement || element instanceof SVGElement)) return;
+  try {
+    element.setPointerCapture(pointerId);
+  } catch {
+    // Synthetic pointer events used in browser automation may not have an
+    // active browser pointer. Drag interactions still work through move events.
+  }
 }
 
 interface ParsedNumericToken {
@@ -375,6 +436,7 @@ function CommitField({
         const nextDraft = adjustNumericToken(draft, delta < 0 ? 1 : -1, e);
         if (!nextDraft) return;
         e.preventDefault();
+        e.stopPropagation();
         setDraft(nextDraft);
         scheduleCommit(nextDraft);
       }}
@@ -410,7 +472,15 @@ function MetricField({
   onCommit: (nextValue: string) => void;
 }) {
   return (
-    <div className={FIELD}>
+    <div
+      data-panel-wheel-lock="true"
+      className={FIELD}
+      onWheel={(e) => {
+        if (!disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
       <div className="flex min-w-0 items-center gap-3">
         <span className="flex-shrink-0 text-[11px] font-medium text-neutral-500">{label}</span>
         <CommitField
@@ -422,6 +492,17 @@ function MetricField({
       </div>
     </div>
   );
+}
+
+function isPanelWheelLockedTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("input, textarea, select, [data-panel-wheel-lock='true']"));
+}
+
+function preventPanelScrollFromControlWheel(event: ReactWheelEvent<HTMLDivElement>) {
+  if (!isPanelWheelLockedTarget(event.target)) return;
+  event.preventDefault();
+  event.stopPropagation();
 }
 
 function DetailField({
@@ -1200,8 +1281,10 @@ function ColorField({
               className="relative h-36 cursor-crosshair overflow-hidden rounded-xl border border-neutral-700 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
               style={{
                 backgroundColor: hueColor,
+                touchAction: "none",
               }}
               onPointerDown={(event) => {
+                event.preventDefault();
                 event.currentTarget.setPointerCapture(event.pointerId);
                 updateSaturationValue(event.clientX, event.clientY, event.currentTarget);
               }}
@@ -1363,7 +1446,6 @@ function ColorSlider({
         <span className="text-[10px] font-medium text-neutral-400">{displayValue}</span>
       </div>
       <div
-        ref={trackRef}
         role="slider"
         tabIndex={disabled ? -1 : 0}
         aria-label={label}
@@ -1371,12 +1453,14 @@ function ColorSlider({
         aria-valuemax={max}
         aria-valuenow={value}
         aria-disabled={disabled}
-        className={`relative h-4 rounded-full border border-neutral-700 shadow-[inset_0_1px_2px_rgba(0,0,0,0.55)] outline-none focus:border-[#f5a400] focus:ring-2 focus:ring-[#f5a400]/40 ${
+        className={`relative flex h-8 items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#f5a400]/40 ${
           disabled ? "cursor-not-allowed opacity-50" : "cursor-ew-resize"
         }`}
-        style={{ background }}
+        style={{ touchAction: "none" }}
         onPointerDown={(event) => {
           if (disabled) return;
+          event.preventDefault();
+          event.currentTarget.focus();
           event.currentTarget.setPointerCapture(event.pointerId);
           commitFromClientX(event.clientX);
         }}
@@ -1401,6 +1485,11 @@ function ColorSlider({
           }
         }}
       >
+        <div
+          ref={trackRef}
+          className="h-4 w-full rounded-full border border-neutral-700 shadow-[inset_0_1px_2px_rgba(0,0,0,0.55)]"
+          style={{ background }}
+        />
         <div
           className="pointer-events-none absolute top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.85),0_6px_14px_rgba(0,0,0,0.5)]"
           style={{ left: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: thumbColor }}
@@ -1530,6 +1619,847 @@ function ImageFillField({
       />
     </div>
   );
+}
+
+function MotionControls({
+  draft,
+  active,
+  ownership,
+  maxDuration,
+  disabled,
+  onChange,
+  onClear,
+}: {
+  draft: MotionDraft;
+  active: boolean;
+  ownership: MotionOwnershipReport;
+  maxDuration?: number;
+  disabled?: boolean;
+  onChange: (nextMotion: MotionDraft) => void;
+  onClear: () => void;
+}) {
+  const safeDraft = clampMotionDraftToTimeline(draft, maxDuration);
+  const commitDraft = (nextDraft: MotionDraft) => {
+    onChange(clampMotionDraftToTimeline(nextDraft, maxDuration));
+  };
+  const patchDraft = (partial: Partial<MotionDraft>) => {
+    commitDraft({ ...safeDraft, ...partial });
+  };
+  const patchPresetShape = (partial: Partial<MotionDraft>) => {
+    commitDraft({ ...safeDraft, ...partial, keyframes: undefined });
+  };
+  const changePreset = (preset: MotionPreset) => {
+    commitDraft(
+      buildDefaultMotionDraft(preset, {
+        start: safeDraft.start,
+        duration: safeDraft.duration,
+        ease: safeDraft.ease,
+      }),
+    );
+  };
+  const parseControlNumber = (value: string, fallback: number, min: number): number => {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? Math.max(min, parsed) : fallback;
+  };
+  const distanceDisabled = disabled || safeDraft.preset === "pop";
+  const curveModel = buildMotionCurveModel(safeDraft);
+  const timelineLimitLabel =
+    maxDuration != null && Number.isFinite(maxDuration) && maxDuration > 0
+      ? `Motion window max ${formatMotionTime(maxDuration)}`
+      : null;
+  const patchTrack = (
+    key: keyof MotionKeyframes,
+    edge: keyof MotionKeyframeRange,
+    nextValue: number,
+  ) => {
+    const keyframes = keyframesFromCurveModel(curveModel);
+    commitDraft({
+      ...safeDraft,
+      keyframes: {
+        ...keyframes,
+        [key]: {
+          ...keyframes[key],
+          [edge]: clampMotionTrackValue(key, nextValue),
+        },
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <MotionOwnershipBadges ownership={ownership} />
+      <SegmentedControl
+        disabled={disabled}
+        value={safeDraft.preset}
+        onChange={(next) => changePreset(next as MotionPreset)}
+        options={MOTION_PRESET_OPTIONS}
+      />
+      <MotionCurveView
+        model={curveModel}
+        disabled={disabled}
+        onTrackChange={(key, edge, value) => patchTrack(key, edge, value)}
+        onEaseChange={(nextEase) => patchDraft({ ease: nextEase })}
+      />
+      <div className={RESPONSIVE_GRID}>
+        <SelectField
+          label="Direction"
+          value={safeDraft.direction}
+          disabled={distanceDisabled}
+          onChange={(next) => patchPresetShape({ direction: next as MotionDirection })}
+          options={MOTION_DIRECTION_OPTIONS}
+        />
+        <DetailField
+          label="Start"
+          value={formatNumericValue(safeDraft.start)}
+          disabled={disabled}
+          onCommit={(next) => patchDraft({ start: parseControlNumber(next, safeDraft.start, 0) })}
+        />
+        <DetailField
+          label="Duration"
+          value={formatNumericValue(safeDraft.duration)}
+          disabled={disabled}
+          onCommit={(next) =>
+            patchDraft({ duration: parseControlNumber(next, safeDraft.duration, 0.05) })
+          }
+        />
+      </div>
+      <MotionEaseField
+        value={safeDraft.ease}
+        disabled={disabled}
+        onChange={(nextEase) => patchDraft({ ease: nextEase })}
+      />
+      {timelineLimitLabel && (
+        <div className="font-mono text-[10px] tabular-nums text-neutral-600">
+          {timelineLimitLabel}
+        </div>
+      )}
+      <div className="grid gap-1.5">
+        <span className={LABEL}>Distance</span>
+        <SliderControl
+          value={safeDraft.distance}
+          min={0}
+          max={160}
+          step={1}
+          disabled={distanceDisabled}
+          displayValue={`${Math.round(safeDraft.distance)}px`}
+          formatDisplayValue={(next) => `${Math.round(next)}px`}
+          onCommit={(next) => patchPresetShape({ distance: next })}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={disabled || !active}
+        onClick={onClear}
+        className="inline-flex h-8 items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-[11px] font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white disabled:cursor-not-allowed disabled:text-neutral-600"
+      >
+        <X size={12} />
+        Clear motion
+      </button>
+    </div>
+  );
+}
+
+function MotionEaseField({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: MotionEase;
+  disabled?: boolean;
+  onChange: (nextEase: MotionEase) => void;
+}) {
+  const isCustom = isMotionBezierEase(value);
+  const bezier = parseMotionBezierEase(value) ?? DEFAULT_CUSTOM_MOTION_BEZIER;
+  const selectOptions = [
+    ...MOTION_EASE_OPTIONS.map((option) => ({
+      label: `${option.group} / ${option.label}`,
+      value: option.value,
+    })),
+    { label: "Custom / Cubic Bezier", value: CUSTOM_EASE_VALUE },
+  ];
+
+  const patchBezier = (partial: Partial<MotionBezierEase>) => {
+    onChange(formatMotionBezierEase({ ...bezier, ...partial }));
+  };
+
+  return (
+    <div className="grid gap-3">
+      <SelectField
+        label="Ease"
+        value={isCustom ? CUSTOM_EASE_VALUE : value}
+        disabled={disabled}
+        onChange={(next) => {
+          if (next === CUSTOM_EASE_VALUE) {
+            onChange(formatMotionBezierEase(bezier));
+            return;
+          }
+          const normalized = normalizeMotionEase(next);
+          if (normalized) onChange(normalized);
+        }}
+        options={selectOptions}
+      />
+      {isCustom && (
+        <div className={`${FIELD} grid gap-3 p-3`}>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0 truncate font-mono text-[10px] tabular-nums text-neutral-400">
+              {formatMotionBezierEase(bezier)}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {CUSTOM_EASE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onChange(formatMotionBezierEase(preset.value))}
+                  className="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-[10px] font-medium text-neutral-400 transition-colors hover:border-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:text-neutral-600"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3">
+            <BezierSlider
+              label="P1 X"
+              value={bezier.x1}
+              min={0}
+              max={1}
+              disabled={disabled}
+              onCommit={(next) => patchBezier({ x1: next })}
+            />
+            <BezierSlider
+              label="P1 Y"
+              value={bezier.y1}
+              min={-2}
+              max={3}
+              disabled={disabled}
+              onCommit={(next) => patchBezier({ y1: next })}
+            />
+            <BezierSlider
+              label="P2 X"
+              value={bezier.x2}
+              min={0}
+              max={1}
+              disabled={disabled}
+              onCommit={(next) => patchBezier({ x2: next })}
+            />
+            <BezierSlider
+              label="P2 Y"
+              value={bezier.y2}
+              min={-2}
+              max={3}
+              disabled={disabled}
+              onCommit={(next) => patchBezier({ y2: next })}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BezierSlider({
+  label,
+  value,
+  min,
+  max,
+  disabled,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  disabled?: boolean;
+  onCommit: (nextValue: number) => void;
+}) {
+  return (
+    <div className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-3">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+        {label}
+      </span>
+      <SliderControl
+        value={value}
+        min={min}
+        max={max}
+        step={0.01}
+        disabled={disabled}
+        displayValue={formatNumericValue(value)}
+        formatDisplayValue={formatNumericValue}
+        onCommit={(next) => onCommit(roundPanelNumber(next))}
+      />
+    </div>
+  );
+}
+
+function keyframesFromCurveModel(model: MotionCurveModel): MotionKeyframes {
+  const entries = new Map(
+    model.tracks.map((track) => [track.key, { from: track.from, to: track.to }]),
+  );
+  return {
+    x: entries.get("x") ?? { from: 0, to: 0 },
+    y: entries.get("y") ?? { from: 0, to: 0 },
+    opacity: entries.get("opacity") ?? { from: 1, to: 1 },
+    scale: entries.get("scale") ?? { from: 1, to: 1 },
+  };
+}
+
+function clampMotionTrackValue(key: keyof MotionKeyframes, value: number): number {
+  const normalized = Number.isFinite(value) ? value : 0;
+  if (key === "opacity") return Math.min(1, Math.max(0, normalized));
+  if (key === "scale") return Math.max(0, normalized);
+  return normalized;
+}
+
+function MotionOwnershipBadges({ ownership }: { ownership: MotionOwnershipReport }) {
+  if (ownership.badges.length === 0) return null;
+  return (
+    <div className="flex min-w-0 flex-wrap gap-2" aria-label="Motion ownership">
+      {ownership.badges.map((badge) => (
+        <span
+          key={`${badge.kind}-${badge.state}`}
+          title={badge.description}
+          className={`inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${getMotionBadgeClass(
+            badge.state,
+          )}`}
+        >
+          <span className="truncate">{badge.label}</span>
+          <span className="text-[9px] opacity-70">{badge.state}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function getMotionBadgeClass(state: MotionOwnershipState): string {
+  switch (state) {
+    case "Editable":
+      return "border-[#3ce6ac]/35 bg-[#3ce6ac]/10 text-[#c4fff0]";
+    case "Mixed":
+      return "border-amber-400/35 bg-amber-400/10 text-amber-100";
+    case "Unsafe":
+      return "border-red-400/35 bg-red-400/10 text-red-100";
+    case "Detected":
+    default:
+      return "border-neutral-700 bg-neutral-950/70 text-neutral-300";
+  }
+}
+
+function MotionCurveView({
+  model,
+  disabled,
+  onTrackChange,
+  onEaseChange,
+}: {
+  model: MotionCurveModel;
+  disabled?: boolean;
+  onTrackChange: (
+    key: keyof MotionKeyframes,
+    edge: keyof MotionKeyframeRange,
+    value: number,
+  ) => void;
+  onEaseChange: (nextEase: MotionEase) => void;
+}) {
+  const primaryTrack = selectPrimaryMotionTrack(model);
+
+  return (
+    <div className={`${FIELD} space-y-4 p-4`} aria-label="Motion curve visualization">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="min-w-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+          Curve
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-2 font-mono text-[10px] tabular-nums text-neutral-500">
+          <span>{formatMotionTime(model.start)}</span>
+          <span className="text-neutral-700">/</span>
+          <span>{formatMotionTime(model.duration)}</span>
+          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] text-neutral-400">
+            {getMotionEaseLabel(model.ease)}
+          </span>
+        </div>
+      </div>
+
+      <MotionHeroCurve
+        model={model}
+        track={primaryTrack}
+        disabled={disabled}
+        onTrackChange={onTrackChange}
+        onEaseChange={onEaseChange}
+      />
+
+      <div className="grid gap-3 border-t border-neutral-800/70 pt-3">
+        {model.tracks.map((track) => (
+          <MotionTrackEditorRow
+            key={track.key}
+            track={track}
+            disabled={disabled}
+            onTrackChange={onTrackChange}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function selectPrimaryMotionTrack(model: MotionCurveModel): MotionCurveTrack {
+  const preferred: Array<MotionCurveTrack["key"]> = ["y", "x", "scale", "opacity"];
+  for (const key of preferred) {
+    const activeTrack = model.tracks.find((track) => track.key === key && track.active);
+    if (activeTrack) return activeTrack;
+  }
+  return (
+    model.tracks[0] ?? {
+      key: "opacity",
+      label: "Opacity",
+      from: 0,
+      to: 1,
+      unit: "",
+      active: true,
+      points: [],
+    }
+  );
+}
+
+function MotionHeroCurve({
+  model,
+  track,
+  disabled,
+  onTrackChange,
+  onEaseChange,
+}: {
+  model: MotionCurveModel;
+  track: MotionCurveTrack;
+  disabled?: boolean;
+  onTrackChange: (
+    key: keyof MotionKeyframes,
+    edge: keyof MotionKeyframeRange,
+    value: number,
+  ) => void;
+  onEaseChange: (nextEase: MotionEase) => void;
+}) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const draggingEdgeRef = useRef<keyof MotionKeyframeRange | null>(null);
+  const draggingBezierHandleRef = useRef<keyof MotionBezierEase | null>(null);
+  const [draggingEdge, setDraggingEdge] = useState<keyof MotionKeyframeRange | null>(null);
+  const [draggingBezierHandle, setDraggingBezierHandle] = useState<keyof MotionBezierEase | null>(
+    null,
+  );
+  const domain = buildHeroDomain(track, model.ease);
+  const bezier = parseMotionBezierEase(model.ease);
+  const ticks = buildHeroTicks(domain, track.unit);
+  const path = buildHeroCurvePath(model, track, domain);
+  const startX = getHeroX(model.markers[0]?.percent ?? 0);
+  const endX = getHeroX(100);
+  const xSpan = Math.max(1, endX - startX);
+  const startY = getHeroY(track.from, domain);
+  const endY = getHeroY(track.to, domain);
+  const commitFromPointer = useCallback(
+    (edge: keyof MotionKeyframeRange, clientY: number) => {
+      const svg = svgRef.current;
+      const rect = svg?.getBoundingClientRect();
+      if (!rect || rect.height <= 0) return;
+      const svgY = ((clientY - rect.top) / rect.height) * 170;
+      onTrackChange(track.key, edge, clampMotionTrackValue(track.key, getHeroValue(svgY, domain)));
+    },
+    [domain, onTrackChange, track.key],
+  );
+  const commitBezierFromPointer = useCallback(
+    (handle: keyof MotionBezierEase, clientX: number, clientY: number) => {
+      if (!bezier || Math.abs(track.to - track.from) < 0.0001) return;
+      const svg = svgRef.current;
+      const rect = svg?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      const svgX = ((clientX - rect.left) / rect.width) * 320;
+      const svgY = ((clientY - rect.top) / rect.height) * 170;
+      const nextX = Math.min(1, Math.max(0, (svgX - startX) / xSpan));
+      const nextValue = getHeroValue(svgY, domain);
+      const nextY = Math.min(3, Math.max(-2, (nextValue - track.from) / (track.to - track.from)));
+      const nextBezier =
+        handle === "x1" || handle === "y1"
+          ? { ...bezier, x1: roundPanelNumber(nextX), y1: roundPanelNumber(nextY) }
+          : { ...bezier, x2: roundPanelNumber(nextX), y2: roundPanelNumber(nextY) };
+      onEaseChange(formatMotionBezierEase(nextBezier));
+    },
+    [bezier, domain, onEaseChange, startX, track.from, track.to, xSpan],
+  );
+  const changeByStep = (edge: keyof MotionKeyframeRange, delta: number) => {
+    onTrackChange(track.key, edge, clampMotionTrackValue(track.key, track[edge] + delta));
+  };
+  const valueStep = track.unit === "px" ? 1 : 0.01;
+  const canEdit = !disabled && track.active;
+  const canEditBezier = canEdit && bezier != null && Math.abs(track.to - track.from) >= 0.0001;
+  const bezierP1 = bezier
+    ? {
+        x: startX + bezier.x1 * xSpan,
+        y: getHeroY(track.from + (track.to - track.from) * bezier.y1, domain),
+      }
+    : null;
+  const bezierP2 = bezier
+    ? {
+        x: startX + bezier.x2 * xSpan,
+        y: getHeroY(track.from + (track.to - track.from) * bezier.y2, domain),
+      }
+    : null;
+
+  const endpoint = (edge: keyof MotionKeyframeRange, x: number, y: number) => (
+    <g key={edge}>
+      <circle
+        cx={x}
+        cy={y}
+        r="10"
+        fill="transparent"
+        className={canEdit ? "cursor-ns-resize" : "cursor-default"}
+        onPointerDown={(event) => {
+          if (!canEdit) return;
+          event.preventDefault();
+          event.stopPropagation();
+          draggingEdgeRef.current = edge;
+          setDraggingEdge(edge);
+          trySetElementPointerCapture(event.currentTarget, event.pointerId);
+          commitFromPointer(edge, event.clientY);
+        }}
+      />
+      <circle
+        cx={x}
+        cy={y}
+        r="4.8"
+        fill="#f8d85c"
+        stroke={draggingEdge === edge ? "#fff3b0" : "transparent"}
+        strokeWidth="2"
+        className={canEdit ? "pointer-events-none" : "opacity-70"}
+      />
+      <circle
+        cx={x}
+        cy={y}
+        r="13"
+        fill="transparent"
+        stroke={draggingEdge === edge ? "rgba(248,216,92,0.26)" : "transparent"}
+        strokeWidth="2"
+        className="pointer-events-none"
+      />
+    </g>
+  );
+  const bezierHandle = (
+    handle: "x1" | "x2",
+    point: { x: number; y: number },
+    anchor: { x: number; y: number },
+  ) => (
+    <g key={handle}>
+      <line
+        x1={anchor.x}
+        y1={anchor.y}
+        x2={point.x}
+        y2={point.y}
+        stroke="rgba(248,216,92,0.25)"
+        strokeDasharray="3 5"
+      />
+      <circle
+        cx={point.x}
+        cy={point.y}
+        r="10"
+        fill="transparent"
+        className={canEditBezier ? "cursor-move" : "cursor-default"}
+        onPointerDown={(event) => {
+          if (!canEditBezier) return;
+          event.preventDefault();
+          event.stopPropagation();
+          draggingBezierHandleRef.current = handle;
+          setDraggingBezierHandle(handle);
+          trySetElementPointerCapture(event.currentTarget, event.pointerId);
+          commitBezierFromPointer(handle, event.clientX, event.clientY);
+        }}
+      />
+      <circle
+        cx={point.x}
+        cy={point.y}
+        r="4"
+        fill="#080808"
+        stroke={draggingBezierHandle === handle ? "#fff3b0" : "#f8d85c"}
+        strokeWidth="2"
+        className="pointer-events-none"
+      />
+    </g>
+  );
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/80 px-2 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <svg
+        ref={svgRef}
+        viewBox="0 0 320 170"
+        className="h-[170px] w-full outline-none"
+        role="group"
+        aria-label={`${track.label} curve. Drag endpoints to edit from and to values.`}
+        style={{ touchAction: "none" }}
+        onPointerMove={(event) => {
+          const edge = draggingEdgeRef.current;
+          const bezierHandleKey = draggingBezierHandleRef.current;
+          if (disabled || (!edge && !bezierHandleKey)) return;
+          event.preventDefault();
+          if (edge) commitFromPointer(edge, event.clientY);
+          if (bezierHandleKey)
+            commitBezierFromPointer(bezierHandleKey, event.clientX, event.clientY);
+        }}
+        onPointerUp={() => {
+          draggingEdgeRef.current = null;
+          draggingBezierHandleRef.current = null;
+          setDraggingEdge(null);
+          setDraggingBezierHandle(null);
+        }}
+        onPointerCancel={() => {
+          draggingEdgeRef.current = null;
+          draggingBezierHandleRef.current = null;
+          setDraggingEdge(null);
+          setDraggingBezierHandle(null);
+        }}
+      >
+        <rect x="0" y="0" width="320" height="170" rx="16" fill="#080808" />
+        {ticks.map((tick) => (
+          <g key={`${tick.value}-${tick.label}`}>
+            <line
+              x1="54"
+              x2="304"
+              y1={tick.y}
+              y2={tick.y}
+              stroke="rgba(255,255,255,0.13)"
+              strokeDasharray="4 6"
+            />
+            <text
+              x="46"
+              y={tick.y + 4}
+              fill="rgba(255,255,255,0.38)"
+              fontSize="10"
+              textAnchor="end"
+            >
+              {tick.label}
+            </text>
+          </g>
+        ))}
+        <line x1={startX} x2={startX} y1="18" y2="142" stroke="rgba(248,216,92,0.18)" />
+        <path
+          d={path}
+          fill="none"
+          stroke={track.active ? "#f8d85c" : "rgba(248,216,92,0.45)"}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        {bezierP1 && bezierHandle("x1", bezierP1, { x: startX, y: startY })}
+        {bezierP2 && bezierHandle("x2", bezierP2, { x: endX, y: endY })}
+        {endpoint("from", startX, startY)}
+        {endpoint("to", endX, endY)}
+        <text x="54" y="160" fill="rgba(255,255,255,0.4)" fontSize="10">
+          {formatMotionTime(0)}
+        </text>
+        <text x="304" y="160" fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+          {formatMotionTime(model.windowEnd)}
+        </text>
+        <text x="54" y="14" fill="rgba(255,255,255,0.55)" fontSize="10">
+          {track.label}
+        </text>
+      </svg>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={!canEdit}
+          onKeyDown={(event) => {
+            if (!canEdit) return;
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              changeByStep("from", valueStep);
+            } else if (event.key === "ArrowDown") {
+              event.preventDefault();
+              changeByStep("from", -valueStep);
+            }
+          }}
+          className="rounded-lg border border-neutral-800 bg-neutral-950/70 px-2 py-1 text-left font-mono text-[9px] tabular-nums text-neutral-500 outline-none transition-colors focus-visible:border-[#f8d85c]/60 disabled:cursor-default disabled:opacity-60"
+        >
+          From {formatNumericValue(track.from)}
+          {track.unit}
+        </button>
+        <button
+          type="button"
+          disabled={!canEdit}
+          onKeyDown={(event) => {
+            if (!canEdit) return;
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              changeByStep("to", valueStep);
+            } else if (event.key === "ArrowDown") {
+              event.preventDefault();
+              changeByStep("to", -valueStep);
+            }
+          }}
+          className="rounded-lg border border-neutral-800 bg-neutral-950/70 px-2 py-1 text-right font-mono text-[9px] tabular-nums text-neutral-500 outline-none transition-colors focus-visible:border-[#f8d85c]/60 disabled:cursor-default disabled:opacity-60"
+        >
+          To {formatNumericValue(track.to)}
+          {track.unit}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MotionTrackEditorRow({
+  track,
+  disabled,
+  onTrackChange,
+}: {
+  track: MotionCurveTrack;
+  disabled?: boolean;
+  onTrackChange: (
+    key: keyof MotionKeyframes,
+    edge: keyof MotionKeyframeRange,
+    value: number,
+  ) => void;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[70px_minmax(0,1fr)] items-center gap-3 text-[10px] ${
+        track.active ? "text-neutral-200" : "text-neutral-600"
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="truncate font-semibold uppercase tracking-[0.12em]">{track.label}</div>
+        <div className="mt-0.5 font-mono text-[9px] tabular-nums text-neutral-600">
+          {formatNumericValue(track.from)}
+          {track.unit} {"->"} {formatNumericValue(track.to)}
+          {track.unit}
+        </div>
+      </div>
+      <div className="grid min-w-0 grid-cols-2 gap-2">
+        <MotionKeyframeField
+          label={`${track.label} from`}
+          value={track.from}
+          unit={track.unit}
+          disabled={disabled}
+          onCommit={(next) => onTrackChange(track.key, "from", next)}
+        />
+        <MotionKeyframeField
+          label={`${track.label} to`}
+          value={track.to}
+          unit={track.unit}
+          disabled={disabled}
+          onCommit={(next) => onTrackChange(track.key, "to", next)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MotionKeyframeField({
+  label,
+  value,
+  unit,
+  disabled,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  unit: "px" | "";
+  disabled?: boolean;
+  onCommit: (nextValue: number) => void;
+}) {
+  const parseMotionInput = (next: string) => {
+    const parsed = Number.parseFloat(next);
+    onCommit(Number.isFinite(parsed) ? parsed : value);
+  };
+  return (
+    <label
+      className="flex h-7 min-w-0 items-center rounded-md border border-neutral-800 bg-neutral-950/70 px-1.5"
+      data-panel-wheel-lock="true"
+    >
+      <span className="sr-only">{label}</span>
+      <CommitField
+        value={formatNumericValue(value)}
+        disabled={disabled}
+        onCommit={parseMotionInput}
+      />
+      {unit && <span className="ml-0.5 flex-shrink-0 text-[9px] text-neutral-600">{unit}</span>}
+    </label>
+  );
+}
+
+interface HeroDomain {
+  min: number;
+  max: number;
+}
+
+function buildHeroDomain(track: MotionCurveTrack, ease: MotionEase): HeroDomain {
+  const sampledValues = [track.from, track.to];
+  for (let index = 0; index <= 40; index += 1) {
+    const progress = sampleMotionEase(ease, index / 40);
+    sampledValues.push(track.from + (track.to - track.from) * progress);
+  }
+
+  if (track.unit === "px") {
+    const minValue = Math.min(0, ...sampledValues);
+    const maxValue = Math.max(0, ...sampledValues);
+    const span = Math.max(1, maxValue - minValue);
+    const padding = Math.max(8, span * 0.12);
+    return {
+      min: roundMotionDisplayNumber(minValue - (minValue < 0 ? padding : 0)),
+      max: roundMotionDisplayNumber(maxValue + padding),
+    };
+  }
+
+  if (track.key === "opacity") return { min: 0, max: 1 };
+
+  const maxValue = Math.max(1.2, ...sampledValues);
+  return {
+    min: 0,
+    max: roundMotionDisplayNumber(maxValue),
+  };
+}
+
+function roundMotionDisplayNumber(value: number): number {
+  const normalized = Math.abs(value) < 0.0001 ? 0 : value;
+  return Math.round(normalized * 1000) / 1000;
+}
+
+function buildHeroTicks(domain: HeroDomain, unit: MotionCurveTrack["unit"]) {
+  return [domain.max, (domain.min + domain.max) / 2, domain.min].map((value) => ({
+    value,
+    y: getHeroY(value, domain),
+    label: `${formatNumericValue(value)}${unit}`,
+  }));
+}
+
+function buildHeroCurvePath(
+  model: MotionCurveModel,
+  track: MotionCurveTrack,
+  domain: HeroDomain,
+): string {
+  const startX = getHeroX(model.markers[0]?.percent ?? 0);
+  const endX = getHeroX(100);
+  const span = Math.max(1, endX - startX);
+  const fromY = getHeroY(track.from, domain);
+  const points = [`M 54 ${fromY}`, `L ${startX} ${fromY}`];
+  for (let index = 1; index <= 40; index += 1) {
+    const rawProgress = index / 40;
+    const easedProgress = sampleMotionEase(model.ease, rawProgress);
+    const value = track.from + (track.to - track.from) * easedProgress;
+    points.push(`L ${roundPanelNumber(startX + span * rawProgress)} ${getHeroY(value, domain)}`);
+  }
+  points.push(`L ${endX} ${getHeroY(track.to, domain)}`);
+  return points.join(" ");
+}
+
+function getHeroX(percent: number): number {
+  return 54 + (Math.min(100, Math.max(0, percent)) / 100) * 250;
+}
+
+function getHeroY(value: number, domain: HeroDomain): number {
+  if (Math.abs(domain.max - domain.min) < 0.0001) return 80;
+  const normalized = (value - domain.min) / (domain.max - domain.min);
+  return Math.round((142 - normalized * 112) * 100) / 100;
+}
+
+function getHeroValue(y: number, domain: HeroDomain): number {
+  const clampedY = Math.min(142, Math.max(30, y));
+  const normalized = (142 - clampedY) / 112;
+  return roundPanelNumber(domain.min + normalized * (domain.max - domain.min));
+}
+
+function formatMotionTime(value: number): string {
+  return `${formatNumericValue(value)}s`;
 }
 
 function GradientField({
@@ -1892,7 +2822,7 @@ function SelectField({
   label: string;
   value: string;
   disabled?: boolean;
-  options: string[];
+  options: Array<string | { label: string; value: string }>;
   onChange: (nextValue: string) => void;
 }) {
   return (
@@ -1906,8 +2836,11 @@ function SelectField({
           className="min-w-0 w-full appearance-none bg-transparent text-[11px] font-medium text-neutral-100 outline-none disabled:cursor-not-allowed disabled:text-neutral-600"
         >
           {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
+            <option
+              key={typeof option === "string" ? option : option.value}
+              value={typeof option === "string" ? option : option.value}
+            >
+              {typeof option === "string" ? option : option.label}
             </option>
           ))}
         </select>
@@ -1969,18 +2902,23 @@ function SelectionColorRow({
 }
 
 export const PropertyPanel = memo(function PropertyPanel({
+  mode = "design",
   projectId,
   assets,
   element,
+  motionMaxDuration,
   copiedAgentPrompt,
+  copiedElementLocator = false,
   onClearSelection,
   onSetStyle,
+  onSetMotion,
   onSetText,
   onSetTextFieldStyle,
   onAddTextField,
   onRemoveTextField,
   onDetachFromLayout,
   onAskAgent,
+  onCopyElementLocator,
   onCopyAgentInstruction,
   onImportAssets,
   fontAssets = [],
@@ -2002,10 +2940,43 @@ export const PropertyPanel = memo(function PropertyPanel({
     element?.textFields[0]?.key ?? null,
   );
   const hasTextControls = element != null && isTextEditableSelection(element);
+  const motionAttribute = element?.dataAttributes["hf-motion"];
+  const activeMotionDraft = useMemo(() => {
+    const parsed = parseMotionDraft(motionAttribute);
+    return parsed ? clampMotionDraftToTimeline(parsed, motionMaxDuration) : null;
+  }, [motionAttribute, motionMaxDuration]);
+  const motionDraft = useMemo(
+    () =>
+      clampMotionDraftToTimeline(activeMotionDraft ?? buildDefaultMotionDraft(), motionMaxDuration),
+    [activeMotionDraft, motionMaxDuration],
+  );
+  const motionOwnership = useMemo(
+    () =>
+      detectMotionOwnership({
+        element: element?.element ?? null,
+        dataAttributes: element?.dataAttributes,
+        computedStyles: element?.computedStyles,
+      }),
+    [element],
+  );
+  const panelScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setPreferredFillMode(fillMode);
   }, [fillMode, element?.id, element?.selector, backgroundImage]);
+
+  useEffect(() => {
+    const panel = panelScrollRef.current;
+    if (!panel) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!isPanelWheelLockedTarget(event.target)) return;
+      event.preventDefault();
+    };
+
+    panel.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+    return () => panel.removeEventListener("wheel", handleWheel, { capture: true });
+  }, [element?.id, element?.selector]);
 
   useEffect(() => {
     const nextFields = element?.textFields ?? [];
@@ -2037,6 +3008,7 @@ export const PropertyPanel = memo(function PropertyPanel({
   const clipContent = ["hidden", "clip"].includes((styles.overflow ?? "").trim());
   const sourceLabel = element.id ? `#${element.id}` : element.selector;
   const showEditableSections = element.capabilities.canEditStyles;
+  const isMotionMode = mode === "motion";
   const disabledMoveReason =
     allowLayoutDetach &&
     element.capabilities.reasonIfDisabled &&
@@ -2058,6 +3030,32 @@ export const PropertyPanel = memo(function PropertyPanel({
     }
   };
 
+  const motionSection = showEditableSections ? (
+    <Section
+      title="Motion"
+      icon={<Zap size={15} />}
+      accessory={
+        <div className="rounded-full border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400">
+          {activeMotionDraft ? "Active" : "Off"}
+        </div>
+      }
+    >
+      <MotionControls
+        draft={motionDraft}
+        active={activeMotionDraft != null}
+        ownership={motionOwnership}
+        maxDuration={motionMaxDuration}
+        disabled={styleEditingDisabled}
+        onChange={onSetMotion}
+        onClear={() => onSetMotion(null)}
+      />
+    </Section>
+  ) : (
+    <div className="border-t border-neutral-800 px-4 py-5 text-[11px] leading-5 text-neutral-500">
+      Motion controls require a style-editable DOM layer.
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-neutral-900 text-neutral-100">
       <div className="border-b border-neutral-800 px-4 py-5">
@@ -2078,454 +3076,492 @@ export const PropertyPanel = memo(function PropertyPanel({
             <X size={13} />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onAskAgent}
-          className="mt-4 inline-flex h-8 items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-950 px-3.5 text-[11px] font-medium text-neutral-100 transition-colors hover:border-studio-accent/40 hover:text-studio-accent"
-        >
-          <MessageSquare size={15} />
-          <span>{copiedAgentPrompt ? "Prompt copied" : "Ask agent"}</span>
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onAskAgent}
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-950 px-3.5 text-[11px] font-medium text-neutral-100 transition-colors hover:border-studio-accent/40 hover:text-studio-accent"
+          >
+            <MessageSquare size={15} />
+            <span>{copiedAgentPrompt ? "Prompt copied" : "Ask agent"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void Promise.resolve(onCopyElementLocator());
+            }}
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-950 px-3.5 text-[11px] font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:text-white"
+          >
+            <ClipboardList size={15} />
+            <span>{copiedElementLocator ? "LOC copied" : "Copy LOC"}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <Section title="Layout" icon={<Move size={15} />}>
-          <div className={RESPONSIVE_GRID}>
-            <MetricField
-              label="X"
-              value={styles.left ?? "auto"}
-              disabled={moveEditingDisabled}
-              onCommit={(next) => onSetStyle("left", next)}
-            />
-            <MetricField
-              label="Y"
-              value={styles.top ?? "auto"}
-              disabled={moveEditingDisabled}
-              onCommit={(next) => onSetStyle("top", next)}
-            />
-            <MetricField
-              label="W"
-              value={styles.width ?? "auto"}
-              disabled={resizeEditingDisabled}
-              onCommit={(next) => onSetStyle("width", next)}
-            />
-            <MetricField
-              label="H"
-              value={styles.height ?? "auto"}
-              disabled={resizeEditingDisabled}
-              onCommit={(next) => onSetStyle("height", next)}
-            />
-          </div>
-          {disabledMoveReason && (
-            <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-l border-amber-500/40 pl-3">
-              <div className="min-w-0 text-[11px] leading-5 text-neutral-400">
-                <div className="font-medium text-amber-100">{disabledMoveReason}</div>
-                <div>Copy a targeted prompt so an agent can refactor this layer safely.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  void Promise.resolve(
-                    onCopyAgentInstruction(buildMakeMovableAgentInstruction(disabledMoveReason)),
-                  );
-                }}
-                className="inline-flex h-8 flex-shrink-0 items-center rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-[11px] font-medium text-neutral-100 transition-colors hover:border-amber-400/70 hover:text-amber-100"
-              >
-                {copiedAgentPrompt ? "Prompt copied" : "Ask agent to make movable"}
-              </button>
-            </div>
-          )}
-          {allowLayoutDetach && element.capabilities.canDetachFromLayout && (
-            <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-l border-amber-500/40 pl-3">
-              <div className="min-w-0 text-[11px] leading-5 text-neutral-400">
-                <div className="font-medium text-neutral-200">
-                  This layer is controlled by layout.
-                </div>
-                <div>Detaches from flex/grid flow and preserves current visual position.</div>
-              </div>
-              <button
-                type="button"
-                onClick={onDetachFromLayout}
-                className="inline-flex h-8 flex-shrink-0 items-center rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-[11px] font-medium text-neutral-100 transition-colors hover:border-amber-400/70 hover:text-amber-100"
-              >
-                Make movable
-              </button>
-            </div>
-          )}
-        </Section>
-
-        {showEditableSections && isFlex && (
-          <Section title="Flex" icon={<Layers size={15} />}>
-            <div className="space-y-4">
-              <SegmentedControl
-                disabled={styleEditingDisabled}
-                value={styles["flex-direction"] || "row"}
-                onChange={(next) => onSetStyle("flex-direction", next)}
-                options={[
-                  { label: "→ Row", value: "row" },
-                  { label: "↓ Column", value: "column" },
-                ]}
-              />
-              <div className={RESPONSIVE_GRID}>
-                <SelectField
-                  label="Justify"
-                  value={styles["justify-content"] || "flex-start"}
-                  disabled={styleEditingDisabled}
-                  onChange={(next) => onSetStyle("justify-content", next)}
-                  options={[
-                    "flex-start",
-                    "center",
-                    "space-between",
-                    "space-around",
-                    "space-evenly",
-                    "flex-end",
-                  ]}
-                />
-                <SelectField
-                  label="Align"
-                  value={styles["align-items"] || "stretch"}
-                  disabled={styleEditingDisabled}
-                  onChange={(next) => onSetStyle("align-items", next)}
-                  options={["stretch", "flex-start", "center", "flex-end", "baseline"]}
-                />
-              </div>
-              <DetailField
-                label="Gap"
-                value={styles.gap ?? "0px"}
-                disabled={styleEditingDisabled}
-                onCommit={(next) => onSetStyle("gap", next.endsWith("px") ? next : `${next}px`)}
-              />
-              <label className="flex items-center gap-3 rounded-2xl border border-neutral-800 bg-neutral-900 px-3 py-3 text-[12px] text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <input
-                  type="checkbox"
-                  checked={clipContent}
-                  disabled={styleEditingDisabled}
-                  onChange={(e) => onSetStyle("overflow", e.target.checked ? "hidden" : "visible")}
-                  className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-[#3ce6ac] focus:ring-[#3ce6ac]"
-                />
-                <span>Clip content</span>
-              </label>
-            </div>
-          </Section>
-        )}
-
-        {showEditableSections && (
+      <div
+        ref={panelScrollRef}
+        className="flex-1 overflow-y-auto"
+        onWheel={preventPanelScrollFromControlWheel}
+      >
+        {isMotionMode ? (
+          motionSection
+        ) : (
           <>
-            <Section title="Radius" icon={<Settings size={15} />}>
-              <SliderControl
-                value={radiusValue}
-                min={0}
-                max={Math.max(240, Math.ceil(radiusValue))}
-                step={1}
-                disabled={styleEditingDisabled}
-                displayValue={`${formatNumericValue(radiusValue)}px`}
-                formatDisplayValue={(next) => `${formatNumericValue(next)}px`}
-                onCommit={(next) => onSetStyle("border-radius", `${formatNumericValue(next)}px`)}
-              />
-            </Section>
-
-            <Section title="Blending" icon={<Eye size={15} />}>
-              <div className="space-y-4">
-                <SliderControl
-                  value={opacityValue}
-                  min={0}
-                  max={100}
-                  step={1}
-                  disabled={styleEditingDisabled}
-                  displayValue={`${opacityValue}%`}
-                  formatDisplayValue={(next) => `${Math.round(next)}%`}
-                  onCommit={(next) => onSetStyle("opacity", formatNumericValue(next / 100))}
+            <Section title="Layout" icon={<Move size={15} />}>
+              <div className={RESPONSIVE_GRID}>
+                <MetricField
+                  label="X"
+                  value={styles.left ?? "auto"}
+                  disabled={moveEditingDisabled}
+                  onCommit={(next) => onSetStyle("left", next)}
                 />
-                <SelectField
-                  label="Mode"
-                  value={styles["mix-blend-mode"] || "normal"}
-                  disabled={styleEditingDisabled}
-                  onChange={(next) => onSetStyle("mix-blend-mode", next)}
-                  options={["normal", "multiply", "screen", "overlay", "darken", "lighten"]}
+                <MetricField
+                  label="Y"
+                  value={styles.top ?? "auto"}
+                  disabled={moveEditingDisabled}
+                  onCommit={(next) => onSetStyle("top", next)}
+                />
+                <MetricField
+                  label="W"
+                  value={styles.width ?? "auto"}
+                  disabled={resizeEditingDisabled}
+                  onCommit={(next) => onSetStyle("width", next)}
+                />
+                <MetricField
+                  label="H"
+                  value={styles.height ?? "auto"}
+                  disabled={resizeEditingDisabled}
+                  onCommit={(next) => onSetStyle("height", next)}
                 />
               </div>
-            </Section>
-
-            <Section
-              title="Fill"
-              icon={<Palette size={15} />}
-              accessory={
-                <div className="rounded-full border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400">
-                  {preferredFillMode}
+              {disabledMoveReason && (
+                <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-l border-amber-500/40 pl-3">
+                  <div className="min-w-0 text-[11px] leading-5 text-neutral-400">
+                    <div className="font-medium text-amber-100">{disabledMoveReason}</div>
+                    <div>Copy a targeted prompt so an agent can refactor this layer safely.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void Promise.resolve(
+                        onCopyAgentInstruction(
+                          buildMakeMovableAgentInstruction(disabledMoveReason),
+                        ),
+                      );
+                    }}
+                    className="inline-flex h-8 flex-shrink-0 items-center rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-[11px] font-medium text-neutral-100 transition-colors hover:border-amber-400/70 hover:text-amber-100"
+                  >
+                    {copiedAgentPrompt ? "Prompt copied" : "Ask agent to make movable"}
+                  </button>
                 </div>
-              }
-            >
-              <div className="space-y-4">
-                <SegmentedControl
-                  disabled={styleEditingDisabled}
-                  value={preferredFillMode}
-                  onChange={handleFillModeChange}
-                  options={[
-                    { label: "Solid", value: "Solid" },
-                    { label: "Gradient", value: "Gradient" },
-                    { label: "Image", value: "Image" },
-                  ]}
-                />
-                {preferredFillMode === "Solid" ? (
-                  <ColorField
-                    label="Fill color"
-                    value={styles["background-color"] ?? "transparent"}
-                    disabled={styleEditingDisabled}
-                    onCommit={(next) => onSetStyle("background-color", next)}
-                  />
-                ) : preferredFillMode === "Gradient" ? (
-                  <GradientField
-                    value={
-                      backgroundImage !== "none"
-                        ? backgroundImage
-                        : serializeGradient(buildDefaultGradientModel(styles["background-color"]))
-                    }
-                    fallbackColor={styles["background-color"]}
-                    disabled={styleEditingDisabled}
-                    onCommit={(next) => onSetStyle("background-image", next)}
-                  />
-                ) : (
-                  <ImageFillField
-                    projectId={projectId}
-                    sourceFile={element.sourceFile}
-                    value={imageUrl}
-                    assets={assets}
-                    disabled={styleEditingDisabled}
-                    onCommit={(next) => onSetStyle("background-image", next)}
-                    onImportAssets={onImportAssets}
-                  />
-                )}
-                {!hasTextControls && (
-                  <ColorField
-                    label="Text color"
-                    value={styles.color ?? "rgb(0, 0, 0)"}
-                    disabled={styleEditingDisabled}
-                    onCommit={(next) => onSetStyle("color", next)}
-                  />
-                )}
-              </div>
+              )}
+              {allowLayoutDetach && element.capabilities.canDetachFromLayout && (
+                <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-l border-amber-500/40 pl-3">
+                  <div className="min-w-0 text-[11px] leading-5 text-neutral-400">
+                    <div className="font-medium text-neutral-200">
+                      This layer is controlled by layout.
+                    </div>
+                    <div>Detaches from flex/grid flow and preserves current visual position.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onDetachFromLayout}
+                    className="inline-flex h-8 flex-shrink-0 items-center rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-[11px] font-medium text-neutral-100 transition-colors hover:border-amber-400/70 hover:text-amber-100"
+                  >
+                    Make movable
+                  </button>
+                </div>
+              )}
             </Section>
 
-            {hasTextControls && (
-              <Section title="Text" icon={<Type size={15} />}>
-                {(() => {
-                  const textFields = element.textFields;
-                  const activeField =
-                    textFields.find((field) => field.key === activeTextFieldKey) ?? textFields[0];
-                  if (!activeField) return null;
-
-                  if (textFields.length === 1) {
-                    return (
-                      <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-[11px] font-medium text-neutral-100">
-                            {formatTextFieldPreview(activeField.value) || "Text"}
-                          </div>
-                          <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500">
-                            {activeField.tagName}
-                          </div>
-                        </div>
-
-                        <TextAreaField
-                          key={activeField.key}
-                          label="Content"
-                          value={activeField.value}
-                          disabled={false}
-                          onCommit={(next) => onSetText(next, activeField.key)}
-                        />
-
-                        <ColorField
-                          label="Text color"
-                          value={getTextFieldColor(activeField, styles)}
-                          disabled={false}
-                          onCommit={(next) => onSetTextFieldStyle(activeField.key, "color", next)}
-                        />
-
-                        <div className={RESPONSIVE_GRID}>
-                          <MetricField
-                            label="Size"
-                            value={
-                              activeField.computedStyles["font-size"] ||
-                              styles["font-size"] ||
-                              "16px"
-                            }
-                            disabled={false}
-                            liveCommit
-                            onCommit={(next) =>
-                              onSetTextFieldStyle(activeField.key, "font-size", next)
-                            }
-                          />
-                          <FontWeightField
-                            value={
-                              activeField.computedStyles["font-weight"] ||
-                              styles["font-weight"] ||
-                              "400"
-                            }
-                            disabled={false}
-                            onCommit={(next) =>
-                              onSetTextFieldStyle(activeField.key, "font-weight", next)
-                            }
-                          />
-                        </div>
-
-                        <FontFamilyField
-                          value={
-                            activeField.computedStyles["font-family"] ||
-                            styles["font-family"] ||
-                            "inherit"
-                          }
-                          disabled={false}
-                          importedFonts={fontAssets}
-                          onImportFonts={onImportFonts}
-                          onCommit={(next) =>
-                            onSetTextFieldStyle(activeField.key, "font-family", next)
-                          }
-                        />
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="space-y-4">
-                      <div className="grid gap-1.5">
-                        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                          <span className={LABEL}>Text layers</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void Promise.resolve(onAddTextField(activeField.key)).then(
-                                (nextKey) => {
-                                  if (nextKey) setActiveTextFieldKey(nextKey);
-                                },
-                              );
-                            }}
-                            className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-950 px-2.5 text-[11px] font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
-                          >
-                            <Plus size={12} className="flex-shrink-0" />
-                            <span className="truncate">Add text</span>
-                          </button>
-                        </div>
-                        <div className="grid gap-2">
-                          {textFields.map((field, index) => {
-                            const active = field.key === activeField.key;
-                            return (
-                              <button
-                                key={field.key}
-                                type="button"
-                                onClick={() => setActiveTextFieldKey(field.key)}
-                                className={`min-w-0 w-full rounded-xl border px-3 py-2 text-left transition-colors ${
-                                  active
-                                    ? "border-studio-accent/50 bg-studio-accent/10"
-                                    : "border-neutral-800 bg-neutral-900/80 hover:border-neutral-700 hover:bg-neutral-900"
-                                }`}
-                              >
-                                <div className="flex min-w-0 items-center justify-between gap-2">
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <span
-                                      className="h-4 w-4 flex-shrink-0 rounded border border-neutral-700 bg-neutral-950"
-                                      style={{ backgroundColor: getTextFieldColor(field, styles) }}
-                                    />
-                                    <span className="min-w-0 truncate text-[11px] font-medium text-neutral-100">
-                                      {formatTextFieldPreview(field.value) || `Text ${index + 1}`}
-                                    </span>
-                                  </div>
-                                  <span className="flex-shrink-0 rounded-md border border-neutral-700 bg-neutral-950 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-500">
-                                    {field.tagName}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
-                        <div className="flex min-w-0 items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="truncate text-[11px] font-medium text-neutral-100">
-                              {formatTextFieldPreview(activeField.value) || "Text"}
-                            </div>
-                            <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500">
-                              {activeField.tagName}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => onRemoveTextField(activeField.key)}
-                            className="inline-flex h-7 flex-shrink-0 items-center rounded-lg border border-neutral-700 bg-neutral-950 px-2.5 text-[11px] font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
-                          >
-                            Remove
-                          </button>
-                        </div>
-
-                        <TextAreaField
-                          key={activeField.key}
-                          label="Content"
-                          value={activeField.value}
-                          disabled={false}
-                          autoFocus
-                          onCommit={(next) => onSetText(next, activeField.key)}
-                        />
-
-                        <ColorField
-                          label="Text color"
-                          value={getTextFieldColor(activeField, styles)}
-                          disabled={false}
-                          onCommit={(next) => onSetTextFieldStyle(activeField.key, "color", next)}
-                        />
-
-                        <div className={RESPONSIVE_GRID}>
-                          <MetricField
-                            label="Size"
-                            value={activeField.computedStyles["font-size"] || "16px"}
-                            disabled={false}
-                            liveCommit
-                            onCommit={(next) =>
-                              onSetTextFieldStyle(activeField.key, "font-size", next)
-                            }
-                          />
-                          <FontWeightField
-                            value={activeField.computedStyles["font-weight"] || "400"}
-                            disabled={false}
-                            onCommit={(next) =>
-                              onSetTextFieldStyle(activeField.key, "font-weight", next)
-                            }
-                          />
-                        </div>
-
-                        <FontFamilyField
-                          value={
-                            activeField.computedStyles["font-family"] ||
-                            styles["font-family"] ||
-                            "inherit"
-                          }
-                          disabled={false}
-                          importedFonts={fontAssets}
-                          onImportFonts={onImportFonts}
-                          onCommit={(next) =>
-                            onSetTextFieldStyle(activeField.key, "font-family", next)
-                          }
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
+            {showEditableSections && isFlex && (
+              <Section title="Flex" icon={<Layers size={15} />}>
+                <div className="space-y-4">
+                  <SegmentedControl
+                    disabled={styleEditingDisabled}
+                    value={styles["flex-direction"] || "row"}
+                    onChange={(next) => onSetStyle("flex-direction", next)}
+                    options={[
+                      { label: "→ Row", value: "row" },
+                      { label: "↓ Column", value: "column" },
+                    ]}
+                  />
+                  <div className={RESPONSIVE_GRID}>
+                    <SelectField
+                      label="Justify"
+                      value={styles["justify-content"] || "flex-start"}
+                      disabled={styleEditingDisabled}
+                      onChange={(next) => onSetStyle("justify-content", next)}
+                      options={[
+                        "flex-start",
+                        "center",
+                        "space-between",
+                        "space-around",
+                        "space-evenly",
+                        "flex-end",
+                      ]}
+                    />
+                    <SelectField
+                      label="Align"
+                      value={styles["align-items"] || "stretch"}
+                      disabled={styleEditingDisabled}
+                      onChange={(next) => onSetStyle("align-items", next)}
+                      options={["stretch", "flex-start", "center", "flex-end", "baseline"]}
+                    />
+                  </div>
+                  <DetailField
+                    label="Gap"
+                    value={styles.gap ?? "0px"}
+                    disabled={styleEditingDisabled}
+                    onCommit={(next) => onSetStyle("gap", next.endsWith("px") ? next : `${next}px`)}
+                  />
+                  <label className="flex items-center gap-3 rounded-2xl border border-neutral-800 bg-neutral-900 px-3 py-3 text-[12px] text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                    <input
+                      type="checkbox"
+                      checked={clipContent}
+                      disabled={styleEditingDisabled}
+                      onChange={(e) =>
+                        onSetStyle("overflow", e.target.checked ? "hidden" : "visible")
+                      }
+                      className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-[#3ce6ac] focus:ring-[#3ce6ac]"
+                    />
+                    <span>Clip content</span>
+                  </label>
+                </div>
               </Section>
             )}
 
-            {selectionColors.length > 0 && (
-              <Section title="Selection colors" icon={<Palette size={15} />}>
-                <div className="space-y-3">
-                  {selectionColors.map((entry) => (
-                    <SelectionColorRow
-                      key={`${entry.swatch}-${entry.token}`}
-                      swatch={entry.swatch}
-                      token={entry.token}
-                      sources={entry.sources}
+            {showEditableSections && (
+              <>
+                <Section title="Radius" icon={<Settings size={15} />}>
+                  <SliderControl
+                    value={radiusValue}
+                    min={0}
+                    max={Math.max(240, Math.ceil(radiusValue))}
+                    step={1}
+                    disabled={styleEditingDisabled}
+                    displayValue={`${formatNumericValue(radiusValue)}px`}
+                    formatDisplayValue={(next) => `${formatNumericValue(next)}px`}
+                    onCommit={(next) =>
+                      onSetStyle("border-radius", `${formatNumericValue(next)}px`)
+                    }
+                  />
+                </Section>
+
+                <Section title="Blending" icon={<Eye size={15} />}>
+                  <div className="space-y-4">
+                    <SliderControl
+                      value={opacityValue}
+                      min={0}
+                      max={100}
+                      step={1}
+                      disabled={styleEditingDisabled}
+                      displayValue={`${opacityValue}%`}
+                      formatDisplayValue={(next) => `${Math.round(next)}%`}
+                      onCommit={(next) => onSetStyle("opacity", formatNumericValue(next / 100))}
                     />
-                  ))}
-                </div>
-              </Section>
+                    <SelectField
+                      label="Mode"
+                      value={styles["mix-blend-mode"] || "normal"}
+                      disabled={styleEditingDisabled}
+                      onChange={(next) => onSetStyle("mix-blend-mode", next)}
+                      options={["normal", "multiply", "screen", "overlay", "darken", "lighten"]}
+                    />
+                  </div>
+                </Section>
+
+                <Section
+                  title="Fill"
+                  icon={<Palette size={15} />}
+                  accessory={
+                    <div className="rounded-full border border-neutral-700 bg-neutral-900 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400">
+                      {preferredFillMode}
+                    </div>
+                  }
+                >
+                  <div className="space-y-4">
+                    <SegmentedControl
+                      disabled={styleEditingDisabled}
+                      value={preferredFillMode}
+                      onChange={handleFillModeChange}
+                      options={[
+                        { label: "Solid", value: "Solid" },
+                        { label: "Gradient", value: "Gradient" },
+                        { label: "Image", value: "Image" },
+                      ]}
+                    />
+                    {preferredFillMode === "Solid" ? (
+                      <ColorField
+                        label="Fill color"
+                        value={styles["background-color"] ?? "transparent"}
+                        disabled={styleEditingDisabled}
+                        onCommit={(next) => onSetStyle("background-color", next)}
+                      />
+                    ) : preferredFillMode === "Gradient" ? (
+                      <GradientField
+                        value={
+                          backgroundImage !== "none"
+                            ? backgroundImage
+                            : serializeGradient(
+                                buildDefaultGradientModel(styles["background-color"]),
+                              )
+                        }
+                        fallbackColor={styles["background-color"]}
+                        disabled={styleEditingDisabled}
+                        onCommit={(next) => onSetStyle("background-image", next)}
+                      />
+                    ) : (
+                      <ImageFillField
+                        projectId={projectId}
+                        sourceFile={element.sourceFile}
+                        value={imageUrl}
+                        assets={assets}
+                        disabled={styleEditingDisabled}
+                        onCommit={(next) => onSetStyle("background-image", next)}
+                        onImportAssets={onImportAssets}
+                      />
+                    )}
+                    {!hasTextControls && (
+                      <ColorField
+                        label="Text color"
+                        value={styles.color ?? "rgb(0, 0, 0)"}
+                        disabled={styleEditingDisabled}
+                        onCommit={(next) => onSetStyle("color", next)}
+                      />
+                    )}
+                  </div>
+                </Section>
+
+                {hasTextControls && (
+                  <Section title="Text" icon={<Type size={15} />}>
+                    {(() => {
+                      const textFields = element.textFields;
+                      const activeField =
+                        textFields.find((field) => field.key === activeTextFieldKey) ??
+                        textFields[0];
+                      if (!activeField) return null;
+
+                      if (textFields.length === 1) {
+                        return (
+                          <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-[11px] font-medium text-neutral-100">
+                                {formatTextFieldPreview(activeField.value) || "Text"}
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500">
+                                {activeField.tagName}
+                              </div>
+                            </div>
+
+                            <TextAreaField
+                              key={activeField.key}
+                              label="Content"
+                              value={activeField.value}
+                              disabled={false}
+                              onCommit={(next) => onSetText(next, activeField.key)}
+                            />
+
+                            <ColorField
+                              label="Text color"
+                              value={getTextFieldColor(activeField, styles)}
+                              disabled={false}
+                              onCommit={(next) =>
+                                onSetTextFieldStyle(activeField.key, "color", next)
+                              }
+                            />
+
+                            <div className={RESPONSIVE_GRID}>
+                              <MetricField
+                                label="Size"
+                                value={
+                                  activeField.computedStyles["font-size"] ||
+                                  styles["font-size"] ||
+                                  "16px"
+                                }
+                                disabled={false}
+                                liveCommit
+                                onCommit={(next) =>
+                                  onSetTextFieldStyle(activeField.key, "font-size", next)
+                                }
+                              />
+                              <FontWeightField
+                                value={
+                                  activeField.computedStyles["font-weight"] ||
+                                  styles["font-weight"] ||
+                                  "400"
+                                }
+                                disabled={false}
+                                onCommit={(next) =>
+                                  onSetTextFieldStyle(activeField.key, "font-weight", next)
+                                }
+                              />
+                            </div>
+
+                            <FontFamilyField
+                              value={
+                                activeField.computedStyles["font-family"] ||
+                                styles["font-family"] ||
+                                "inherit"
+                              }
+                              disabled={false}
+                              importedFonts={fontAssets}
+                              onImportFonts={onImportFonts}
+                              onCommit={(next) =>
+                                onSetTextFieldStyle(activeField.key, "font-family", next)
+                              }
+                            />
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="grid gap-1.5">
+                            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                              <span className={LABEL}>Text layers</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void Promise.resolve(onAddTextField(activeField.key)).then(
+                                    (nextKey) => {
+                                      if (nextKey) setActiveTextFieldKey(nextKey);
+                                    },
+                                  );
+                                }}
+                                className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-950 px-2.5 text-[11px] font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
+                              >
+                                <Plus size={12} className="flex-shrink-0" />
+                                <span className="truncate">Add text</span>
+                              </button>
+                            </div>
+                            <div className="grid gap-2">
+                              {textFields.map((field, index) => {
+                                const active = field.key === activeField.key;
+                                return (
+                                  <button
+                                    key={field.key}
+                                    type="button"
+                                    onClick={() => setActiveTextFieldKey(field.key)}
+                                    className={`min-w-0 w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                                      active
+                                        ? "border-studio-accent/50 bg-studio-accent/10"
+                                        : "border-neutral-800 bg-neutral-900/80 hover:border-neutral-700 hover:bg-neutral-900"
+                                    }`}
+                                  >
+                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <span
+                                          className="h-4 w-4 flex-shrink-0 rounded border border-neutral-700 bg-neutral-950"
+                                          style={{
+                                            backgroundColor: getTextFieldColor(field, styles),
+                                          }}
+                                        />
+                                        <span className="min-w-0 truncate text-[11px] font-medium text-neutral-100">
+                                          {formatTextFieldPreview(field.value) ||
+                                            `Text ${index + 1}`}
+                                        </span>
+                                      </div>
+                                      <span className="flex-shrink-0 rounded-md border border-neutral-700 bg-neutral-950 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-500">
+                                        {field.tagName}
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
+                            <div className="flex min-w-0 items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate text-[11px] font-medium text-neutral-100">
+                                  {formatTextFieldPreview(activeField.value) || "Text"}
+                                </div>
+                                <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-500">
+                                  {activeField.tagName}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => onRemoveTextField(activeField.key)}
+                                className="inline-flex h-7 flex-shrink-0 items-center rounded-lg border border-neutral-700 bg-neutral-950 px-2.5 text-[11px] font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
+                              >
+                                Remove
+                              </button>
+                            </div>
+
+                            <TextAreaField
+                              key={activeField.key}
+                              label="Content"
+                              value={activeField.value}
+                              disabled={false}
+                              autoFocus
+                              onCommit={(next) => onSetText(next, activeField.key)}
+                            />
+
+                            <ColorField
+                              label="Text color"
+                              value={getTextFieldColor(activeField, styles)}
+                              disabled={false}
+                              onCommit={(next) =>
+                                onSetTextFieldStyle(activeField.key, "color", next)
+                              }
+                            />
+
+                            <div className={RESPONSIVE_GRID}>
+                              <MetricField
+                                label="Size"
+                                value={activeField.computedStyles["font-size"] || "16px"}
+                                disabled={false}
+                                liveCommit
+                                onCommit={(next) =>
+                                  onSetTextFieldStyle(activeField.key, "font-size", next)
+                                }
+                              />
+                              <FontWeightField
+                                value={activeField.computedStyles["font-weight"] || "400"}
+                                disabled={false}
+                                onCommit={(next) =>
+                                  onSetTextFieldStyle(activeField.key, "font-weight", next)
+                                }
+                              />
+                            </div>
+
+                            <FontFamilyField
+                              value={
+                                activeField.computedStyles["font-family"] ||
+                                styles["font-family"] ||
+                                "inherit"
+                              }
+                              disabled={false}
+                              importedFonts={fontAssets}
+                              onImportFonts={onImportFonts}
+                              onCommit={(next) =>
+                                onSetTextFieldStyle(activeField.key, "font-family", next)
+                              }
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </Section>
+                )}
+
+                {selectionColors.length > 0 && (
+                  <Section title="Selection colors" icon={<Palette size={15} />}>
+                    <div className="space-y-3">
+                      {selectionColors.map((entry) => (
+                        <SelectionColorRow
+                          key={`${entry.swatch}-${entry.token}`}
+                          swatch={entry.swatch}
+                          token={entry.token}
+                          sources={entry.sources}
+                        />
+                      ))}
+                    </div>
+                  </Section>
+                )}
+              </>
             )}
           </>
         )}

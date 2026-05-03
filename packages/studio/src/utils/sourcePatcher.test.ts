@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyPatch,
   applyPatchByTarget,
+  findSourceLocationByTarget,
   readAttributeByTarget,
   readTagSnippetByTarget,
   type PatchOperation,
@@ -119,6 +120,22 @@ describe("applyPatchByTarget", () => {
     expect(withMediaStart).toContain('data-media-start="0.7"');
   });
 
+  it("removes attributes by target when the patch value is null", () => {
+    const html = `<div id="headline" data-hf-motion="v=1;preset=fade-up" data-start="0"></div>`;
+
+    const patched = applyPatchByTarget(
+      html,
+      { id: "headline" },
+      {
+        type: "attribute",
+        property: "hf-motion",
+        value: null,
+      },
+    );
+
+    expect(patched).toBe(`<div id="headline" data-start="0"></div>`);
+  });
+
   it("reads media timing attributes by selector", () => {
     const html = `<div class="hero clip" data-start="0.2" data-duration="1.4" data-media-start="0.4"></div>`;
 
@@ -207,5 +224,23 @@ describe("applyPatchByTarget", () => {
 
     expect(patched).toContain(`<div class="headline clip" data-start="0"></div>`);
     expect(patched).toContain(`<div class="headline clip" data-start="2.5"></div>`);
+  });
+
+  it("finds the source line and column for a targeted element", () => {
+    const html = [
+      "<main>",
+      '  <section class="headline clip" data-start="0"></section>',
+      '  <section class="headline clip" data-start="1"></section>',
+      "</main>",
+    ].join("\n");
+
+    const location = findSourceLocationByTarget(html, {
+      selector: ".headline",
+      selectorIndex: 1,
+    });
+
+    expect(location?.line).toBe(3);
+    expect(location?.column).toBe(3);
+    expect(location?.tag).toBe('<section class="headline clip" data-start="1"');
   });
 });

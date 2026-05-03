@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect, memo, type ReactNode } from "react";
-import { useMountEffect } from "../../hooks/useMountEffect";
 import { useTimelinePlayer, PlayerControls, Timeline, usePlayerStore } from "../../player";
 import type { TimelineElement } from "../../player";
 import type { BlockedTimelineEditIntent } from "../../player/components/timelineEditing";
@@ -9,6 +8,11 @@ import {
   TIMELINE_TOGGLE_SHORTCUT_LABEL,
   getTimelineToggleTitle,
 } from "../../utils/timelineDiscovery";
+import {
+  getCompositionLabel,
+  getCompositionPreviewUrl,
+  parseCompositionSourceMap,
+} from "../../utils/compositionPaths";
 
 interface NLELayoutProps {
   projectId: string;
@@ -30,7 +34,7 @@ interface NLELayoutProps {
   /** Custom clip content renderer for timeline (thumbnails, waveforms, etc.) */
   renderClipContent?: (
     element: TimelineElement,
-    style: { clip: string; label: string },
+    style: { clip: string; label: string; accent?: string },
   ) => ReactNode;
   onFileDrop?: (
     files: File[],
@@ -51,6 +55,17 @@ interface NLELayoutProps {
     updates: Pick<TimelineElement, "start" | "duration" | "playbackStart">,
   ) => Promise<void> | void;
   onBlockedEditAttempt?: (element: TimelineElement, intent: BlockedTimelineEditIntent) => void;
+  /** Mirror timeline clip selection into the parent editor selection model. */
+  onSelectTimelineElement?: (element: TimelineElement | null) => void;
+  /** Enable the preview inspector for an explicit timeline clip. */
+  onInspectTimelineElement?: (element: TimelineElement) => void;
+  inspectedTimelineElementId?: string | null;
+  /** Descendant layer counts for clips that can expose nested DOM layers. */
+  timelineLayerChildCounts?: ReadonlyMap<string, number>;
+  /** Timeline clips with custom thumbnail content enabled. */
+  thumbnailedTimelineElementIds?: Set<string>;
+  /** Toggle thumbnail content for an explicit timeline clip. */
+  onToggleTimelineElementThumbnail?: (element: TimelineElement) => void;
   /** Exposes the compIdToSrc map for parent components (e.g., useRenderClipContent) */
   onCompIdToSrcChange?: (map: Map<string, string>) => void;
   /** Whether the timeline panel is visible (default: true) */
@@ -62,6 +77,31 @@ interface NLELayoutProps {
 const MIN_TIMELINE_H = 100;
 const DEFAULT_TIMELINE_H = 220;
 const MIN_PREVIEW_H = 120;
+
+export function resolveTimelineCompositionSource(
+  element: Pick<TimelineElement, "id" | "compositionSrc">,
+  compIdToSrc: ReadonlyMap<string, string>,
+): string | undefined {
+  if (element.compositionSrc) return element.compositionSrc;
+
+  const candidates = new Set<string>();
+  const addCandidate = (value: string) => {
+    if (value) candidates.add(value);
+  };
+  addCandidate(element.id);
+  addCandidate(element.id.replace(/^(scene|composition|comp)-/, ""));
+  addCandidate(element.id.replace(/-(host|comp|layer|mount)$/, ""));
+  addCandidate(
+    element.id.replace(/^(scene|composition|comp)-/, "").replace(/-(host|comp|layer|mount)$/, ""),
+  );
+
+  for (const candidate of candidates) {
+    const src = compIdToSrc.get(candidate);
+    if (src) return src;
+  }
+
+  return undefined;
+}
 
 export const NLELayout = memo(function NLELayout({
   projectId,
@@ -80,6 +120,12 @@ export const NLELayout = memo(function NLELayout({
   onMoveElement,
   onResizeElement,
   onBlockedEditAttempt,
+  onSelectTimelineElement,
+  onInspectTimelineElement,
+  inspectedTimelineElementId,
+  timelineLayerChildCounts,
+  thumbnailedTimelineElementIds,
+  onToggleTimelineElementThumbnail,
   onCompIdToSrcChange,
   timelineVisible,
   onToggleTimeline,
@@ -89,6 +135,7 @@ export const NLELayout = memo(function NLELayout({
     togglePlay,
     seek,
     onIframeLoad: baseOnIframeLoad,
+    refreshPlayer,
     saveSeekPosition,
   } = useTimelinePlayer();
 
@@ -102,15 +149,15 @@ export const NLELayout = memo(function NLELayout({
     usePlayerStore.getState().reset();
   }
 
-  // Save seek position before the Player component creates a new player
-  // on refreshKey change. The Player handles the actual reload via the
-  // dual-player crossfade; we just need to persist the current time.
+  // Refresh the current iframe in place after project file writes. Direct
+  // project/composition navigation still remounts through NLEPreview's stable
+  // project/directUrl key.
   const prevRefreshKeyRef = useRef(refreshKey);
   useEffect(() => {
     if (refreshKey === prevRefreshKeyRef.current) return;
     prevRefreshKeyRef.current = refreshKey;
-    saveSeekPosition();
-  }, [refreshKey, saveSeekPosition]);
+    refreshPlayer();
+  }, [refreshKey, refreshPlayer]);
 
   // Wrap onIframeLoad to also notify parent of iframe ref
   const onIframeLoad = useCallback(() => {
@@ -120,25 +167,23 @@ export const NLELayout = memo(function NLELayout({
 
   // Composition ID → actual file path mapping, built from the raw index.html
   const [compIdToSrc, setCompIdToSrc] = useState<Map<string, string>>(new Map());
-  useMountEffect(() => {
+  // eslint-disable-next-line no-restricted-syntax
+  useEffect(() => {
+    let cancelled = false;
     fetch(`/api/projects/${projectId}/files/index.html`)
       .then((r) => r.json())
       .then((data: { content?: string }) => {
+        if (cancelled) return;
         const html = data.content || "";
-        const map = new Map<string, string>();
-        const re =
-          /data-composition-id=["']([^"']+)["'][^>]*data-composition-src=["']([^"']+)["']|data-composition-src=["']([^"']+)["'][^>]*data-composition-id=["']([^"']+)["']/g;
-        let match;
-        while ((match = re.exec(html)) !== null) {
-          const id = match[1] || match[4];
-          const src = match[2] || match[3];
-          if (id && src) map.set(id, src);
-        }
+        const map = parseCompositionSourceMap(html);
         setCompIdToSrc(map);
         onCompIdToSrcChange?.(map);
       })
       .catch(() => {});
-  });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, onCompIdToSrcChange]);
 
   // Patch elements with compositionSrc whenever elements or compIdToSrc change.
   // The runtime strips data-composition-src from the DOM after loading, so elements
@@ -156,8 +201,7 @@ export const NLELayout = memo(function NLELayout({
       let patched = false;
       const updated = elements.map((el) => {
         if (el.compositionSrc) return el;
-        // Try exact match, then strip common suffixes (-host, -comp, -layer)
-        const src = map.get(el.id) ?? map.get(el.id.replace(/-(host|comp|layer)$/, ""));
+        const src = resolveTimelineCompositionSource(el, map);
         if (src) {
           patched = true;
           return { ...el, compositionSrc: src };
@@ -185,7 +229,7 @@ export const NLELayout = memo(function NLELayout({
 
   // Composition drill-down stack
   const [compositionStack, setCompositionStack] = useState<CompositionLevel[]>([
-    { id: "master", label: "Master", previewUrl: `/api/projects/${projectId}/preview` },
+    { id: "master", label: "Master", previewUrl: getCompositionPreviewUrl(projectId, null) },
   ]);
 
   // Wrap setCompositionStack to auto-notify parent on composition change
@@ -265,12 +309,8 @@ export const NLELayout = memo(function NLELayout({
           return prev.slice(0, -1);
         }
         // Extract a clean label from the path (strip directories and extension)
-        const label =
-          resolvedPath
-            .split("/")
-            .pop()
-            ?.replace(/\.html$/, "") || resolvedPath;
-        const previewUrl = `/api/projects/${projectId}/preview/comp/${resolvedPath}`;
+        const label = getCompositionLabel(resolvedPath);
+        const previewUrl = getCompositionPreviewUrl(projectId, resolvedPath);
         return [...prev, { id: resolvedPath, label, previewUrl }];
       });
     },
@@ -299,13 +339,13 @@ export const NLELayout = memo(function NLELayout({
       usePlayerStore.getState().setElements([]);
       updateCompositionStack((prev) => (prev.length > 1 ? [prev[0]] : prev));
     } else if (activeCompositionPath && activeCompositionPath.startsWith("compositions/")) {
-      const label = activeCompositionPath.replace(/^compositions\//, "").replace(/\.html$/, "");
-      const previewUrl = `/api/projects/${projectId}/preview/comp/${activeCompositionPath}`;
+      const label = getCompositionLabel(activeCompositionPath);
+      const previewUrl = getCompositionPreviewUrl(projectId, activeCompositionPath);
       usePlayerStore.getState().setElements([]);
       updateCompositionStack((prev) => {
         if (prev[prev.length - 1]?.id === activeCompositionPath) return prev;
         return [
-          { id: "master", label: "Master", previewUrl: `/api/projects/${projectId}/preview` },
+          { id: "master", label: "Master", previewUrl: getCompositionPreviewUrl(projectId, null) },
           { id: activeCompositionPath, label, previewUrl },
         ];
       });
@@ -364,7 +404,6 @@ export const NLELayout = memo(function NLELayout({
             onIframeLoad={onIframeLoad}
             portrait={portrait}
             directUrl={directUrl}
-            refreshKey={refreshKey}
           />
           {previewOverlay}
         </div>
@@ -410,6 +449,12 @@ export const NLELayout = memo(function NLELayout({
               <Timeline
                 onSeek={seek}
                 onDrillDown={handleDrillDown}
+                onSelectElement={onSelectTimelineElement}
+                onInspectElement={onInspectTimelineElement}
+                inspectedElementId={inspectedTimelineElementId}
+                layerChildCounts={timelineLayerChildCounts}
+                thumbnailedElementIds={thumbnailedTimelineElementIds}
+                onToggleElementThumbnail={onToggleTimelineElementThumbnail}
                 renderClipContent={renderClipContent}
                 onFileDrop={onFileDrop}
                 onDeleteElement={onDeleteElement}

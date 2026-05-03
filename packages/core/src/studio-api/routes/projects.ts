@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import type { StudioApiAdapter } from "../types.js";
 import { walkDir } from "../helpers/safePath.js";
+import { primeProjectSnapshotCache } from "../history/projectSnapshotCache.js";
 
 export function registerProjectRoutes(api: Hono, adapter: StudioApiAdapter): void {
   // List all projects
@@ -24,6 +25,7 @@ export function registerProjectRoutes(api: Hono, adapter: StudioApiAdapter): voi
   api.get("/projects/:id", async (c) => {
     const project = await adapter.resolveProject(c.req.param("id"));
     if (!project) return c.json({ error: "not found" }, 404);
+    primeProjectSnapshotCache(project);
     const files = walkDir(project.dir);
     return c.json({ id: project.id, dir: project.dir, title: project.title, files });
   });

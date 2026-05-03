@@ -1,7 +1,7 @@
 import type { TimelineTrackStyle } from "./timelineTheme";
 // TimelineClip — Visual clip component for the NLE timeline.
 
-import { memo, type ReactNode } from "react";
+import { memo, useState, type ReactNode } from "react";
 import type { TimelineElement } from "../store/playerStore";
 import { defaultTimelineTheme, getClipHandleOpacity, type TimelineTheme } from "./timelineTheme";
 import { getTimelineEditCapabilities } from "./timelineEditing";
@@ -17,10 +17,16 @@ interface TimelineClipProps {
   theme?: TimelineTheme;
   trackStyle: TimelineTrackStyle;
   isComposition: boolean;
+  isInspectorActive?: boolean;
+  isThumbnailActive?: boolean;
+  thumbnailLabel?: string;
+  childCount?: number;
   onHoverStart: () => void;
   onHoverEnd: () => void;
   onPointerDown?: (e: React.PointerEvent) => void;
   onResizeStart?: (edge: "start" | "end", e: React.PointerEvent) => void;
+  onInspectorClick?: (e: React.MouseEvent) => void;
+  onThumbnailClick?: (e: React.MouseEvent) => void;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: (e: React.MouseEvent) => void;
   children?: ReactNode;
@@ -37,27 +43,39 @@ export const TimelineClip = memo(function TimelineClip({
   theme = defaultTimelineTheme,
   trackStyle,
   isComposition,
+  isInspectorActive = false,
+  isThumbnailActive = false,
+  thumbnailLabel = "thumbnail",
+  childCount = 0,
   onHoverStart,
   onHoverEnd,
   onPointerDown,
   onResizeStart,
+  onInspectorClick,
+  onThumbnailClick,
   onClick,
   onDoubleClick,
   children,
 }: TimelineClipProps) {
+  const [localHovered, setLocalHovered] = useState(false);
+  const effectiveHovered = isHovered || localHovered;
   const leftPx = el.start * pps;
   const widthPx = Math.max(el.duration * pps, 4);
-  const handleOpacity = getClipHandleOpacity({ isHovered, isSelected, isDragging });
+  const handleOpacity = getClipHandleOpacity({
+    isHovered: effectiveHovered,
+    isSelected,
+    isDragging,
+  });
   const borderColor = isSelected
     ? theme.clipBorderActive
-    : isHovered
+    : effectiveHovered
       ? theme.clipBorderHover
       : theme.clipBorder;
   const boxShadow = isDragging
     ? theme.clipShadowDragging
     : isSelected
       ? theme.clipShadowActive
-      : isHovered
+      : effectiveHovered
         ? theme.clipShadowHover
         : theme.clipShadow;
   const capabilities = getTimelineEditCapabilities(el);
@@ -100,21 +118,66 @@ export const TimelineClip = memo(function TimelineClip({
         boxShadow,
         transition:
           "border-color 120ms ease-out, box-shadow 140ms ease-out, background 140ms ease-out",
-        zIndex: isDragging ? 20 : isSelected ? 10 : isHovered ? 5 : 1,
+        zIndex: isDragging ? 20 : isSelected ? 10 : effectiveHovered ? 5 : 1,
         cursor: capabilities.canMove ? "grab" : "default",
         transform: isDragging ? "translateY(-1px)" : undefined,
+        contain: "layout paint style",
       }}
       title={
         isComposition
           ? `${el.compositionSrc} \u2022 Double-click to open`
           : `${displayLabel} \u2022 ${el.start.toFixed(1)}s \u2013 ${(el.start + el.duration).toFixed(1)}s`
       }
-      onPointerEnter={onHoverStart}
-      onPointerLeave={onHoverEnd}
+      onPointerEnter={() => {
+        setLocalHovered(true);
+        onHoverStart();
+      }}
+      onPointerLeave={() => {
+        setLocalHovered(false);
+        onHoverEnd();
+      }}
       onPointerDown={onPointerDown}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
+      {childCount > 0 && !isDragging && (
+        <button
+          type="button"
+          className={`absolute left-1.5 top-1.5 z-20 flex h-5 items-center gap-1 rounded-md border px-1.5 text-[9px] font-semibold tabular-nums transition-colors ${
+            isInspectorActive
+              ? "border-studio-accent/70 bg-studio-accent/20 text-studio-accent"
+              : "border-white/10 bg-black/40 text-neutral-300 hover:border-studio-accent/50 hover:bg-studio-accent/10 hover:text-studio-accent"
+          }`}
+          data-timeline-layer-count={childCount}
+          aria-label={`Show ${childCount} nested selectable layer${childCount === 1 ? "" : "s"} for ${el.label || el.id || el.tag}`}
+          aria-pressed={isInspectorActive}
+          title={`Show ${childCount} nested selectable layer${childCount === 1 ? "" : "s"}`}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onInspectorClick?.(event);
+          }}
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h16" />
+            <path d="M7 12h13" />
+            <path d="M10 17h10" />
+          </svg>
+          {childCount}
+        </button>
+      )}
       <div
         aria-hidden="true"
         role="presentation"
@@ -187,6 +250,85 @@ export const TimelineClip = memo(function TimelineClip({
           }}
         />
       </div>
+      {(onThumbnailClick || onInspectorClick) && !isDragging && (
+        <div className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1">
+          {onThumbnailClick && (
+            <button
+              type="button"
+              data-timeline-thumbnail-button="true"
+              aria-label={`${isThumbnailActive ? "Hide" : "Show"} ${thumbnailLabel} for ${el.label || el.id || el.tag}`}
+              aria-pressed={isThumbnailActive}
+              title={
+                isThumbnailActive ? `Hide clip ${thumbnailLabel}` : `Show clip ${thumbnailLabel}`
+              }
+              className={`flex h-5 w-5 items-center justify-center rounded-md border text-[10px] transition-colors ${
+                isThumbnailActive
+                  ? "border-studio-accent/70 bg-studio-accent/20 text-studio-accent"
+                  : "border-white/10 bg-black/35 text-neutral-400 hover:border-studio-accent/50 hover:bg-studio-accent/10 hover:text-studio-accent"
+              }`}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onThumbnailClick(event);
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <circle cx="8" cy="10" r="1.5" />
+                <path d="m21 16-5-5L5 19" />
+              </svg>
+            </button>
+          )}
+          {onInspectorClick && (
+            <button
+              type="button"
+              data-timeline-inspector-button="true"
+              aria-label={`Inspect ${el.label || el.id || el.tag}`}
+              aria-pressed={isInspectorActive}
+              title={isInspectorActive ? "Disable clip inspector" : "Inspect clip in preview"}
+              className={`flex h-5 w-5 items-center justify-center rounded-md border text-[10px] transition-colors ${
+                isInspectorActive
+                  ? "border-studio-accent/70 bg-studio-accent/20 text-studio-accent"
+                  : "border-white/10 bg-black/35 text-neutral-400 hover:border-studio-accent/50 hover:bg-studio-accent/10 hover:text-studio-accent"
+              }`}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onInspectorClick(event);
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
       {children}
     </div>
   );

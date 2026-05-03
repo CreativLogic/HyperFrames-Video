@@ -71,7 +71,7 @@ function splitInlineStyleDeclarations(style: string): string[] {
 export interface PatchOperation {
   type: "inline-style" | "attribute" | "text-content";
   property: string;
-  value: string;
+  value: string | null;
 }
 
 export interface PatchTarget {
@@ -194,6 +194,48 @@ interface TagMatch {
   end: number;
 }
 
+export interface SourceLocation {
+  line: number;
+  column: number;
+  offset: number;
+  tag: string;
+}
+
+function getLineColumnAtOffset(
+  source: string,
+  offset: number,
+): Pick<SourceLocation, "line" | "column"> {
+  const safeOffset = Math.max(0, Math.min(source.length, offset));
+  let line = 1;
+  let columnStart = 0;
+
+  for (let index = 0; index < safeOffset; index += 1) {
+    const char = source[index];
+    if (char === "\n") {
+      line += 1;
+      columnStart = index + 1;
+    }
+  }
+
+  return {
+    line,
+    column: safeOffset - columnStart + 1,
+  };
+}
+
+export function findSourceLocationByTarget(
+  html: string,
+  target: PatchTarget,
+): SourceLocation | null {
+  const match = findTagByTarget(html, target);
+  if (!match) return null;
+  return {
+    ...getLineColumnAtOffset(html, match.start),
+    offset: match.start,
+    tag: match.tag,
+  };
+}
+
 function replaceTagAtMatch(html: string, match: TagMatch, newTag: string): string {
   return `${html.slice(0, match.start)}${newTag}${html.slice(match.end)}`;
 }
@@ -277,14 +319,20 @@ function patchAttributeByTarget(
   html: string,
   target: PatchTarget,
   attr: string,
-  value: string,
+  value: string | null,
 ): string {
   const match = findTagByTarget(html, target);
   if (!match) return html;
 
   const fullAttr = attr.startsWith("data-") ? attr : `data-${attr}`;
   const attrPattern = new RegExp(`\\b${fullAttr}=(["'])([^"']*)\\1`);
+  const removableAttrPattern = new RegExp(`\\s+\\b${fullAttr}=(["'])([^"']*)\\1`);
   const tag = match.tag;
+
+  if (value == null) {
+    if (!attrPattern.test(tag)) return html;
+    return replaceTagAtMatch(html, match, tag.replace(removableAttrPattern, ""));
+  }
 
   if (attrPattern.test(tag)) {
     const newTag = tag.replace(attrPattern, `${fullAttr}="${value}"`);
@@ -298,7 +346,12 @@ function patchAttributeByTarget(
 /**
  * Apply an attribute change to an element in the HTML source.
  */
-function patchAttribute(html: string, elementId: string, attr: string, value: string): string {
+function patchAttribute(
+  html: string,
+  elementId: string,
+  attr: string,
+  value: string | null,
+): string {
   const idPattern = new RegExp(`(<[^>]*\\bid=(["'])${escapeRegex(elementId)}\\2[^>]*)>`, "i");
   const match = idPattern.exec(html);
   if (!match) return html;
@@ -306,6 +359,12 @@ function patchAttribute(html: string, elementId: string, attr: string, value: st
   const tag = match[1];
   const fullAttr = attr.startsWith("data-") ? attr : `data-${attr}`;
   const attrPattern = new RegExp(`\\b${fullAttr}=(["'])([^"']*)\\1`);
+  const removableAttrPattern = new RegExp(`\\s+\\b${fullAttr}=(["'])([^"']*)\\1`);
+
+  if (value == null) {
+    if (!attrPattern.test(tag)) return html;
+    return html.replace(tag, tag.replace(removableAttrPattern, ""));
+  }
 
   if (attrPattern.test(tag)) {
     // Update existing attribute
@@ -377,11 +436,11 @@ function patchTextContentByTarget(html: string, target: PatchTarget, value: stri
 export function applyPatch(html: string, elementId: string, op: PatchOperation): string {
   switch (op.type) {
     case "inline-style":
-      return patchInlineStyle(html, elementId, op.property, op.value);
+      return patchInlineStyle(html, elementId, op.property, op.value ?? "");
     case "attribute":
       return patchAttribute(html, elementId, op.property, op.value);
     case "text-content":
-      return patchTextContent(html, elementId, op.value);
+      return patchTextContent(html, elementId, op.value ?? "");
     default:
       return html;
   }
@@ -397,11 +456,11 @@ export function applyPatchByTarget(html: string, target: PatchTarget, op: PatchO
 
   switch (op.type) {
     case "inline-style":
-      return patchInlineStyleByTarget(html, target, op.property, op.value);
+      return patchInlineStyleByTarget(html, target, op.property, op.value ?? "");
     case "attribute":
       return patchAttributeByTarget(html, target, op.property, op.value);
     case "text-content":
-      return patchTextContentByTarget(html, target, op.value);
+      return patchTextContentByTarget(html, target, op.value ?? "");
     default:
       return html;
   }

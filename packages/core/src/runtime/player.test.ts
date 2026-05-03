@@ -31,6 +31,7 @@ function createMockTimeline(opts?: { time?: number; duration?: number }): Runtim
 function createMockDeps(timeline?: RuntimeTimelineLike | null) {
   let isPlaying = false;
   let playbackRate = 1;
+  let currentTime = 0;
   return {
     getTimeline: vi.fn(() => timeline ?? null),
     setTimeline: vi.fn(),
@@ -43,6 +44,10 @@ function createMockDeps(timeline?: RuntimeTimelineLike | null) {
       playbackRate = v;
     }),
     getCanonicalFps: vi.fn(() => 30),
+    getCurrentTime: vi.fn(() => currentTime),
+    setCurrentTime: (v: number) => {
+      currentTime = v;
+    },
     onSyncMedia: vi.fn(),
     onStatePost: vi.fn(),
     onDeterministicSeek: vi.fn(),
@@ -129,11 +134,14 @@ function createNestedTimelineHarness() {
 
 describe("createRuntimePlayer", () => {
   describe("play", () => {
-    it("does nothing without a timeline", () => {
+    it("starts adapter-driven playback without a timeline", () => {
       const deps = createMockDeps(null);
       const player = createRuntimePlayer(deps);
       player.play();
-      expect(deps.setIsPlaying).not.toHaveBeenCalled();
+      expect(deps.setIsPlaying).toHaveBeenCalledWith(true);
+      expect(deps.onDeterministicPlay).toHaveBeenCalled();
+      expect(deps.onShowNativeVideos).toHaveBeenCalled();
+      expect(deps.onStatePost).toHaveBeenCalledWith(true);
     });
 
     it("does nothing if already playing", () => {
@@ -178,11 +186,15 @@ describe("createRuntimePlayer", () => {
   });
 
   describe("pause", () => {
-    it("does nothing without a timeline", () => {
+    it("pauses adapter-driven playback without a timeline", () => {
       const deps = createMockDeps(null);
+      deps.getCurrentTime = vi.fn(() => 2);
       const player = createRuntimePlayer(deps);
       player.pause();
-      expect(deps.setIsPlaying).not.toHaveBeenCalled();
+      expect(deps.onDeterministicSeek).toHaveBeenCalledWith(2);
+      expect(deps.onDeterministicPause).toHaveBeenCalled();
+      expect(deps.setIsPlaying).toHaveBeenCalledWith(false);
+      expect(deps.onSyncMedia).toHaveBeenCalledWith(2, false);
     });
 
     it("pauses the timeline and syncs media", () => {
@@ -301,11 +313,13 @@ describe("createRuntimePlayer", () => {
   });
 
   describe("seek", () => {
-    it("does nothing without a timeline", () => {
+    it("seeks adapter-driven playback without a timeline", () => {
       const deps = createMockDeps(null);
       const player = createRuntimePlayer(deps);
       player.seek(5);
-      expect(deps.onDeterministicSeek).not.toHaveBeenCalled();
+      expect(deps.onDeterministicSeek).toHaveBeenCalledWith(5);
+      expect(deps.setIsPlaying).toHaveBeenCalledWith(false);
+      expect(deps.onSyncMedia).toHaveBeenCalledWith(5, false);
     });
 
     it("seeks to quantized time and pauses", () => {
@@ -418,16 +432,17 @@ describe("createRuntimePlayer", () => {
       expect(player.getDuration()).toBe(30);
     });
 
-    it("getTime returns 0 without timeline", () => {
+    it("getTime returns adapter-driven current time without timeline", () => {
       const deps = createMockDeps(null);
+      deps.getCurrentTime = vi.fn(() => 4.5);
       const player = createRuntimePlayer(deps);
-      expect(player.getTime()).toBe(0);
+      expect(player.getTime()).toBe(4.5);
     });
 
-    it("getDuration returns 0 without timeline", () => {
+    it("getDuration returns safe duration without timeline", () => {
       const deps = createMockDeps(null);
       const player = createRuntimePlayer(deps);
-      expect(player.getDuration()).toBe(0);
+      expect(player.getDuration()).toBe(10);
     });
 
     it("isPlaying delegates to deps", () => {

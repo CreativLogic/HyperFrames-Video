@@ -209,6 +209,42 @@ describe("edit history", () => {
     expect(state.undo[0].files["index.html"].after).toBe("c");
   });
 
+  it("coalesces motion edits for the same layer inside the coalesce window", () => {
+    const first = buildEditHistoryEntry({
+      projectId: "project-1",
+      label: "Edit layer motion",
+      kind: "motion",
+      coalesceKey: "motion:index.html:#headline",
+      files: {
+        "index.html": { before: "before", after: "motion-a" },
+      },
+      now: 100,
+      id: "entry-1",
+    });
+    const second = buildEditHistoryEntry({
+      projectId: "project-1",
+      label: "Edit layer motion",
+      kind: "motion",
+      coalesceKey: "motion:index.html:#headline",
+      files: {
+        "index.html": { before: "motion-a", after: "motion-b" },
+      },
+      now: 300,
+      id: "entry-2",
+    });
+
+    const state = pushEditHistoryEntry(
+      pushEditHistoryEntry(createEmptyEditHistory(), first),
+      second,
+      { coalesceMs: 1000 },
+    );
+
+    expect(state.undo).toHaveLength(1);
+    expect(state.undo[0].kind).toBe("motion");
+    expect(state.undo[0].files["index.html"].before).toBe("before");
+    expect(state.undo[0].files["index.html"].after).toBe("motion-b");
+  });
+
   it("does not coalesce source editor edits outside the coalesce window", () => {
     const first = buildEditHistoryEntry({
       projectId: "project-1",

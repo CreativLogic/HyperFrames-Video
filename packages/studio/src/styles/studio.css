@@ -9,6 +9,34 @@
  */
 :root {
   color-scheme: dark;
+  scrollbar-color: #737373 transparent;
+  scrollbar-width: thin;
+}
+
+* {
+  scrollbar-color: #737373 transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #737373;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8a8a8a;
+  background-clip: content-box;
 }
 
 body {

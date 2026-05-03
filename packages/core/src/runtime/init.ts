@@ -2,6 +2,7 @@ import { installRuntimeControlBridge, postRuntimeMessage } from "./bridge";
 import { initRuntimeAnalytics, emitAnalyticsEvent } from "./analytics";
 import { createCssAdapter } from "./adapters/css";
 import { createGsapAdapter } from "./adapters/gsap";
+import { createHfMotionAdapter } from "./adapters/hfMotion";
 import { createAnimeJsAdapter } from "./adapters/animejs";
 import { createLottieAdapter } from "./adapters/lottie";
 import { createThreeAdapter } from "./adapters/three";
@@ -468,12 +469,17 @@ export function initSandboxRuntimeModular(): void {
   const resolveAuthoredCompositionDurationFloorSeconds = (): number | null => {
     const rootEl = resolveRootCompositionElement();
     if (!rootEl) return null;
+    const rootDeclaredDuration = Number(rootEl.getAttribute("data-duration"));
+    const rootDeclaredEnd = Number(rootEl.getAttribute("data-end"));
+    let maxWindowEndSeconds = Math.max(
+      Number.isFinite(rootDeclaredDuration) && rootDeclaredDuration > 0 ? rootDeclaredDuration : 0,
+      Number.isFinite(rootDeclaredEnd) && rootDeclaredEnd > 0 ? rootDeclaredEnd : 0,
+    );
     const timelines = (window.__timelines ?? {}) as Record<string, RuntimeTimelineLike | undefined>;
     const startResolver = createRuntimeStartTimeResolver({
       timelineRegistry: timelines,
       includeAuthoredTimingAttrs: true,
     });
-    let maxWindowEndSeconds = 0;
     const compositionNodes = Array.from(
       rootEl.querySelectorAll("[data-composition-id][data-start]"),
     );
@@ -1498,6 +1504,7 @@ export function initSandboxRuntimeModular(): void {
     getPlaybackRate: () => state.playbackRate,
     setPlaybackRate: applyPlaybackRate,
     getCanonicalFps: () => state.canonicalFps,
+    getCurrentTime: () => state.currentTime,
     onSyncMedia: (timeSeconds, playing) => {
       state.currentTime = Math.max(0, Number(timeSeconds) || 0);
       state.isPlaying = playing;
@@ -1600,6 +1607,10 @@ export function initSandboxRuntimeModular(): void {
     createLottieAdapter(),
     createThreeAdapter(),
     createGsapAdapter({ getTimeline: () => state.capturedTimeline }),
+    createHfMotionAdapter({
+      resolveStartSeconds: (element) => resolveStartForElement(element, 0),
+      getCurrentTime: () => state.capturedTimeline?.time() ?? state.currentTime,
+    }),
   ] as RuntimeDeterministicAdapter[];
   installRuntimeErrorDiagnostics();
   runAdapters("discover");
@@ -1609,6 +1620,7 @@ export function initSandboxRuntimeModular(): void {
   }
   let timelinePollTick = 0;
   let lastObservedTimelineTime: number | null = null;
+  let lastTimelineLessPlaybackAtMs: number | null = null;
   let lastExplicitSeekAtMs = 0;
   let loopGuardRebindTriggered = false;
   let loopWrapCandidateCount = 0;
@@ -1636,6 +1648,29 @@ export function initSandboxRuntimeModular(): void {
       bindMediaMetadataListeners();
     }
     syncCurrentTimeFromTimeline();
+    if (state.isPlaying && !state.capturedTimeline) {
+      const now = performance.now();
+      const previousTick = lastTimelineLessPlaybackAtMs ?? now;
+      lastTimelineLessPlaybackAtMs = now;
+      const elapsedSeconds = Math.max(0, (now - previousTick) / 1000);
+      const safeDuration = getSafeTimelineDurationSeconds(null, 0);
+      const nextTime = Math.max(0, (state.currentTime || 0) + elapsedSeconds * state.playbackRate);
+      state.currentTime = safeDuration > 0 && nextTime >= safeDuration ? safeDuration : nextTime;
+      for (const adapter of state.deterministicAdapters) {
+        try {
+          adapter.seek({ time: state.currentTime });
+        } catch {
+          // ignore adapter failure
+        }
+      }
+      syncMediaForCurrentState();
+      if (safeDuration > 0 && state.currentTime >= safeDuration) {
+        player.pause();
+      }
+      postState(false);
+      return;
+    }
+    lastTimelineLessPlaybackAtMs = null;
     if (state.isPlaying && state.capturedTimeline) {
       const currentObserved = Math.max(0, state.currentTime || 0);
       const previousObserved = lastObservedTimelineTime;

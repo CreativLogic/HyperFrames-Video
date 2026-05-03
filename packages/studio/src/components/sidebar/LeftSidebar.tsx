@@ -22,6 +22,7 @@ interface LeftSidebarProps {
   assets: string[];
   activeComposition: string | null;
   onSelectComposition: (comp: string) => void;
+  resolveCompositionSourceContent?: (path: string) => Promise<string>;
   onImportFiles?: (files: FileList, dir?: string) => void;
   fileTree?: string[];
   editingFile?: { path: string; content: string | null } | null;
@@ -45,6 +46,7 @@ export const LeftSidebar = memo(function LeftSidebar({
   assets,
   activeComposition,
   onSelectComposition,
+  resolveCompositionSourceContent,
   onImportFiles,
   fileTree: fileProp,
   editingFile,
@@ -91,15 +93,18 @@ export const LeftSidebar = memo(function LeftSidebar({
     >
       {/* Tabs — Code first */}
       <div className="border-b border-neutral-800/50 px-3 py-3 flex-shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="relative min-w-0">
           <div
-            className="grid min-w-0 flex-1 gap-1 rounded-[18px] bg-neutral-900 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+            className={`grid min-w-0 gap-1 rounded-[18px] bg-neutral-900 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${
+              onToggleCollapse ? "pr-9" : ""
+            }`}
             style={{ gridTemplateColumns: "0.9fr 1.25fr 0.9fr" }}
           >
             <button
               type="button"
+              data-sidebar-tab="code"
               onClick={() => selectTab("code")}
-              className={`rounded-[14px] px-2.5 py-2 text-[10px] font-semibold transition-all ${
+              className={`min-w-0 truncate rounded-[14px] px-2 py-2 text-[10px] font-semibold transition-all ${
                 tab === "code"
                   ? "bg-neutral-800 text-white"
                   : "text-neutral-500 hover:text-neutral-200"
@@ -109,8 +114,9 @@ export const LeftSidebar = memo(function LeftSidebar({
             </button>
             <button
               type="button"
+              data-sidebar-tab="compositions"
               onClick={() => selectTab("compositions")}
-              className={`rounded-[14px] px-2.5 py-2 text-[10px] font-semibold transition-all ${
+              className={`min-w-0 truncate rounded-[14px] px-2 py-2 text-[10px] font-semibold transition-all ${
                 tab === "compositions"
                   ? "bg-neutral-800 text-white"
                   : "text-neutral-500 hover:text-neutral-200"
@@ -120,8 +126,9 @@ export const LeftSidebar = memo(function LeftSidebar({
             </button>
             <button
               type="button"
+              data-sidebar-tab="assets"
               onClick={() => selectTab("assets")}
-              className={`rounded-[14px] px-2.5 py-2 text-[10px] font-semibold transition-all ${
+              className={`min-w-0 truncate rounded-[14px] px-2 py-2 text-[10px] font-semibold transition-all ${
                 tab === "assets"
                   ? "bg-neutral-800 text-white"
                   : "text-neutral-500 hover:text-neutral-200"
@@ -134,7 +141,7 @@ export const LeftSidebar = memo(function LeftSidebar({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-transparent text-neutral-500 transition-colors hover:border-neutral-800 hover:bg-neutral-900 hover:text-neutral-300"
+              className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-neutral-500 transition-colors hover:border-neutral-800 hover:bg-neutral-950 hover:text-neutral-300"
               title="Hide sidebar"
               aria-label="Hide sidebar"
             >
@@ -160,10 +167,11 @@ export const LeftSidebar = memo(function LeftSidebar({
       {/* Tab content */}
       {tab === "compositions" && (
         <CompositionsTab
-          projectId={projectId}
           compositions={compositions}
           activeComposition={activeComposition}
           onSelect={onSelectComposition}
+          projectId={projectId}
+          resolveSourceContent={resolveCompositionSourceContent}
         />
       )}
       {tab === "assets" && (

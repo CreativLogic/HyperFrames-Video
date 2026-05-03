@@ -25,6 +25,7 @@ interface TimelineLike {
 export interface ClipManifestClip {
   id: string | null;
   label: string;
+  timelineLabel?: string | null;
   start: number;
   duration: number;
   track: number;
@@ -220,7 +221,10 @@ export function parseTimelineFromDOM(doc: Document, rootDuration: number): Timel
     const selectorIndex = getTimelineElementSelectorIndex(doc, el, selector);
     const label = getTimelineElementDisplayLabel({
       id: el.id || compId || null,
-      label: el.getAttribute("data-timeline-label") ?? el.getAttribute("data-label"),
+      label:
+        el.getAttribute("data-timeline-label") ??
+        el.getAttribute("data-label") ??
+        el.getAttribute("aria-label"),
       tag: tagLower,
     });
     const identity = buildTimelineElementIdentity({

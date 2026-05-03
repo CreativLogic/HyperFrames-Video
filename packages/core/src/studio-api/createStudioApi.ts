@@ -8,6 +8,8 @@ import { registerRenderRoutes } from "./routes/render.js";
 import { registerThumbnailRoutes } from "./routes/thumbnail.js";
 import { registerWaveformRoutes } from "./routes/waveform.js";
 import { registerFontRoutes } from "./routes/fonts.js";
+import { registerHistoryRoutes } from "./routes/history.js";
+import { createStudioEventBus } from "./events.js";
 
 /**
  * Create a Hono sub-app with all studio API routes.
@@ -17,9 +19,11 @@ import { registerFontRoutes } from "./routes/fonts.js";
  */
 export function createStudioApi(adapter: StudioApiAdapter): Hono {
   const api = new Hono();
+  const events = createStudioEventBus();
 
   registerProjectRoutes(api, adapter);
   registerFileRoutes(api, adapter);
+  registerHistoryRoutes(api, adapter, events);
   registerPreviewRoutes(api, adapter);
   registerLintRoutes(api, adapter);
   registerRenderRoutes(api, adapter);

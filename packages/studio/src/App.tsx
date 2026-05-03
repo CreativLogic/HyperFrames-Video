@@ -1,20 +1,11 @@
-import {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-  type MouseEvent,
-  type ReactNode,
-} from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, type MouseEvent } from "react";
 import { useMountEffect } from "./hooks/useMountEffect";
 import { NLELayout } from "./components/nle/NLELayout";
 import { SourceEditor } from "./components/editor/SourceEditor";
 import { LeftSidebar } from "./components/sidebar/LeftSidebar";
 import { RenderQueue } from "./components/renders/RenderQueue";
 import { useRenderQueue } from "./components/renders/useRenderQueue";
-import { CompositionThumbnail, VideoThumbnail, liveTime, usePlayerStore } from "./player";
-import { AudioWaveform } from "./player/components/AudioWaveform";
+import { liveTime, usePlayerStore } from "./player";
 import type { TimelineElement } from "./player";
 import { LintModal } from "./components/LintModal";
 import type { LintFinding } from "./components/LintModal";
@@ -38,9 +29,10 @@ import { useCaptionStore } from "./captions/store";
 import { useCaptionSync } from "./captions/hooks/useCaptionSync";
 import { parseCaptionComposition } from "./captions/parser";
 import { copyTextToClipboard } from "./utils/clipboard";
-import { usePersistentEditHistory } from "./hooks/usePersistentEditHistory";
+import { useSharedEditHistory } from "./hooks/useSharedEditHistory";
 import {
   applyPatchByTarget,
+  findSourceLocationByTarget,
   readAttributeByTarget,
   readTagSnippetByTarget,
   type PatchOperation,
@@ -54,15 +46,14 @@ import {
   getTimelineZoomPercent,
 } from "./player/components/timelineZoom";
 import {
-  TIMELINE_TOGGLE_SHORTCUT_LABEL,
-  getTimelineEditorHintDismissed,
   getTimelineToggleTitle,
-  setTimelineEditorHintDismissed,
   shouldHandleTimelineToggleHotkey,
 } from "./utils/timelineDiscovery";
 import { buildFrameCaptureFilename, buildFrameCaptureUrl } from "./utils/frameCapture";
 import { Camera } from "./icons/SystemIcons";
 import { PropertyPanel } from "./components/editor/PropertyPanel";
+import { TimelineThumbnailContent } from "./player/components/TimelineThumbnailContent";
+import { AudioWaveform } from "./player/components/AudioWaveform";
 import { googleFontStylesheetUrl } from "./components/editor/fontCatalog";
 import {
   fontFamilyFromAssetPath,
@@ -70,6 +61,7 @@ import {
   type ImportedFontAsset,
 } from "./components/editor/fontAssets";
 import { DomEditOverlay } from "./components/editor/DomEditOverlay";
+import { TimelineLayerPanel } from "./components/editor/TimelineLayerPanel";
 import {
   buildDefaultDomEditTextField,
   buildDomEditDetachPatchOperations,
@@ -78,15 +70,36 @@ import {
   buildDomEditStylePatchOperation,
   buildDomEditTextPatchOperation,
   buildElementAgentPrompt,
+  collectDomEditLayerItems,
+  countDomEditChildLayers,
   findElementForSelection,
+  getDomEditLayerKey,
   isTextEditableSelection,
   serializeDomEditTextFields,
   resolveDomEditCapabilities,
   resolveDomEditSelection,
+  type DomEditLayerItem,
   type DomEditTextField,
   type DomEditSelection,
 } from "./components/editor/domEditing";
+import {
+  buildMotionAgentContext,
+  buildDomEditMotionPatchOperations,
+  buildMotionVarsId,
+  clampMotionDraftToTimeline,
+  detectMotionOwnership,
+  parseMotionDraft,
+  type MotionDraft,
+} from "./components/editor/motionEditing";
 import { saveProjectFilesWithHistory } from "./utils/studioFileHistory";
+import { getStudioThumbnailService } from "./thumbnails/studioThumbnailService";
+import { hashThumbnailSource } from "./thumbnails/sourceHash";
+import {
+  canInspectTimelineElement,
+  getTimelineElementKey,
+  isAudioTimelineElement,
+  shouldShowTimelineInspectorBounds,
+} from "./utils/timelineInspector";
 
 interface EditingFile {
   path: string;
@@ -98,11 +111,92 @@ interface AppToast {
   tone: "error" | "info";
 }
 
-function getTimelineElementLabel(element: TimelineElement): string {
-  return element.label || element.id || element.tag;
+interface PreviewPlayerCompat {
+  getTime: () => number;
+  renderSeek: (timeSeconds: number) => void;
 }
 
 type RightPanelTab = "design" | "renders";
+
+function getPreviewPlayer(win: Window | null | undefined): PreviewPlayerCompat | null {
+  const player = (win as (Window & { __player?: unknown }) | null | undefined)?.__player;
+  if (!player || typeof player !== "object") return null;
+  const maybePlayer = player as Partial<PreviewPlayerCompat>;
+  return typeof maybePlayer.getTime === "function" && typeof maybePlayer.renderSeek === "function"
+    ? (maybePlayer as PreviewPlayerCompat)
+    : null;
+}
+
+function parseFiniteSeconds(value: string | null): number | null {
+  if (value == null || value.trim() === "") return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isLayerVisibleInPreview(element: HTMLElement): boolean {
+  if (!element.isConnected) return false;
+  const win = element.ownerDocument.defaultView;
+  if (!win) return false;
+
+  const style = win.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  if (Number.parseFloat(style.opacity || "1") <= 0.01) return false;
+
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0.5 || rect.height <= 0.5) return false;
+
+  const viewportWidth = win.innerWidth || element.ownerDocument.documentElement.clientWidth;
+  const viewportHeight = win.innerHeight || element.ownerDocument.documentElement.clientHeight;
+  return (
+    rect.right > 0 && rect.bottom > 0 && rect.left < viewportWidth && rect.top < viewportHeight
+  );
+}
+
+function resolveLayerVisibleSeekTime(
+  layerElement: HTMLElement,
+  timelineElement: TimelineElement | null,
+  player: PreviewPlayerCompat | null,
+): number | null {
+  if (!timelineElement || !player) return null;
+
+  const clipStart = Math.max(0, timelineElement.start);
+  const clipEnd = Math.max(clipStart, clipStart + Math.max(0, timelineElement.duration));
+  const authoredStart = parseFiniteSeconds(
+    layerElement.getAttribute("data-start") ??
+      layerElement.closest<HTMLElement>("[data-start]")?.getAttribute("data-start") ??
+      null,
+  );
+  const preferredTime =
+    authoredStart == null
+      ? clipStart
+      : Math.min(clipEnd, Math.max(clipStart, clipStart + authoredStart));
+
+  const candidates = [preferredTime, clipStart];
+  const duration = Math.max(0, clipEnd - clipStart);
+  if (duration > 0) {
+    const maxSamples = 180;
+    const frameStep = 1 / 24;
+    const step = Math.max(frameStep, duration / maxSamples);
+    for (let time = clipStart; time <= clipEnd + 0.0001; time += step) {
+      candidates.push(Math.min(clipEnd, time));
+    }
+  }
+  candidates.push(clipEnd);
+
+  let lastTried = preferredTime;
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const time = Math.min(clipEnd, Math.max(clipStart, candidate));
+    const key = time.toFixed(4);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lastTried = time;
+    player.renderSeek(time);
+    if (isLayerVisibleInPreview(layerElement)) return time;
+  }
+
+  return lastTried;
+}
 
 const GENERIC_FONT_FAMILIES = new Set([
   "inherit",
@@ -170,6 +264,92 @@ function normalizeProjectAssetPath(value: string): string {
     .replace(/^\.?\//, "");
 }
 
+function normalizeRelativeProjectPath(path: string): string | null {
+  const parts: string[] = [];
+  for (const part of path.replace(/\\/g, "/").split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (parts.length === 0) return null;
+      parts.pop();
+      continue;
+    }
+    parts.push(part);
+  }
+  return parts.join("/");
+}
+
+function extractPreviewAssetPath(value: string): string | null {
+  try {
+    const parsed = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? new URL(value) : null;
+    const path = parsed?.pathname ?? value;
+    const marker = "/preview/";
+    const markerIndex = path.indexOf(marker);
+    if (markerIndex < 0) return null;
+    const encodedPath = path.slice(markerIndex + marker.length);
+    if (!encodedPath || encodedPath.startsWith("comp/")) return null;
+    return normalizeRelativeProjectPath(decodeURIComponent(encodedPath));
+  } catch {
+    return null;
+  }
+}
+
+function resolveTimelineAudioAssetPath(
+  element: Pick<TimelineElement, "tag" | "src" | "sourceFile">,
+): string | null {
+  if (!isAudioTimelineElement(element) || !element.src) return null;
+  const src = element.src.trim();
+  if (!src || src.startsWith("data:") || src.startsWith("blob:")) return null;
+
+  const previewPath = extractPreviewAssetPath(src);
+  if (previewPath) return previewPath;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return null;
+
+  const cleanPath = src.split(/[?#]/)[0] ?? src;
+  const baseDir = element.sourceFile?.includes("/")
+    ? element.sourceFile.slice(0, element.sourceFile.lastIndexOf("/"))
+    : "";
+  return normalizeRelativeProjectPath(baseDir ? `${baseDir}/${cleanPath}` : cleanPath);
+}
+
+function encodeProjectRoutePath(path: string): string {
+  return path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+function buildWaveformUrl(projectId: string, assetPath: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/waveform/${encodeProjectRoutePath(assetPath)}`;
+}
+
+function getPreviewCompositionPathFromIframe(iframe: HTMLIFrameElement | null): string | null {
+  if (!iframe?.src) return null;
+  try {
+    const pathname = new URL(iframe.src).pathname;
+    const marker = "/preview/comp/";
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+    const encodedPath = pathname.slice(markerIndex + marker.length).replace(/^\/+/, "");
+    return encodedPath ? decodeURIComponent(encodedPath) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getRenderedPreviewIframe(): HTMLIFrameElement | null {
+  if (typeof document === "undefined") return null;
+  const player = document.querySelector("hyperframes-player");
+  const iframe = player?.shadowRoot?.querySelector("iframe");
+  return iframe instanceof HTMLIFrameElement ? iframe : null;
+}
+
+function getCurrentPreviewIframe(
+  refIframe: HTMLIFrameElement | null,
+  stateIframe: HTMLIFrameElement | null,
+): HTMLIFrameElement | null {
+  return getRenderedPreviewIframe() ?? refIframe ?? stateIframe;
+}
+
 function toRelativeProjectAssetPath(sourceFile: string, assetPath: string): string {
   const fromParts = normalizeProjectAssetPath(sourceFile).split("/").filter(Boolean);
   const targetParts = normalizeProjectAssetPath(assetPath).split("/").filter(Boolean);
@@ -199,6 +379,40 @@ function toProjectAbsolutePath(projectDir: string | null, sourceFile: string): s
   if (!normalizedRoot) return undefined;
 
   return `${normalizedRoot}/${normalizedSource.replace(/^\.?\//, "")}`;
+}
+
+function formatElementLocatorClipboardText({
+  selection,
+  absolutePath,
+  sourceLocation,
+  currentTime,
+}: {
+  selection: DomEditSelection;
+  absolutePath: string;
+  sourceLocation: NonNullable<ReturnType<typeof findSourceLocationByTarget>> | null;
+  currentTime: number;
+}): string {
+  const pathWithLocation = sourceLocation
+    ? `${absolutePath}:${sourceLocation.line}:${sourceLocation.column}`
+    : absolutePath;
+  const lines = [
+    pathWithLocation,
+    "",
+    "HyperFrames selected element locator",
+    `Absolute path: ${absolutePath}`,
+    sourceLocation
+      ? `LOC: ${sourceLocation.line}:${sourceLocation.column}`
+      : "LOC: unavailable from current source",
+    `Source file: ${selection.sourceFile}`,
+    `Composition: ${selection.compositionPath}`,
+    `Selector: ${selection.selector ?? "(none)"}`,
+    `Selector index: ${selection.selectorIndex ?? 0}`,
+    `DOM id: ${selection.id ?? "(none)"}`,
+    `Tag: <${selection.tagName}>`,
+    `Playback time: ${currentTime.toFixed(3)}s`,
+  ];
+
+  return lines.join("\n");
 }
 
 function ensureImportedFontFace(
@@ -289,9 +503,20 @@ function getHistoryShortcutLabel(action: "undo" | "redo"): string {
   return action === "undo" ? `${modifier}+Z` : `${modifier}+Shift+Z`;
 }
 
+function isDomHTMLElement(value: unknown): value is HTMLElement {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "nodeType" in value &&
+    (value as { nodeType?: unknown }).nodeType === 1 &&
+    "getBoundingClientRect" in value &&
+    typeof (value as { getBoundingClientRect?: unknown }).getBoundingClientRect === "function"
+  );
+}
+
 function getDomEditCoalesceKey(
   selection: Pick<DomEditSelection, "id" | "selector" | "sourceFile">,
-  action: "move" | "resize",
+  action: "move" | "resize" | "motion",
 ): string {
   const target = selection.id || selection.selector || "selection";
   return `${action}:${selection.sourceFile || "index.html"}:${target}`;
@@ -344,7 +569,7 @@ function findMappedCompositionHost(
     const nestedCompId = nestedCurrent.getAttribute("data-composition-id");
     if (nestedCompId && nestedCompId !== rootCompositionId) {
       const hostCandidate = nestedCurrent.parentElement?.closest(".clip");
-      if (hostCandidate instanceof HTMLElement) {
+      if (isDomHTMLElement(hostCandidate)) {
         const hostCompId = hostCandidate.getAttribute("data-composition-id");
         const compositionSrc =
           hostCandidate.getAttribute("data-composition-src") ??
@@ -400,7 +625,7 @@ function isResizeStyleProperty(property: string): boolean {
 
 function getDomDetachCoordinateRoot(element: HTMLElement): HTMLElement {
   const offsetParent = element.offsetParent;
-  if (offsetParent instanceof HTMLElement) return offsetParent;
+  if (isDomHTMLElement(offsetParent)) return offsetParent;
 
   let current = element.parentElement;
   while (current) {
@@ -429,52 +654,16 @@ function measureDomDetachRect(element: HTMLElement): {
   };
 }
 
-function getDomSelectionClickKey(
-  selection: Pick<DomEditSelection, "id" | "selector" | "selectorIndex">,
-): string {
-  if (selection.id) return `id:${selection.id}`;
-  return `${selection.selector ?? "unknown"}:${selection.selectorIndex ?? 0}`;
-}
-
-function getPreviewTargetFromPointer(
-  iframe: HTMLIFrameElement,
-  clientX: number,
-  clientY: number,
-): HTMLElement | null {
-  let doc: Document | null = null;
-  let win: Window | null = null;
-  try {
-    doc = iframe.contentDocument;
-    win = iframe.contentWindow;
-  } catch {
-    return null;
-  }
-  if (!doc || !win) return null;
-
-  const iframeRect = iframe.getBoundingClientRect();
-  const root =
-    doc.querySelector<HTMLElement>("[data-composition-id]") ?? doc.documentElement ?? null;
-  const rootRect = root?.getBoundingClientRect();
-  const rootWidth = rootRect?.width || win.innerWidth;
-  const rootHeight = rootRect?.height || win.innerHeight;
-  if (!rootWidth || !rootHeight) return null;
-
-  const scaleX = iframeRect.width / rootWidth;
-  const scaleY = iframeRect.height / rootHeight;
-  const localX = (clientX - iframeRect.left) / scaleX;
-  const localY = (clientY - iframeRect.top) / scaleY;
-
-  return getEventTargetElement(doc.elementFromPoint(localX, localY));
-}
-
 // ── Ask Agent Modal ──
 
 function AskAgentModal({
   selectionLabel,
+  motionContextIncluded,
   onSubmit,
   onClose,
 }: {
   selectionLabel: string;
+  motionContextIncluded?: boolean;
   onSubmit: (instruction: string) => void;
   onClose: () => void;
 }) {
@@ -505,6 +694,11 @@ function AskAgentModal({
             <p className="text-xs text-neutral-500 mt-0.5">
               {selectionLabel.length > 50 ? `${selectionLabel.slice(0, 49)}…` : selectionLabel}
             </p>
+            {motionContextIncluded && (
+              <div className="mt-2 inline-flex rounded-full border border-[#3ce6ac]/30 bg-[#3ce6ac]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c4fff0]">
+                Motion context included
+              </div>
+            )}
           </div>
           <button
             className="p-1 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50"
@@ -552,6 +746,31 @@ function AskAgentModal({
       </div>
     </div>
   );
+}
+
+function selectionHasMotionAgentContext(selection: DomEditSelection): boolean {
+  if (selection.dataAttributes["hf-motion"]) return true;
+  return (
+    detectMotionOwnership({
+      element: selection.element,
+      dataAttributes: selection.dataAttributes,
+      computedStyles: selection.computedStyles,
+    }).badges.length > 0
+  );
+}
+
+function resolveSelectionMotionMaxDuration(
+  selection: DomEditSelection | null,
+  fallbackDuration: number,
+): number {
+  const clipElement = selection?.element.closest(".clip") ?? selection?.element ?? null;
+  const rawDuration =
+    clipElement?.getAttribute("data-duration") ?? selection?.element.getAttribute("data-duration");
+  const parsedDuration = rawDuration != null ? Number.parseFloat(rawDuration) : null;
+  if (parsedDuration != null && Number.isFinite(parsedDuration) && parsedDuration > 0) {
+    return parsedDuration;
+  }
+  return fallbackDuration;
 }
 
 const DEFAULT_TIMELINE_ASSET_DURATION: Record<TimelineAssetKind, number> = {
@@ -650,8 +869,10 @@ export function StudioApp() {
   const [domEditSelection, setDomEditSelection] = useState<DomEditSelection | null>(null);
   const [agentPromptTagSnippet, setAgentPromptTagSnippet] = useState<string | undefined>();
   const [copiedAgentPrompt, setCopiedAgentPrompt] = useState(false);
+  const [copiedElementLocator, setCopiedElementLocator] = useState(false);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
   const [previewIframe, setPreviewIframe] = useState<HTMLIFrameElement | null>(null);
+  const [previewDocumentVersion, setPreviewDocumentVersion] = useState(0);
   // Auto-enter caption edit mode when the iframe contains .caption-group elements.
   // This is a subscription to external events (postMessage from runtime) — useEffect
   // is appropriate here. The runtime fires "state"/"timeline" messages after all
@@ -751,6 +972,12 @@ export function StudioApp() {
     const handleMessage = (e: MessageEvent) => {
       const data = e.data;
       if (data?.source === "hf-preview" && (data?.type === "state" || data?.type === "timeline")) {
+        const currentIframe = getRenderedPreviewIframe();
+        if (currentIframe && currentIframe !== previewIframeRef.current) {
+          previewIframeRef.current = currentIframe;
+          setPreviewIframe(currentIframe);
+        }
+        setPreviewDocumentVersion((version) => version + 1);
         tryActivateCaptions();
       }
     };
@@ -775,9 +1002,10 @@ export function StudioApp() {
   const [appToast, setAppToast] = useState<AppToast | null>(null);
   const [timelineVisible, setTimelineVisible] = useState(true);
   const [captureFrameTime, setCaptureFrameTime] = useState(0);
-  const [timelineEditorHintDismissed, setTimelineEditorHintState] = useState(
-    getTimelineEditorHintDismissed,
+  const [thumbnailedTimelineElementIds, setThumbnailedTimelineElementIds] = useState<Set<string>>(
+    () => new Set(),
   );
+  const [inspectedTimelineElementId, setInspectedTimelineElementId] = useState<string | null>(null);
   const dragCounterRef = useRef(0);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastBlockedTimelineToastAtRef = useRef(0);
@@ -789,12 +1017,50 @@ export function StudioApp() {
     startX: number;
     startW: number;
   } | null>(null);
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const refreshPreviewDocumentVersion = useCallback(() => {
+    setPreviewDocumentVersion((version) => version + 1);
+    window.setTimeout(() => setPreviewDocumentVersion((version) => version + 1), 50);
+    window.setTimeout(() => setPreviewDocumentVersion((version) => version + 1), 250);
+    window.setTimeout(() => setPreviewDocumentVersion((version) => version + 1), 1000);
+  }, []);
 
-  // Derive active preview URL from composition path (for drilled-down thumbnails)
-  const activePreviewUrl = activeCompPath
-    ? `/api/projects/${projectId}/preview/comp/${activeCompPath}`
-    : null;
   const isMasterView = !activeCompPath || activeCompPath === "index.html";
+  const layerInspectionCompositionPath = useMemo(() => {
+    void previewDocumentVersion;
+    if (activeCompPath && activeCompPath !== "index.html") return activeCompPath;
+    return (
+      getPreviewCompositionPathFromIframe(
+        getCurrentPreviewIframe(previewIframeRef.current, previewIframe),
+      ) ?? activeCompPath
+    );
+  }, [activeCompPath, previewDocumentVersion, previewIframe]);
+  const layerInspectionIsMasterView =
+    !layerInspectionCompositionPath || layerInspectionCompositionPath === "index.html";
+  // eslint-disable-next-line no-restricted-syntax
+  useEffect(() => {
+    if (!layerInspectionCompositionPath) return;
+    let attempts = 0;
+    let intervalId: number | null = null;
+    const tick = () => {
+      const iframe = getCurrentPreviewIframe(previewIframeRef.current, previewIframe);
+      const hasCompositionRoot = Boolean(
+        iframe?.contentDocument?.querySelector("[data-composition-id]"),
+      );
+      setPreviewDocumentVersion((version) => version + 1);
+      attempts += 1;
+      if ((hasCompositionRoot || attempts >= 20) && intervalId != null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    tick();
+    intervalId = window.setInterval(tick, 100);
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, [layerInspectionCompositionPath, previewIframe]);
   const zoomMode = usePlayerStore((s) => s.zoomMode);
   const manualZoomPercent = usePlayerStore((s) => s.manualZoomPercent);
   const setZoomMode = usePlayerStore((s) => s.setZoomMode);
@@ -803,6 +1069,17 @@ export function StudioApp() {
   const timelineElements = usePlayerStore((s) => s.elements);
   const setSelectedTimelineElementId = usePlayerStore((s) => s.setSelectedElementId);
   const timelineDuration = usePlayerStore((s) => s.duration);
+  const inspectedTimelineElement = useMemo(
+    () =>
+      timelineElements.find(
+        (element) => getTimelineElementKey(element) === inspectedTimelineElementId,
+      ) ?? null,
+    [inspectedTimelineElementId, timelineElements],
+  );
+  const showInspectedTimelineBounds = useMemo(
+    () => shouldShowTimelineInspectorBounds(currentTime, inspectedTimelineElement),
+    [currentTime, inspectedTimelineElement],
+  );
   const effectiveTimelineDuration = useMemo(() => {
     const maxEnd =
       timelineElements.length > 0
@@ -810,10 +1087,39 @@ export function StudioApp() {
         : 0;
     return Math.max(timelineDuration, maxEnd);
   }, [timelineDuration, timelineElements]);
+  const selectedMotionMaxDuration = useMemo(
+    () => resolveSelectionMotionMaxDuration(domEditSelection, effectiveTimelineDuration),
+    [domEditSelection, effectiveTimelineDuration],
+  );
   const displayedTimelineZoomPercent = useMemo(
     () => getTimelineZoomPercent(zoomMode, manualZoomPercent),
     [zoomMode, manualZoomPercent],
   );
+  useEffect(() => {
+    setThumbnailedTimelineElementIds((current) => {
+      if (current.size === 0) return current;
+      const available = new Set(
+        timelineElements
+          .map(getTimelineElementKey)
+          .filter((id): id is string => typeof id === "string"),
+      );
+      const next = new Set([...current].filter((id) => available.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [timelineElements]);
+  const handleTimelineElementThumbnailToggle = useCallback((element: TimelineElement) => {
+    const elementKey = getTimelineElementKey(element);
+    if (!elementKey) return;
+    setThumbnailedTimelineElementIds((current) => {
+      const next = new Set(current);
+      if (next.has(elementKey)) {
+        next.delete(elementKey);
+      } else {
+        next.add(elementKey);
+      }
+      return next;
+    });
+  }, []);
   const toggleTimelineVisibility = useCallback(() => {
     setTimelineVisible((visible) => !visible);
   }, []);
@@ -840,10 +1146,6 @@ export function StudioApp() {
   useMountEffect(() => () => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   });
-  const dismissTimelineEditorHint = useCallback(() => {
-    setTimelineEditorHintState(true);
-    setTimelineEditorHintDismissed(true);
-  }, []);
   const handleTimelineToggleHotkey = useCallback(
     (event: KeyboardEvent) => {
       if (!shouldHandleTimelineToggleHotkey(event)) return;
@@ -883,146 +1185,8 @@ export function StudioApp() {
     [handleTimelineToggleHotkey],
   );
 
-  const renderClipContent = useCallback(
-    (el: TimelineElement, style: { clip: string; label: string }): ReactNode => {
-      const pid = projectIdRef.current;
-      if (!pid) return null;
-
-      // Resolve composition source path using the compIdToSrc map
-      let compSrc = el.compositionSrc;
-      if (compSrc && compIdToSrc.size > 0) {
-        const resolved =
-          compIdToSrc.get(el.id) ||
-          compIdToSrc.get(compSrc.replace(/^compositions\//, "").replace(/\.html$/, ""));
-        if (resolved) compSrc = resolved;
-      }
-
-      // Composition clips — always use the comp's own preview URL for thumbnails.
-      // This renders the composition in isolation so we get clean frames
-      // instead of capturing the master at a time when the comp is fading in.
-      if (compSrc) {
-        return (
-          <CompositionThumbnail
-            previewUrl={`/api/projects/${pid}/preview/comp/${compSrc}`}
-            label={getTimelineElementLabel(el)}
-            labelColor={style.label}
-            accentColor={style.clip}
-            seekTime={0}
-            duration={el.duration}
-          />
-        );
-      }
-
-      // When drilled into a composition, render all inner elements via
-      // CompositionThumbnail at their start time — most accurate visual.
-      if (activePreviewUrl && el.duration > 0) {
-        return (
-          <CompositionThumbnail
-            previewUrl={activePreviewUrl}
-            label={getTimelineElementLabel(el)}
-            labelColor={style.label}
-            accentColor={style.clip}
-            selector={el.selector}
-            selectorIndex={el.selectorIndex}
-            seekTime={el.start}
-            duration={el.duration}
-          />
-        );
-      }
-
-      const htmlPreviewEligible =
-        el.duration > 0 &&
-        effectiveTimelineDuration > 0 &&
-        el.duration < effectiveTimelineDuration * 0.92 &&
-        !/(backdrop|background|overlay|scrim|mask)/i.test(el.id);
-
-      // Audio clips — waveform visualization
-      if (el.tag === "audio") {
-        const previewBase = `/api/projects/${pid}/preview/`;
-        const previewIdx = el.src?.startsWith("http") ? el.src.indexOf(previewBase) : -1;
-        const srcRelative = el.src
-          ? previewIdx !== -1
-            ? decodeURIComponent(el.src.slice(previewIdx + previewBase.length))
-            : el.src.startsWith("http")
-              ? null
-              : el.src
-          : null;
-        const audioUrl = srcRelative
-          ? `/api/projects/${pid}/preview/${srcRelative}`
-          : (el.src ?? "");
-        const waveformUrl = srcRelative
-          ? `/api/projects/${pid}/waveform/${srcRelative}`
-          : undefined;
-        return (
-          <AudioWaveform
-            audioUrl={audioUrl}
-            waveformUrl={waveformUrl}
-            label={getTimelineElementLabel(el)}
-            labelColor={style.label}
-          />
-        );
-      }
-
-      if ((el.tag === "video" || el.tag === "img") && el.src) {
-        const mediaSrc = el.src.startsWith("http")
-          ? el.src
-          : `/api/projects/${pid}/preview/${el.src}`;
-        return (
-          <VideoThumbnail
-            videoSrc={mediaSrc}
-            label={getTimelineElementLabel(el)}
-            labelColor={style.label}
-            duration={el.duration}
-          />
-        );
-      }
-
-      if (htmlPreviewEligible) {
-        return (
-          <CompositionThumbnail
-            previewUrl={`/api/projects/${pid}/preview`}
-            label={getTimelineElementLabel(el)}
-            labelColor={style.label}
-            accentColor={style.clip}
-            selector={el.selector}
-            selectorIndex={el.selectorIndex}
-            seekTime={el.start}
-            duration={el.duration}
-          />
-        );
-      }
-
-      return null;
-    },
-    [compIdToSrc, activePreviewUrl, effectiveTimelineDuration],
-  );
   const timelineToolbar = (
     <div className="border-b border-neutral-800/40 bg-neutral-950/96">
-      {timelineVisible && timelineElements.length > 0 && !timelineEditorHintDismissed && (
-        <div className="px-3 pt-3">
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-studio-accent/20 bg-studio-accent/[0.07] px-3 py-3">
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold text-neutral-100">Timeline editor</div>
-              <p className="mt-1 text-[11px] leading-5 text-neutral-300">
-                Drag clips to move timing, and drag clip edges to resize them when handles are
-                available. Hide the panel anytime and bring it back with{" "}
-                <span className="font-mono text-[10px] text-studio-accent">
-                  {TIMELINE_TOGGLE_SHORTCUT_LABEL}
-                </span>
-                .
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={dismissTimelineEditorHint}
-              className="flex-shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-[10px] font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-neutral-100"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="flex items-center justify-between px-3 py-2">
         <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500">
           Timeline
@@ -1098,13 +1262,14 @@ export function StudioApp() {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const projectIdRef = useRef(projectId);
-  const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const consoleErrorsRef = useRef<LintFinding[]>([]);
   const copiedAgentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedElementLocatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const domEditSelectionRef = useRef<DomEditSelection | null>(domEditSelection);
   const lastPreviewClickRef = useRef<{ key: string; at: number } | null>(null);
   const domEditSaveTimestampRef = useRef(0);
   const domTextCommitVersionRef = useRef(0);
+  const fileContentCacheRef = useRef<Map<string, string>>(new Map());
 
   // Listen for external file changes (user editing HTML outside the editor).
   // In dev: use Vite HMR. In embedded/production: use SSE from /api/events.
@@ -1137,6 +1302,7 @@ export function StudioApp() {
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
+    fileContentCacheRef.current.clear();
     fetch(`/api/projects/${projectId}`)
       .then((r) => r.json())
       .then((data: { files?: string[]; dir?: string }) => {
@@ -1151,29 +1317,52 @@ export function StudioApp() {
     };
   }, [projectId]);
 
-  const handleFileSelect = useCallback((path: string) => {
+  const loadFileIntoEditor = useCallback((path: string, options?: { expandPanel?: boolean }) => {
     const pid = projectIdRef.current;
     if (!pid) return;
-    // Expand left panel to 50vw when opening a file in Code tab
-    setLeftWidth((prev) => Math.max(prev, Math.floor(window.innerWidth * 0.5)));
+    if (options?.expandPanel !== false) {
+      setLeftWidth((prev) => Math.max(prev, Math.floor(window.innerWidth * 0.5)));
+    }
     // Skip fetching binary content for media files — just set the path for preview
     if (isMediaFile(path)) {
       setEditingFile({ path, content: null });
       return;
     }
+    const cacheKey = `${pid}\0${path}`;
+    const cached = fileContentCacheRef.current.get(cacheKey);
+    if (cached != null) {
+      setEditingFile({ path, content: cached });
+      return;
+    }
+    setEditingFile({ path, content: null });
     fetch(`/api/projects/${pid}/files/${encodeURIComponent(path)}`)
       .then((r) => r.json())
       .then((data: { content?: string }) => {
         if (data.content != null) {
+          fileContentCacheRef.current.set(cacheKey, data.content);
+          if (editingPathRef.current && editingPathRef.current !== path) return;
           setEditingFile({ path, content: data.content });
         }
       })
       .catch(() => {});
   }, []);
 
+  const handleFileSelect = useCallback(
+    (path: string) => loadFileIntoEditor(path, { expandPanel: true }),
+    [loadFileIntoEditor],
+  );
+
+  const handleCompositionSelect = useCallback(
+    (comp: string) => {
+      setActiveCompPath(comp === "index.html" || comp.startsWith("compositions/") ? comp : null);
+      loadFileIntoEditor(comp, { expandPanel: false });
+    },
+    [loadFileIntoEditor],
+  );
+
   const editingPathRef = useRef(editingFile?.path);
   editingPathRef.current = editingFile?.path;
-  const editHistory = usePersistentEditHistory({ projectId });
+  const editHistory = useSharedEditHistory({ projectId });
 
   const readProjectFile = useCallback(async (path: string): Promise<string> => {
     const pid = projectIdRef.current;
@@ -1182,6 +1371,7 @@ export function StudioApp() {
     if (!response.ok) throw new Error(`Failed to read ${path}`);
     const data = (await response.json()) as { content?: string };
     if (typeof data.content !== "string") throw new Error(`Missing file contents for ${path}`);
+    fileContentCacheRef.current.set(`${pid}\0${path}`, data.content);
     return data.content;
   }, []);
 
@@ -1194,10 +1384,110 @@ export function StudioApp() {
       body: content,
     });
     if (!response.ok) throw new Error(`Failed to save ${path}`);
+    fileContentCacheRef.current.set(`${pid}\0${path}`, content);
     if (editingPathRef.current === path) {
       setEditingFile({ path, content });
     }
   }, []);
+
+  const resolveCompositionSourceHash = useCallback(
+    async (path: string): Promise<string> => hashThumbnailSource(await readProjectFile(path)),
+    [readProjectFile],
+  );
+
+  const renderTimelineClipContent = useCallback(
+    (element: TimelineElement, style: { clip: string; label: string; accent?: string }) => {
+      const activeProjectId = projectIdRef.current ?? projectId ?? "";
+      if (isAudioTimelineElement(element)) {
+        const audioAssetPath = resolveTimelineAudioAssetPath(element);
+        return (
+          <AudioWaveform
+            audioUrl={element.src ?? ""}
+            waveformUrl={
+              activeProjectId && audioAssetPath
+                ? buildWaveformUrl(activeProjectId, audioAssetPath)
+                : undefined
+            }
+            label={element.label || element.id || element.tag}
+            labelColor={style.label}
+          />
+        );
+      }
+      return (
+        <TimelineThumbnailContent
+          element={element}
+          projectId={activeProjectId}
+          style={style}
+          resolveSourceHash={resolveCompositionSourceHash}
+        />
+      );
+    },
+    [projectId, resolveCompositionSourceHash],
+  );
+
+  // Project-scoped edit events cover shared history transactions and adopted
+  // external/agent writes. The older HMR/file-change listener above remains as
+  // a broad preview invalidation fallback for dev and embedded servers.
+  // eslint-disable-next-line no-restricted-syntax
+  useEffect(() => {
+    if (!projectId) return;
+
+    const refreshFromProjectEvent = (event: MessageEvent | Event) => {
+      let changedPaths: string[] = [];
+      try {
+        const data =
+          event instanceof MessageEvent
+            ? (JSON.parse(event.data) as { changedPaths?: unknown; unmanagedPaths?: unknown })
+            : ((event as CustomEvent).detail as {
+                changedPaths?: unknown;
+                unmanagedPaths?: unknown;
+              });
+        if (Array.isArray(data.changedPaths)) {
+          changedPaths = data.changedPaths.filter(
+            (path): path is string => typeof path === "string",
+          );
+        }
+        if (Array.isArray(data.unmanagedPaths)) {
+          changedPaths.push(
+            ...data.unmanagedPaths.filter((path): path is string => typeof path === "string"),
+          );
+        }
+      } catch {
+        changedPaths = [];
+      }
+      if (changedPaths.length === 0) {
+        fileContentCacheRef.current.clear();
+        void getStudioThumbnailService().clearProject(projectId);
+      } else {
+        for (const path of changedPaths) {
+          fileContentCacheRef.current.delete(`${projectId}\0${path}`);
+        }
+      }
+
+      const activePath = editingPathRef.current;
+      if (activePath && (changedPaths.length === 0 || changedPaths.includes(activePath))) {
+        readProjectFile(activePath)
+          .then((content) => setEditingFile({ path: activePath, content }))
+          .catch(() => {});
+      }
+
+      // NLELayout owns the actual preview refresh. Keep project events on the
+      // same path as timeline/source edits so refreshPlayer() can preserve the
+      // current player instance and seek position.
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => setRefreshKey((key) => key + 1), 250);
+    };
+
+    const events = new EventSource(`/api/projects/${projectId}/events`);
+    events.addEventListener("file-change", refreshFromProjectEvent);
+    events.addEventListener("project-edit", refreshFromProjectEvent);
+    events.addEventListener("history-updated", refreshFromProjectEvent);
+    window.addEventListener("hf:project-history-event", refreshFromProjectEvent);
+    return () => {
+      events.close();
+      window.removeEventListener("hf:project-history-event", refreshFromProjectEvent);
+    };
+  }, [projectId, readProjectFile]);
 
   const handleContentChange = useCallback(
     (content: string) => {
@@ -1269,6 +1559,7 @@ export function StudioApp() {
       const trackZIndices = buildTrackZIndexMap(
         relevantElements.map((timelineElement) => timelineElement.track),
       );
+      const movedElementZIndex = trackZIndices.get(updates.track);
 
       let patchedContent = applyPatchByTarget(originalContent, patchTarget, {
         type: "attribute",
@@ -1280,26 +1571,11 @@ export function StudioApp() {
         property: "track-index",
         value: String(updates.track),
       });
-      for (const timelineElement of relevantElements) {
-        const elementTarget = timelineElement.domId
-          ? {
-              id: timelineElement.domId,
-              selector: timelineElement.selector,
-              selectorIndex: timelineElement.selectorIndex,
-            }
-          : timelineElement.selector
-            ? {
-                selector: timelineElement.selector,
-                selectorIndex: timelineElement.selectorIndex,
-              }
-            : null;
-        if (!elementTarget) continue;
-        const nextZIndex = trackZIndices.get(timelineElement.track);
-        if (nextZIndex == null) continue;
-        patchedContent = applyPatchByTarget(patchedContent, elementTarget, {
+      if (movedElementZIndex != null) {
+        patchedContent = applyPatchByTarget(patchedContent, patchTarget, {
           type: "inline-style",
           property: "z-index",
-          value: String(nextZIndex),
+          value: String(movedElementZIndex),
         });
       }
 
@@ -1583,7 +1859,10 @@ export function StudioApp() {
   );
 
   const applyDomSelection = useCallback(
-    (selection: DomEditSelection | null, options?: { revealPanel?: boolean }) => {
+    (
+      selection: DomEditSelection | null,
+      options?: { revealPanel?: boolean; preserveTimelineSelection?: boolean },
+    ) => {
       setDomEditSelection(selection);
       setAgentPromptTagSnippet(undefined);
       setCopiedAgentPrompt(false);
@@ -1593,18 +1872,29 @@ export function StudioApp() {
           setRightPanelTab("design");
         }
         const nextSelectedTimelineId = findMatchingTimelineElementId(selection, timelineElements);
-        setSelectedTimelineElementId(nextSelectedTimelineId);
+        if (!options?.preserveTimelineSelection) {
+          setSelectedTimelineElementId(nextSelectedTimelineId);
+        }
         return;
       }
 
-      setSelectedTimelineElementId(null);
+      if (!options?.preserveTimelineSelection) {
+        setSelectedTimelineElementId(null);
+      }
     },
     [setSelectedTimelineElementId, timelineElements],
   );
 
   const clearDomSelection = useCallback(() => {
+    setInspectedTimelineElementId(null);
     applyDomSelection(null, { revealPanel: false });
   }, [applyDomSelection]);
+
+  useEffect(() => {
+    if (!inspectedTimelineElementId || inspectedTimelineElement) return;
+    setInspectedTimelineElementId(null);
+    applyDomSelection(null, { revealPanel: false });
+  }, [applyDomSelection, inspectedTimelineElement, inspectedTimelineElementId]);
 
   const handleUndo = useCallback(async () => {
     const result = await editHistory.undo({
@@ -1686,9 +1976,10 @@ export function StudioApp() {
             capabilities: resolveDomEditCapabilities({
               selector: hostSelection.selector,
               tagName: hostSelection.tagName,
-              className: hostSelection.element.className,
+              className: hostSelection.element.getAttribute("class") ?? "",
               inlineStyles: hostSelection.inlineStyles,
               computedStyles: hostSelection.computedStyles,
+              hasStudioOwnedMotion: Boolean(hostSelection.dataAttributes["hf-motion"]),
               isCompositionHost: true,
               isMasterView: true,
             }),
@@ -1703,6 +1994,221 @@ export function StudioApp() {
       });
     },
     [activeCompPath, compIdToSrc, fileTree, isMasterView, timelineElements],
+  );
+
+  const buildDomSelectionForTimelineElement = useCallback(
+    (element: TimelineElement): DomEditSelection | null => {
+      const iframe = getCurrentPreviewIframe(previewIframeRef.current, previewIframe);
+      const doc = iframe?.contentDocument;
+      if (!doc) return null;
+      const effectiveCompositionPath = layerInspectionCompositionPath;
+
+      const target = findElementForSelection(
+        doc,
+        {
+          id: element.domId,
+          selector: element.selector,
+          selectorIndex: element.selectorIndex,
+          sourceFile: element.sourceFile ?? effectiveCompositionPath ?? "index.html",
+        },
+        effectiveCompositionPath,
+      );
+      if (target) {
+        if (!layerInspectionIsMasterView) {
+          return (
+            resolveDomEditSelection(target, {
+              activeCompositionPath: effectiveCompositionPath,
+              isMasterView: false,
+              preferClipAncestor: false,
+            }) ?? buildDomSelectionFromTarget(target)
+          );
+        }
+        return buildDomSelectionFromTarget(target);
+      }
+
+      if (!layerInspectionIsMasterView) {
+        const compositionRoot = doc.querySelector("[data-composition-id]");
+        if (isDomHTMLElement(compositionRoot)) {
+          return resolveDomEditSelection(compositionRoot, {
+            activeCompositionPath: effectiveCompositionPath,
+            isMasterView: false,
+            preferClipAncestor: false,
+          });
+        }
+      }
+
+      return null;
+    },
+    [
+      buildDomSelectionFromTarget,
+      layerInspectionCompositionPath,
+      layerInspectionIsMasterView,
+      previewIframe,
+    ],
+  );
+
+  const timelineLayerChildCounts = useMemo(() => {
+    void previewDocumentVersion;
+    const counts = new Map<string, number>();
+    if (!getCurrentPreviewIframe(previewIframeRef.current, previewIframe)) return counts;
+
+    for (const element of timelineElements) {
+      if (!canInspectTimelineElement(element)) continue;
+      const elementKey = getTimelineElementKey(element);
+      if (!elementKey) continue;
+      const selection = buildDomSelectionForTimelineElement(element);
+      const childCount = countDomEditChildLayers(selection?.element, {
+        activeCompositionPath: layerInspectionCompositionPath,
+        isMasterView: layerInspectionIsMasterView,
+      });
+      if (childCount > 0) counts.set(elementKey, childCount);
+    }
+
+    return counts;
+  }, [
+    buildDomSelectionForTimelineElement,
+    layerInspectionCompositionPath,
+    layerInspectionIsMasterView,
+    previewDocumentVersion,
+    previewIframe,
+    timelineElements,
+  ]);
+
+  const inspectedTimelineLayers = useMemo(() => {
+    void previewDocumentVersion;
+    if (!inspectedTimelineElement) return [];
+    const selection = buildDomSelectionForTimelineElement(inspectedTimelineElement);
+    return collectDomEditLayerItems(selection?.element, {
+      activeCompositionPath: layerInspectionCompositionPath,
+      isMasterView: layerInspectionIsMasterView,
+    });
+  }, [
+    buildDomSelectionForTimelineElement,
+    inspectedTimelineElement,
+    layerInspectionCompositionPath,
+    layerInspectionIsMasterView,
+    previewDocumentVersion,
+  ]);
+
+  const selectedTimelineLayerKey = useMemo(
+    () => (domEditSelection ? getDomEditLayerKey(domEditSelection) : null),
+    [domEditSelection],
+  );
+
+  const handleTimelineElementSelect = useCallback(
+    (element: TimelineElement | null) => {
+      if (!element) {
+        setInspectedTimelineElementId(null);
+        applyDomSelection(null, { revealPanel: false });
+        return;
+      }
+
+      const elementKey = getTimelineElementKey(element);
+      if (!elementKey || inspectedTimelineElementId !== elementKey) {
+        setInspectedTimelineElementId(null);
+        applyDomSelection(null, { revealPanel: false, preserveTimelineSelection: true });
+      }
+    },
+    [applyDomSelection, inspectedTimelineElementId],
+  );
+
+  const handleTimelineLayerSelect = useCallback(
+    (layer: DomEditLayerItem) => {
+      const initialSelection =
+        resolveDomEditSelection(layer.element, {
+          activeCompositionPath: layerInspectionCompositionPath,
+          isMasterView: false,
+          preferClipAncestor: false,
+        }) ?? buildDomSelectionFromTarget(layer.element);
+      if (!initialSelection) {
+        showToast("Could not select that nested layer in the preview.", "info");
+        return;
+      }
+      if (inspectedTimelineElementId) {
+        setSelectedTimelineElementId(inspectedTimelineElementId);
+      }
+      const player = getPreviewPlayer(previewIframeRef.current?.contentWindow);
+      const targetTime = resolveLayerVisibleSeekTime(
+        layer.element,
+        inspectedTimelineElement,
+        player,
+      );
+      if (targetTime != null) {
+        liveTime.notify(targetTime);
+        usePlayerStore.getState().setCurrentTime(targetTime);
+      }
+      const selection =
+        resolveDomEditSelection(layer.element, {
+          activeCompositionPath: layerInspectionCompositionPath,
+          isMasterView: false,
+          preferClipAncestor: false,
+        }) ??
+        buildDomSelectionFromTarget(layer.element) ??
+        initialSelection;
+      applyDomSelection(selection, { preserveTimelineSelection: true });
+    },
+    [
+      applyDomSelection,
+      buildDomSelectionFromTarget,
+      inspectedTimelineElement,
+      inspectedTimelineElementId,
+      layerInspectionCompositionPath,
+      setSelectedTimelineElementId,
+      showToast,
+    ],
+  );
+
+  const handleTimelineLayerPanelClose = useCallback(() => {
+    setInspectedTimelineElementId(null);
+    applyDomSelection(null, { revealPanel: false, preserveTimelineSelection: true });
+  }, [applyDomSelection]);
+
+  const handleTimelineElementInspect = useCallback(
+    (element: TimelineElement) => {
+      const elementKey = getTimelineElementKey(element);
+      if (!elementKey) return;
+
+      if (!canInspectTimelineElement(element)) {
+        setInspectedTimelineElementId(null);
+        applyDomSelection(null, { revealPanel: false, preserveTimelineSelection: true });
+        showToast(
+          "Audio clips use timeline timing controls, not the visual design inspector.",
+          "info",
+        );
+        return;
+      }
+
+      if (inspectedTimelineElementId === elementKey) {
+        setInspectedTimelineElementId(null);
+        applyDomSelection(null, { revealPanel: false, preserveTimelineSelection: true });
+        return;
+      }
+
+      const selection = buildDomSelectionForTimelineElement(element);
+      if (!selection) {
+        showToast("Could not find that clip in the preview.", "info");
+        return;
+      }
+
+      setSelectedTimelineElementId(elementKey);
+      setInspectedTimelineElementId(elementKey);
+      applyDomSelection(selection);
+
+      const targetTime = Math.max(0, element.start);
+      const player = getPreviewPlayer(previewIframeRef.current?.contentWindow);
+      if (player) {
+        player.renderSeek(targetTime);
+      }
+      liveTime.notify(targetTime);
+      usePlayerStore.getState().setCurrentTime(targetTime);
+    },
+    [
+      applyDomSelection,
+      buildDomSelectionForTimelineElement,
+      inspectedTimelineElementId,
+      setSelectedTimelineElementId,
+      showToast,
+    ],
   );
 
   const preloadAgentPromptSnippet = useCallback(
@@ -1762,6 +2268,7 @@ export function StudioApp() {
       operations: Parameters<typeof applyPatchByTarget>[2][],
       options?: {
         label?: string;
+        kind?: "manual" | "timeline" | "source" | "motion";
         coalesceKey?: string;
         skipRefresh?: boolean;
         prepareContent?: (html: string, sourceFile: string) => string;
@@ -1800,7 +2307,7 @@ export function StudioApp() {
       await saveProjectFilesWithHistory({
         projectId: pid,
         label: options?.label ?? "Edit layer",
-        kind: "manual",
+        kind: options?.kind ?? "manual",
         coalesceKey: options?.coalesceKey,
         files: { [targetPath]: patchedContent },
         readFile: async () => originalContent,
@@ -1951,6 +2458,66 @@ export function StudioApp() {
       });
     },
     [domEditSelection, persistDomEditOperations, resolveImportedFontAsset],
+  );
+
+  const handleDomMotionCommit = useCallback(
+    async (motion: MotionDraft | null) => {
+      if (!domEditSelection) return;
+      if (!domEditSelection.capabilities.canEditStyles) return;
+
+      const nextMotion = motion
+        ? clampMotionDraftToTimeline(motion, selectedMotionMaxDuration)
+        : null;
+      const motionVarsId = buildMotionVarsId(
+        domEditSelection.id || domEditSelection.selector || domEditSelection.label,
+      );
+      const operations = buildDomEditMotionPatchOperations(nextMotion, motionVarsId);
+      const iframe = previewIframeRef.current;
+      const doc = iframe?.contentDocument;
+      let refreshedElement: HTMLElement | null = null;
+
+      if (doc) {
+        const el = findElementForSelection(doc, domEditSelection, domEditSelection.sourceFile);
+        if (el) {
+          for (const operation of operations) {
+            const attr = operation.property.startsWith("data-")
+              ? operation.property
+              : `data-${operation.property}`;
+            if (operation.value == null) {
+              el.removeAttribute(attr);
+            } else {
+              el.setAttribute(attr, operation.value);
+            }
+          }
+          refreshedElement = el;
+          const player = getPreviewPlayer(iframe.contentWindow);
+          if (player) {
+            player.renderSeek(player.getTime());
+          }
+        }
+      }
+
+      await persistDomEditOperations(domEditSelection, operations, {
+        label: nextMotion ? "Edit layer motion" : "Clear layer motion",
+        kind: "motion",
+        coalesceKey: getDomEditCoalesceKey(domEditSelection, "motion"),
+        skipRefresh: true,
+      });
+
+      if (refreshedElement) {
+        const nextSelection = buildDomSelectionFromTarget(refreshedElement);
+        if (nextSelection) {
+          applyDomSelection(nextSelection, { revealPanel: false });
+        }
+      }
+    },
+    [
+      applyDomSelection,
+      buildDomSelectionFromTarget,
+      domEditSelection,
+      persistDomEditOperations,
+      selectedMotionMaxDuration,
+    ],
   );
 
   const handleDomTextCommit = useCallback(
@@ -2157,12 +2724,30 @@ export function StudioApp() {
 
       const targetPath = domEditSelection.sourceFile || activeCompPath || "index.html";
       const tagSnippet = agentPromptTagSnippet ?? domEditSelection.element.outerHTML;
+      const hfMotionAttribute = domEditSelection.dataAttributes["hf-motion"];
+      const motionOwnership = detectMotionOwnership({
+        element: domEditSelection.element,
+        dataAttributes: domEditSelection.dataAttributes,
+        computedStyles: domEditSelection.computedStyles,
+      });
+      const parsedMotionDraft = parseMotionDraft(hfMotionAttribute);
+      const motionContext =
+        hfMotionAttribute || motionOwnership.badges.length > 0
+          ? buildMotionAgentContext({
+              hfMotionAttribute,
+              draft: parsedMotionDraft
+                ? clampMotionDraftToTimeline(parsedMotionDraft, selectedMotionMaxDuration)
+                : null,
+              ownership: motionOwnership,
+            })
+          : undefined;
       const prompt = buildElementAgentPrompt({
         selection: domEditSelection,
         currentTime,
         tagSnippet,
         userInstruction,
         sourceFilePath: toProjectAbsolutePath(projectDir, targetPath),
+        motionContext,
       });
 
       const copied = await copyTextToClipboard(prompt);
@@ -2176,78 +2761,95 @@ export function StudioApp() {
       setCopiedAgentPrompt(true);
       copiedAgentTimerRef.current = setTimeout(() => setCopiedAgentPrompt(false), 1600);
     },
-    [activeCompPath, agentPromptTagSnippet, currentTime, domEditSelection, projectDir, showToast],
+    [
+      activeCompPath,
+      agentPromptTagSnippet,
+      currentTime,
+      domEditSelection,
+      projectDir,
+      selectedMotionMaxDuration,
+      showToast,
+    ],
   );
+
+  const handleCopyElementLocator = useCallback(async () => {
+    if (!domEditSelection) return;
+
+    const pid = projectIdRef.current;
+    const targetPath = domEditSelection.sourceFile || activeCompPath || "index.html";
+    const absolutePath = toProjectAbsolutePath(projectDir, targetPath) ?? targetPath;
+    let sourceLocation: NonNullable<ReturnType<typeof findSourceLocationByTarget>> | null = null;
+
+    if (pid) {
+      try {
+        const response = await fetch(
+          `/api/projects/${pid}/files/${encodeURIComponent(targetPath)}`,
+        );
+        if (response.ok) {
+          const data = (await response.json()) as { content?: string };
+          if (typeof data.content === "string") {
+            sourceLocation = findSourceLocationByTarget(data.content, domEditSelection);
+          }
+        }
+      } catch {
+        // The absolute file path and DOM selector still make a useful locator.
+      }
+    }
+
+    const locator = formatElementLocatorClipboardText({
+      selection: domEditSelection,
+      absolutePath,
+      sourceLocation,
+      currentTime,
+    });
+    const copied = await copyTextToClipboard(locator);
+    if (!copied) {
+      showToast("Could not copy element location to clipboard.", "error");
+      return;
+    }
+
+    if (copiedElementLocatorTimerRef.current) {
+      clearTimeout(copiedElementLocatorTimerRef.current);
+    }
+    setCopiedElementLocator(true);
+    copiedElementLocatorTimerRef.current = setTimeout(() => setCopiedElementLocator(false), 1600);
+    showToast("Copied element location.", "info");
+  }, [activeCompPath, currentTime, domEditSelection, projectDir, showToast]);
 
   const handlePreviewIframeRef = useCallback(
     (iframe: HTMLIFrameElement | null) => {
       previewIframeRef.current = iframe;
       setPreviewIframe(iframe);
+      refreshPreviewDocumentVersion();
       syncPreviewTimelineHotkey(iframe);
       consoleErrorsRef.current = [];
       setConsoleErrors(null);
     },
-    [syncPreviewTimelineHotkey],
+    [refreshPreviewDocumentVersion, syncPreviewTimelineHotkey],
   );
 
   const handlePreviewCanvasMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>, options?: { preferClipAncestor?: boolean }) => {
-      const iframe = previewIframeRef.current;
-      if (!iframe || captionEditMode) return;
-      const target = getPreviewTargetFromPointer(iframe, e.clientX, e.clientY);
-      if (!target) {
-        lastPreviewClickRef.current = null;
-        applyDomSelection(null, { revealPanel: false });
-        return;
+    (e: React.MouseEvent<HTMLDivElement>, _options?: { preferClipAncestor?: boolean }) => {
+      if (captionEditMode) return;
+      if (inspectedTimelineElementId) {
+        e.preventDefault();
+        e.stopPropagation();
       }
-      e.preventDefault();
-      e.stopPropagation();
-      const nextSelection = buildDomSelectionFromTarget(target, {
-        preferClipAncestor: options?.preferClipAncestor ?? true,
-      });
-      if (!nextSelection) {
-        lastPreviewClickRef.current = null;
-        applyDomSelection(null, { revealPanel: false });
-        return;
-      }
-      if (nextSelection.isCompositionHost && isMasterView && nextSelection.compositionSrc) {
-        const key = getDomSelectionClickKey(nextSelection);
-        const last = lastPreviewClickRef.current;
-        const now = Date.now();
-        if (last && last.key === key && now - last.at < 350) {
-          lastPreviewClickRef.current = null;
-          applyDomSelection(null, { revealPanel: false });
-          setActiveCompPath(nextSelection.compositionSrc);
-          return;
-        }
-        lastPreviewClickRef.current = { key, at: now };
-      } else {
-        lastPreviewClickRef.current = null;
-      }
-      applyDomSelection(nextSelection);
+      lastPreviewClickRef.current = null;
     },
-    [applyDomSelection, buildDomSelectionFromTarget, captionEditMode, isMasterView],
+    [captionEditMode, inspectedTimelineElementId],
   );
 
   const handlePreviewCanvasDoubleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      const iframe = previewIframeRef.current;
-      if (!iframe || captionEditMode) return;
-      const target = getPreviewTargetFromPointer(iframe, e.clientX, e.clientY);
-      if (!target) return;
-      const nextSelection = buildDomSelectionFromTarget(target, {
-        preferClipAncestor: false,
-      });
-      if (!nextSelection?.isCompositionHost || !isMasterView || !nextSelection.compositionSrc) {
-        return;
+      if (captionEditMode) return;
+      if (inspectedTimelineElementId) {
+        e.preventDefault();
+        e.stopPropagation();
       }
-      e.preventDefault();
-      e.stopPropagation();
       lastPreviewClickRef.current = null;
-      applyDomSelection(null, { revealPanel: false });
-      setActiveCompPath(nextSelection.compositionSrc);
     },
-    [applyDomSelection, buildDomSelectionFromTarget, captionEditMode, isMasterView],
+    [captionEditMode, inspectedTimelineElementId],
   );
 
   const handleSelectedOverlayDoubleClick = useCallback(() => {
@@ -2272,13 +2874,22 @@ export function StudioApp() {
       }
       if (!doc) return;
 
-      const nextElement = findElementForSelection(doc, currentSelection, activeCompPath);
+      const syncCompositionPath = inspectedTimelineElementId
+        ? layerInspectionCompositionPath
+        : activeCompPath;
+      const nextElement = findElementForSelection(doc, currentSelection, syncCompositionPath);
       if (!nextElement) {
         applyDomSelection(null, { revealPanel: false });
         return;
       }
 
-      const nextSelection = buildDomSelectionFromTarget(nextElement);
+      const nextSelection = inspectedTimelineElementId
+        ? (resolveDomEditSelection(nextElement, {
+            activeCompositionPath: layerInspectionCompositionPath,
+            isMasterView: false,
+            preferClipAncestor: false,
+          }) ?? buildDomSelectionFromTarget(nextElement))
+        : buildDomSelectionFromTarget(nextElement);
       if (nextSelection) {
         applyDomSelection(nextSelection, { revealPanel: false });
       }
@@ -2320,6 +2931,7 @@ export function StudioApp() {
     const handleLoad = () => {
       consoleErrorsRef.current = [];
       setConsoleErrors(null);
+      refreshPreviewDocumentVersion();
       attachErrorCapture();
       syncSelectionFromDocument();
     };
@@ -2333,7 +2945,10 @@ export function StudioApp() {
     applyDomSelection,
     buildDomSelectionFromTarget,
     captionEditMode,
+    inspectedTimelineElementId,
+    layerInspectionCompositionPath,
     previewIframe,
+    refreshPreviewDocumentVersion,
   ]);
 
   // eslint-disable-next-line no-restricted-syntax
@@ -2346,6 +2961,9 @@ export function StudioApp() {
   useEffect(
     () => () => {
       if (copiedAgentTimerRef.current) clearTimeout(copiedAgentTimerRef.current);
+      if (copiedElementLocatorTimerRef.current) {
+        clearTimeout(copiedElementLocatorTimerRef.current);
+      }
     },
     [],
   );
@@ -2931,22 +3549,9 @@ export function StudioApp() {
             projectId={projectId}
             compositions={compositions}
             assets={assets}
-            activeComposition={editingFile?.path ?? null}
-            onSelectComposition={(comp) => {
-              // Set active composition for preview drill-down
-              // Don't increment refreshKey — that reloads the master iframe and
-              // overrides the composition navigation. Let activeCompositionPath
-              // handle the preview change via the composition stack.
-              setActiveCompPath(
-                comp === "index.html" || comp.startsWith("compositions/") ? comp : null,
-              );
-              // Load file content for code editor
-              setEditingFile({ path: comp, content: null });
-              fetch(`/api/projects/${projectId}/files/${comp}`)
-                .then((r) => r.json())
-                .then((data) => setEditingFile({ path: comp, content: data.content }))
-                .catch(() => {});
-            }}
+            activeComposition={activeCompPath ?? editingFile?.path ?? null}
+            onSelectComposition={handleCompositionSelect}
+            resolveCompositionSourceContent={readProjectFile}
             fileTree={fileTree}
             editingFile={editingFile}
             onSelectFile={handleFileSelect}
@@ -2996,14 +3601,20 @@ export function StudioApp() {
             refreshKey={refreshKey}
             activeCompositionPath={activeCompPath}
             timelineToolbar={timelineToolbar}
-            renderClipContent={renderClipContent}
             onDeleteElement={handleTimelineElementDelete}
             onAssetDrop={handleTimelineAssetDrop}
             onFileDrop={handleTimelineFileDrop}
             onMoveElement={handleTimelineElementMove}
             onResizeElement={handleTimelineElementResize}
             onBlockedEditAttempt={handleBlockedTimelineEdit}
+            onSelectTimelineElement={handleTimelineElementSelect}
+            onInspectTimelineElement={handleTimelineElementInspect}
+            inspectedTimelineElementId={inspectedTimelineElementId}
+            timelineLayerChildCounts={timelineLayerChildCounts}
+            thumbnailedTimelineElementIds={thumbnailedTimelineElementIds}
+            onToggleTimelineElementThumbnail={handleTimelineElementThumbnailToggle}
             onCompIdToSrcChange={setCompIdToSrc}
+            renderClipContent={renderTimelineClipContent}
             onCompositionChange={(compPath) => {
               // Sync activeCompPath when user drills down via timeline double-click
               // or navigates back via breadcrumb — keeps sidebar + thumbnails in sync.
@@ -3014,19 +3625,38 @@ export function StudioApp() {
               captionEditMode ? (
                 <CaptionOverlay iframeRef={previewIframeRef} />
               ) : (
-                <DomEditOverlay
-                  iframeRef={previewIframeRef}
-                  selection={
-                    !rightCollapsed && rightPanelTab === "design" ? domEditSelection : null
-                  }
-                  allowCanvasMovement={false}
-                  onCanvasMouseDown={handlePreviewCanvasMouseDown}
-                  onCanvasDoubleClick={handlePreviewCanvasDoubleClick}
-                  onSelectedDoubleClick={handleSelectedOverlayDoubleClick}
-                  onBlockedMove={handleBlockedDomMove}
-                  onMoveCommit={handleDomMoveCommit}
-                  onResizeCommit={handleDomResizeCommit}
-                />
+                <>
+                  <DomEditOverlay
+                    iframeRef={previewIframeRef}
+                    selection={
+                      !rightCollapsed &&
+                      rightPanelTab === "design" &&
+                      inspectedTimelineElementId &&
+                      showInspectedTimelineBounds
+                        ? domEditSelection
+                        : null
+                    }
+                    onCanvasMouseDown={handlePreviewCanvasMouseDown}
+                    onCanvasDoubleClick={handlePreviewCanvasDoubleClick}
+                    onSelectedDoubleClick={handleSelectedOverlayDoubleClick}
+                    onBlockedMove={handleBlockedDomMove}
+                    onMoveCommit={handleDomMoveCommit}
+                    onResizeCommit={handleDomResizeCommit}
+                  />
+                  {inspectedTimelineElement && inspectedTimelineLayers.length > 0 && (
+                    <TimelineLayerPanel
+                      clipLabel={
+                        inspectedTimelineElement.label ||
+                        inspectedTimelineElement.id ||
+                        inspectedTimelineElement.tag
+                      }
+                      layers={inspectedTimelineLayers}
+                      selectedLayerKey={selectedTimelineLayerKey}
+                      onSelectLayer={handleTimelineLayerSelect}
+                      onClose={handleTimelineLayerPanelClose}
+                    />
+                  )}
+                </>
               )
             }
             timelineFooter={
@@ -3072,6 +3702,7 @@ export function StudioApp() {
                   <div className="flex items-center gap-1 border-b border-neutral-800 px-3 py-2">
                     <button
                       type="button"
+                      data-right-panel-tab="design"
                       onClick={() => setRightPanelTab("design")}
                       className={`h-8 rounded-xl px-3 text-[11px] font-medium transition-colors ${
                         rightPanelTab === "design"
@@ -3083,6 +3714,7 @@ export function StudioApp() {
                     </button>
                     <button
                       type="button"
+                      data-right-panel-tab="renders"
                       onClick={() => setRightPanelTab("renders")}
                       className={`h-8 rounded-xl px-3 text-[11px] font-medium transition-colors ${
                         rightPanelTab === "renders"
@@ -3096,27 +3728,7 @@ export function StudioApp() {
                     </button>
                   </div>
                   <div className="min-h-0 flex-1">
-                    {rightPanelTab === "design" ? (
-                      <PropertyPanel
-                        projectId={projectId}
-                        assets={assets}
-                        element={domEditSelection}
-                        copiedAgentPrompt={copiedAgentPrompt}
-                        onClearSelection={clearDomSelection}
-                        onSetStyle={handleDomStyleCommit}
-                        onSetText={handleDomTextCommit}
-                        onSetTextFieldStyle={handleDomTextFieldStyleCommit}
-                        onAddTextField={handleDomAddTextField}
-                        onRemoveTextField={handleDomRemoveTextField}
-                        onDetachFromLayout={handleDomDetachFromLayout}
-                        onAskAgent={handleAskAgent}
-                        onCopyAgentInstruction={handleAgentModalSubmit}
-                        onImportAssets={handleImportFiles}
-                        fontAssets={fontAssets}
-                        onImportFonts={handleImportFonts}
-                        allowLayoutDetach={false}
-                      />
-                    ) : (
+                    {rightPanelTab === "renders" ? (
                       <RenderQueue
                         jobs={renderQueue.jobs}
                         projectId={projectId}
@@ -3126,6 +3738,31 @@ export function StudioApp() {
                           renderQueue.startRender(30, quality, format)
                         }
                         isRendering={renderQueue.isRendering}
+                      />
+                    ) : (
+                      <PropertyPanel
+                        mode="design"
+                        projectId={projectId}
+                        assets={assets}
+                        element={domEditSelection}
+                        motionMaxDuration={selectedMotionMaxDuration}
+                        copiedAgentPrompt={copiedAgentPrompt}
+                        copiedElementLocator={copiedElementLocator}
+                        onClearSelection={clearDomSelection}
+                        onSetStyle={handleDomStyleCommit}
+                        onSetMotion={handleDomMotionCommit}
+                        onSetText={handleDomTextCommit}
+                        onSetTextFieldStyle={handleDomTextFieldStyleCommit}
+                        onAddTextField={handleDomAddTextField}
+                        onRemoveTextField={handleDomRemoveTextField}
+                        onDetachFromLayout={handleDomDetachFromLayout}
+                        onAskAgent={handleAskAgent}
+                        onCopyElementLocator={handleCopyElementLocator}
+                        onCopyAgentInstruction={handleAgentModalSubmit}
+                        onImportAssets={handleImportFiles}
+                        fontAssets={fontAssets}
+                        onImportFonts={handleImportFonts}
+                        allowLayoutDetach={false}
                       />
                     )}
                   </div>
@@ -3154,6 +3791,7 @@ export function StudioApp() {
       {agentModalOpen && domEditSelection && (
         <AskAgentModal
           selectionLabel={domEditSelection.label}
+          motionContextIncluded={selectionHasMotionAgentContext(domEditSelection)}
           onSubmit={handleAgentModalSubmit}
           onClose={() => setAgentModalOpen(false)}
         />

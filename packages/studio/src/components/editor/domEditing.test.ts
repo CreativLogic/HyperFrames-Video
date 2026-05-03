@@ -5,7 +5,10 @@ import {
   buildDomEditResizePatchOperations,
   buildDomEditStylePatchOperation,
   buildElementAgentPrompt,
+  collectDomEditLayerItems,
+  countDomEditChildLayers,
   findElementForSelection,
+  getDomEditLayerKey,
   isTextEditableSelection,
   serializeDomEditTextFields,
   type DomEditSelection,
@@ -104,6 +107,35 @@ describe("resolveDomEditCapabilities", () => {
     ).toMatchObject({
       canMove: false,
       canResize: false,
+      canDetachFromLayout: false,
+    });
+  });
+
+  it("allows moving Studio-owned motion layers even while their runtime transform is active", () => {
+    expect(
+      resolveDomEditCapabilities({
+        selector: "#headline",
+        inlineStyles: {
+          left: "120px",
+          top: "80px",
+          width: "240px",
+          height: "140px",
+        },
+        computedStyles: {
+          position: "absolute",
+          left: "120px",
+          top: "80px",
+          width: "240px",
+          height: "140px",
+          transform: "matrix(1, 0, 0, 1, 0, 32)",
+        },
+        hasStudioOwnedMotion: true,
+        isCompositionHost: false,
+        isMasterView: false,
+      }),
+    ).toMatchObject({
+      canMove: true,
+      canResize: true,
       canDetachFromLayout: false,
     });
   });
@@ -373,6 +405,71 @@ describe("resolveDomEditSelection", () => {
     expect(selection?.textFields.map((field) => field.tagName)).toEqual(["strong", "span"]);
     expect(selection?.textFields.map((field) => field.value)).toEqual(["", ""]);
   });
+
+  it("builds a stable selectable layer tree for timeline clip inspection", () => {
+    const document = createDocument(`
+      <section id="clip" class="clip" style="position: absolute;">
+        <div id="card">
+          <h1 class="title">Headline</h1>
+          <p class="copy">Copy</p>
+        </div>
+        <script>window.noop = true;</script>
+      </section>
+    `);
+
+    const root = document.getElementById("clip") as HTMLElement;
+    const layers = collectDomEditLayerItems(root, {
+      activeCompositionPath: "compositions/manual.html",
+      isMasterView: false,
+    });
+
+    expect(layers.map((layer) => [layer.label, layer.tagName, layer.depth])).toEqual([
+      ["Clip", "section", 0],
+      ["Card", "div", 1],
+      ["Title", "h1", 2],
+      ["Copy", "p", 2],
+    ]);
+    expect(layers[0]?.childCount).toBe(1);
+    expect(
+      countDomEditChildLayers(root, {
+        activeCompositionPath: "compositions/manual.html",
+        isMasterView: false,
+      }),
+    ).toBe(3);
+    expect(getDomEditLayerKey(layers[2]!)).toBe("compositions/manual.html:.title:0");
+  });
+
+  it("handles SVG className objects when counting nested timeline layers", () => {
+    const document = createDocument(`
+      <section id="clip" class="clip" style="position: absolute;">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path class="spark" d="M4 12h16" />
+        </svg>
+      </section>
+    `);
+
+    const svg = document.querySelector("svg") as HTMLElement;
+    Object.defineProperty(svg, "className", {
+      configurable: true,
+      value: { baseVal: "icon" },
+    });
+
+    const root = document.getElementById("clip") as HTMLElement;
+
+    expect(() =>
+      countDomEditChildLayers(root, {
+        activeCompositionPath: "compositions/manual.html",
+        isMasterView: false,
+      }),
+    ).not.toThrow();
+
+    const layers = collectDomEditLayerItems(root, {
+      activeCompositionPath: "compositions/manual.html",
+      isMasterView: false,
+    });
+
+    expect(layers.map((layer) => layer.selector)).toContain(".icon");
+  });
 });
 
 describe("patch builders and prompt builder", () => {
@@ -502,6 +599,71 @@ describe("patch builders and prompt builder", () => {
 
     expect(prompt).toContain("Source file: /tmp/hf-studio-project/index.html");
     expect(prompt).not.toContain("Source file: index.html");
+  });
+
+  it("includes motion ownership and runtime guardrails in motion-aware agent prompts", () => {
+    const selection = {
+      element: {} as HTMLElement,
+      id: "headline",
+      selector: "#headline",
+      selectorIndex: undefined,
+      sourceFile: "index.html",
+      compositionPath: "index.html",
+      compositionSrc: undefined,
+      isCompositionHost: false,
+      label: "Headline",
+      tagName: "div",
+      boundingBox: { x: 100, y: 120, width: 500, height: 180 },
+      textContent: "Launch",
+      dataAttributes: {
+        "hf-motion":
+          "v=1;preset=fade-up;start=0;duration=0.6;ease=outCubic;x=0;y=32;opacity=0:1;scale=1:1",
+      },
+      inlineStyles: {},
+      computedStyles: {},
+      textFields: [],
+      capabilities: {
+        canSelect: true,
+        canEditStyles: true,
+        canMove: true,
+        canResize: true,
+        canDetachFromLayout: false,
+      },
+    } satisfies DomEditSelection;
+
+    const prompt = buildElementAgentPrompt({
+      selection,
+      currentTime: 0.35,
+      sourceFilePath: "/tmp/hf-studio-project/index.html",
+      motionContext: {
+        version: 1,
+        state: "mixed",
+        summary: "Multiple motion owners detected; external owners are read-only.",
+        hfMotionAttribute: selection.dataAttributes["hf-motion"],
+        owners: [
+          { label: "HF Motion", state: "Editable", editable: true },
+          { label: "GSAP", state: "Detected", editable: false },
+          { label: "Mixed", state: "Mixed", editable: false },
+        ],
+        curveTracks: [
+          { key: "y", label: "Y", from: 32, to: 0, unit: "px", active: true },
+          { key: "opacity", label: "Opacity", from: 0, to: 1, unit: "", active: true },
+        ],
+        instructions: [
+          "Patch the existing runtime library only when the target is static and element-specific.",
+          "Use an outer layout wrapper when transform ownership is mixed.",
+        ],
+      },
+    });
+
+    expect(prompt).toContain("## HyperFrames element edit request v2");
+    expect(prompt).toContain("Motion context:");
+    expect(prompt).toContain("Authored HF Motion:");
+    expect(prompt).toContain("- HF Motion: Editable");
+    expect(prompt).toContain("- GSAP: Detected");
+    expect(prompt).toContain("- Y: 32px -> 0px");
+    expect(prompt).toContain("Patch the existing runtime library only when");
+    expect(prompt).toContain("Use an outer layout wrapper");
   });
 
   it("serializes child text fields back into HTML", () => {

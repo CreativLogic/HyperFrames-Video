@@ -6,6 +6,15 @@ import { isSafePath } from "../helpers/safePath.js";
 import { getMimeType } from "../helpers/mime.js";
 import { buildSubCompositionHtml } from "../helpers/subComposition.js";
 
+function htmlNoStore(html: string): Response {
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export function registerPreviewRoutes(api: Hono, adapter: StudioApiAdapter): void {
   // Bundled composition preview
   api.get("/projects/:id/preview", async (c) => {
@@ -37,10 +46,10 @@ export function registerPreviewRoutes(api: Hono, adapter: StudioApiAdapter): voi
         bundled = bundled.replace(/<head>/i, `<head><base href="${baseHref}">`);
       }
 
-      return c.html(bundled);
+      return htmlNoStore(bundled);
     } catch {
       const file = resolve(project.dir, "index.html");
-      if (existsSync(file)) return c.html(readFileSync(file, "utf-8"));
+      if (existsSync(file)) return htmlNoStore(readFileSync(file, "utf-8"));
       return c.text("not found", 404);
     }
   });
@@ -63,7 +72,7 @@ export function registerPreviewRoutes(api: Hono, adapter: StudioApiAdapter): voi
     const baseHref = `/api/projects/${project.id}/preview/`;
     const html = buildSubCompositionHtml(project.dir, compPath, adapter.runtimeUrl, baseHref);
     if (!html) return c.text("not found", 404);
-    return c.html(html);
+    return htmlNoStore(html);
   });
 
   // Static asset serving (with range request support for audio/video seeking)

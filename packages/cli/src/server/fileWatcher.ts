@@ -9,6 +9,13 @@ export interface ProjectWatcher {
 }
 
 const WATCHED_EXTENSIONS = new Set([".html", ".css", ".js", ".json"]);
+const IGNORED_SEGMENTS = new Set([
+  ".git",
+  ".hyperframes",
+  ".thumbnails",
+  "node_modules",
+  "renders",
+]);
 const DEBOUNCE_MS = 300;
 
 export function createProjectWatcher(projectDir: string): ProjectWatcher {
@@ -19,6 +26,8 @@ export function createProjectWatcher(projectDir: string): ProjectWatcher {
   try {
     watcher = watch(projectDir, { recursive: true }, (_event, filename) => {
       if (!filename) return;
+      const segments = filename.split(/[\\/]/).filter(Boolean);
+      if (segments.some((segment) => IGNORED_SEGMENTS.has(segment))) return;
       const ext = "." + filename.split(".").pop()?.toLowerCase();
       if (!WATCHED_EXTENSIONS.has(ext)) return;
 

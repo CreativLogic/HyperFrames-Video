@@ -282,4 +282,27 @@ describe("initSandboxRuntimeModular", () => {
     expect(video.paused).toBe(true);
     expect(video.currentTime).toBe(0);
   });
+
+  it("uses root data-duration as the duration for timeline-less compositions", () => {
+    const root = document.createElement("div");
+    root.setAttribute("data-composition-id", "main");
+    root.setAttribute("data-root", "true");
+    root.setAttribute("data-width", "1920");
+    root.setAttribute("data-height", "1080");
+    root.setAttribute("data-duration", "3");
+    document.body.appendChild(root);
+
+    initSandboxRuntimeModular();
+
+    const player = (
+      window as Window & {
+        __player?: { getDuration: () => number; play: () => void; isPlaying: () => boolean };
+      }
+    ).__player;
+    expect(player).toBeDefined();
+    expect(player?.getDuration()).toBe(3);
+
+    player?.play();
+    expect(player?.isPlaying()).toBe(true);
+  });
 });

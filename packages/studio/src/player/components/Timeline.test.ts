@@ -8,9 +8,12 @@ import {
   getTimelinePlayheadLeft,
   getTimelineScrollLeftForZoomAnchor,
   getTimelineScrollLeftForZoomTransition,
+  getTimelineVisibleTimeRange,
+  getTimelineVisibleTrackIndexRange,
   shouldShowTimelineShortcutHint,
   shouldHandleTimelineDeleteKey,
   shouldAutoScrollTimeline,
+  shouldRenderTimelineElementInRange,
 } from "./Timeline";
 import { formatTime } from "../lib/time";
 
@@ -214,6 +217,107 @@ describe("getTimelineScrollLeftForZoomAnchor", () => {
         duration: 120,
       }),
     ).toBe(120);
+  });
+});
+
+describe("getTimelineVisibleTimeRange", () => {
+  it("maps the scroll viewport into an overscanned time range", () => {
+    expect(
+      getTimelineVisibleTimeRange({
+        scrollLeft: 320,
+        viewportWidth: 640,
+        gutter: 32,
+        pixelsPerSecond: 100,
+        duration: 20,
+        overscanPx: 100,
+      }),
+    ).toEqual({ start: 1.88, end: 10.28 });
+  });
+
+  it("clamps invalid or out-of-bounds ranges to the composition duration", () => {
+    expect(
+      getTimelineVisibleTimeRange({
+        scrollLeft: 2000,
+        viewportWidth: 300,
+        gutter: 32,
+        pixelsPerSecond: 100,
+        duration: 5,
+        overscanPx: 100,
+      }),
+    ).toEqual({ start: 5, end: 5 });
+  });
+});
+
+describe("shouldRenderTimelineElementInRange", () => {
+  it("keeps clips that intersect the visible time range", () => {
+    expect(
+      shouldRenderTimelineElementInRange({ start: 3, duration: 2 }, { start: 4, end: 8 }),
+    ).toBe(true);
+    expect(
+      shouldRenderTimelineElementInRange({ start: 8, duration: 1 }, { start: 4, end: 8 }),
+    ).toBe(true);
+  });
+
+  it("skips clips outside the visible time range", () => {
+    expect(
+      shouldRenderTimelineElementInRange({ start: 0, duration: 1 }, { start: 4, end: 8 }),
+    ).toBe(false);
+    expect(
+      shouldRenderTimelineElementInRange({ start: 9, duration: 1 }, { start: 4, end: 8 }),
+    ).toBe(false);
+  });
+});
+
+describe("getTimelineVisibleTrackIndexRange", () => {
+  it("maps vertical scroll into an overscanned track index range", () => {
+    expect(
+      getTimelineVisibleTrackIndexRange({
+        scrollTop: 180,
+        viewportHeight: 220,
+        rulerHeight: 24,
+        trackHeight: 72,
+        trackCount: 20,
+        overscanRows: 1,
+      }),
+    ).toEqual({ startIndex: 1, endIndex: 7 });
+  });
+
+  it("renders all tracks before viewport measurement exists", () => {
+    expect(
+      getTimelineVisibleTrackIndexRange({
+        scrollTop: 0,
+        viewportHeight: 0,
+        rulerHeight: 24,
+        trackHeight: 72,
+        trackCount: 4,
+        overscanRows: 2,
+      }),
+    ).toEqual({ startIndex: 0, endIndex: 3 });
+  });
+
+  it("clamps the range to available tracks", () => {
+    expect(
+      getTimelineVisibleTrackIndexRange({
+        scrollTop: 2000,
+        viewportHeight: 220,
+        rulerHeight: 24,
+        trackHeight: 72,
+        trackCount: 5,
+        overscanRows: 2,
+      }),
+    ).toEqual({ startIndex: 4, endIndex: 4 });
+  });
+
+  it("returns an empty range when there are no tracks", () => {
+    expect(
+      getTimelineVisibleTrackIndexRange({
+        scrollTop: 0,
+        viewportHeight: 220,
+        rulerHeight: 24,
+        trackHeight: 72,
+        trackCount: 0,
+      }),
+    ).toEqual({ startIndex: 0, endIndex: -1 });
   });
 });
 

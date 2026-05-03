@@ -98,6 +98,15 @@ function restoreInlineStyle(
   else element.style.removeProperty(property);
 }
 
+function trySetPointerCapture(element: HTMLElement, pointerId: number) {
+  try {
+    element.setPointerCapture(pointerId);
+  } catch {
+    // Synthetic pointer events used by tests/agent automation may not have an
+    // active pointer in the browser. The drag still works through overlay events.
+  }
+}
+
 interface GestureState {
   kind: GestureKind;
   startX: number;
@@ -234,7 +243,7 @@ export const DomEditOverlay = memo(function DomEditOverlay({
 
     e.preventDefault();
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    trySetPointerCapture(e.target as HTMLElement, e.pointerId);
 
     rafPausedRef.current = true;
 
@@ -415,7 +424,7 @@ export const DomEditOverlay = memo(function DomEditOverlay({
               }
               e.preventDefault();
               e.stopPropagation();
-              e.currentTarget.setPointerCapture(e.pointerId);
+              trySetPointerCapture(e.currentTarget, e.pointerId);
               blockedMoveRef.current = {
                 pointerId: e.pointerId,
                 startX: e.clientX,

@@ -341,6 +341,30 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
     return serve();
   });
 
+  const api = createStudioApi(adapter);
+  let recentApiWriteAt = 0;
+
+  watcher.addListener((relativePath) => {
+    if (Date.now() - recentApiWriteAt < 3000) return;
+    void api
+      .fetch(
+        new Request(
+          `http://studio/projects/${encodeURIComponent(project.id)}/history/adopt-external`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              paths: [relativePath],
+              actor: { type: "external" },
+            }),
+          },
+        ),
+      )
+      .catch((error) => {
+        console.warn("[studio] Failed to adopt external file edit:", error);
+      });
+  });
+
   app.get("/api/events", (c) => {
     return streamSSE(c, async (stream) => {
       const listener = () => {
@@ -356,10 +380,12 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
   // Mount the shared studio API at /api.
   // Use fetch() forwarding (not .route()) so the sub-app sees paths without
   // the /api prefix — the shared module's path extraction uses c.req.path.
-  const api = createStudioApi(adapter);
   app.all("/api/*", async (c) => {
     const url = new URL(c.req.url);
     url.pathname = url.pathname.slice(4); // Strip "/api" prefix
+    if (/^\/projects\/[^/]+\/(?:edits|history\/(?:undo|redo|record-applied))/.test(url.pathname)) {
+      recentApiWriteAt = Date.now();
+    }
     const forwardReq = new Request(url.toString(), {
       method: c.req.method,
       headers: c.req.raw.headers,

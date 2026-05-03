@@ -73,16 +73,15 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
       import("@hyperframes/player").then(() => {
         if (canceled) return;
 
+        let loadHandled = false;
+        let readyProbeInterval: ReturnType<typeof window.setInterval> | undefined;
         const player = document.createElement("hyperframes-player") as HyperframesPlayerElement;
         const src = directUrl || `/api/projects/${projectId}/preview`;
-        player.setAttribute("src", src);
         player.setAttribute("width", String(portrait ? 1080 : 1920));
         player.setAttribute("height", String(portrait ? 1920 : 1080));
         player.style.width = "100%";
         player.style.height = "100%";
         player.style.display = "block";
-        container.appendChild(player);
-        enableInteractiveIframe(player);
 
         const iframe = player.iframeElement;
         if (typeof ref === "function") {
@@ -95,6 +94,13 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
         player.addEventListener("click", preventToggle, { capture: true });
 
         const handleLoad = () => {
+          if (loadHandled) return;
+          loadHandled = true;
+          if (readyProbeInterval != null) {
+            window.clearInterval(readyProbeInterval);
+            readyProbeInterval = undefined;
+          }
+
           onLoad();
 
           if (assetPollRef.current) clearInterval(assetPollRef.current);
@@ -117,9 +123,37 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
         };
         iframe.addEventListener("load", handleLoad);
 
+        container.appendChild(player);
+        enableInteractiveIframe(player);
+        // Set src last so a warm browser/cache cannot complete the iframe load
+        // before Studio has attached the load listener that hydrates timeline state.
+        player.setAttribute("src", src);
+        let readyProbeAttempts = 0;
+        readyProbeInterval = window.setInterval(() => {
+          readyProbeAttempts += 1;
+          try {
+            const doc = iframe.contentDocument;
+            const href = iframe.contentWindow?.location.href;
+            if (
+              doc &&
+              href !== "about:blank" &&
+              (doc.readyState === "interactive" || doc.readyState === "complete")
+            ) {
+              handleLoad();
+              return;
+            }
+          } catch {
+            // The iframe is same-origin in Studio; if the browser briefly denies
+            // access during navigation, keep the normal load listener as authority.
+          }
+
+          if (readyProbeAttempts >= 50) handleLoad();
+        }, 100);
+
         cleanup = () => {
           iframe.removeEventListener("load", handleLoad);
           player.removeEventListener("click", preventToggle, { capture: true });
+          if (readyProbeInterval != null) window.clearInterval(readyProbeInterval);
           if (assetPollRef.current) clearInterval(assetPollRef.current);
           assetPollRef.current = null;
           container.removeChild(player);

@@ -1,5 +1,6 @@
 import { formatTime } from "../../player/lib/time";
 import type { PatchOperation, PatchTarget } from "../../utils/sourcePatcher";
+import type { MotionAgentContext } from "./motionEditing";
 
 const CURATED_STYLE_PROPERTIES = [
   "position",
@@ -67,6 +68,19 @@ export interface DomEditSelection extends PatchTarget {
   computedStyles: Record<string, string>;
   textFields: DomEditTextField[];
   capabilities: DomEditCapabilities;
+}
+
+export interface DomEditLayerItem {
+  key: string;
+  element: HTMLElement;
+  label: string;
+  tagName: string;
+  depth: number;
+  childCount: number;
+  id?: string;
+  selector?: string;
+  selectorIndex?: number;
+  sourceFile: string;
 }
 
 export interface DomEditContextOptions {
@@ -236,7 +250,7 @@ function getSelectionCandidate(startEl: HTMLElement, options: DomEditContextOpti
 }
 
 function getPreferredClassSelector(el: HTMLElement): string | undefined {
-  const classes = el.className
+  const classes = getElementClassName(el)
     .split(/\s+/)
     .map((value) => value.trim())
     .filter(Boolean);
@@ -244,6 +258,10 @@ function getPreferredClassSelector(el: HTMLElement): string | undefined {
   const preferred =
     classes.find((value) => value !== "clip" && !value.startsWith("__hf-")) ?? classes[0];
   return preferred ? `.${preferred}` : undefined;
+}
+
+function getElementClassName(el: HTMLElement): string {
+  return typeof el.className === "string" ? el.className : (el.getAttribute("class") ?? "");
 }
 
 function humanizeIdentifier(value: string): string {
@@ -285,6 +303,13 @@ function getSelectorIndex(
   return index >= 0 ? index : undefined;
 }
 
+export function getDomEditLayerKey(
+  target: Pick<DomEditSelection, "id" | "selector" | "selectorIndex" | "sourceFile">,
+): string {
+  const selectorIndex = target.selectorIndex ?? 0;
+  return `${target.sourceFile}:${target.id ?? target.selector ?? "layer"}:${selectorIndex}`;
+}
+
 function buildElementLabel(el: HTMLElement): string {
   const compositionId = el.getAttribute("data-composition-id");
   if (compositionId && compositionId !== "main") {
@@ -307,6 +332,123 @@ function buildElementLabel(el: HTMLElement): string {
   const text = (el.textContent ?? "").trim().replace(/\s+/g, " ");
   if (text) return text.length > 40 ? `${text.slice(0, 39)}…` : text;
   return el.tagName.toLowerCase();
+}
+
+const DOM_LAYER_IGNORED_TAGS = new Set([
+  "base",
+  "br",
+  "link",
+  "meta",
+  "script",
+  "source",
+  "style",
+  "template",
+  "track",
+  "wbr",
+]);
+
+function isInspectableLayerElement(el: HTMLElement): boolean {
+  const tagName = el.tagName.toLowerCase();
+  if (DOM_LAYER_IGNORED_TAGS.has(tagName)) return false;
+
+  const computed = el.ownerDocument.defaultView?.getComputedStyle(el);
+  if (computed?.display === "none" || computed?.visibility === "hidden") return false;
+
+  return true;
+}
+
+function getDomLayerPatchTarget(
+  el: HTMLElement,
+  activeCompositionPath: string | null,
+): Pick<DomEditSelection, "id" | "selector" | "selectorIndex" | "sourceFile"> | null {
+  if (!isInspectableLayerElement(el)) return null;
+
+  const selector = buildStableSelector(el);
+  if (!selector) return null;
+
+  const { sourceFile } = getSourceFileForElement(el, activeCompositionPath);
+  return {
+    id: el.id || undefined,
+    selector,
+    selectorIndex: getSelectorIndex(
+      el.ownerDocument,
+      el,
+      selector,
+      sourceFile,
+      activeCompositionPath,
+    ),
+    sourceFile,
+  };
+}
+
+function getDirectLayerChildren(el: HTMLElement, options: DomEditContextOptions): HTMLElement[] {
+  return Array.from(el.children).filter(
+    (child): child is HTMLElement =>
+      isHtmlElement(child) && getDomLayerPatchTarget(child, options.activeCompositionPath) !== null,
+  );
+}
+
+export function countDomEditChildLayers(
+  root: HTMLElement | null | undefined,
+  options: DomEditContextOptions,
+  maxCount = 99,
+): number {
+  if (!root) return 0;
+
+  let count = 0;
+  const visit = (el: HTMLElement) => {
+    for (const child of Array.from(el.children)) {
+      if (!isHtmlElement(child)) continue;
+      if (getDomLayerPatchTarget(child, options.activeCompositionPath)) {
+        count += 1;
+        if (count >= maxCount) return;
+      }
+      visit(child);
+      if (count >= maxCount) return;
+    }
+  };
+
+  visit(root);
+  return count;
+}
+
+export function collectDomEditLayerItems(
+  root: HTMLElement | null | undefined,
+  options: DomEditContextOptions,
+  maxItems = 80,
+): DomEditLayerItem[] {
+  if (!root) return [];
+
+  const items: DomEditLayerItem[] = [];
+  const visit = (el: HTMLElement, depth: number) => {
+    if (items.length >= maxItems) return;
+
+    const target = getDomLayerPatchTarget(el, options.activeCompositionPath);
+    if (target) {
+      items.push({
+        key: getDomEditLayerKey(target),
+        element: el,
+        label: buildElementLabel(el),
+        tagName: el.tagName.toLowerCase(),
+        depth,
+        childCount: getDirectLayerChildren(el, options).length,
+        id: target.id ?? undefined,
+        selector: target.selector ?? undefined,
+        selectorIndex: target.selectorIndex,
+        sourceFile: target.sourceFile,
+      });
+    }
+
+    const nextDepth = target ? depth + 1 : depth;
+    for (const child of Array.from(el.children)) {
+      if (!isHtmlElement(child)) continue;
+      visit(child, nextDepth);
+      if (items.length >= maxItems) return;
+    }
+  };
+
+  visit(root, 0);
+  return items;
 }
 
 function getDataAttributes(el: HTMLElement): Record<string, string> {
@@ -433,6 +575,7 @@ export function resolveDomEditCapabilities(args: {
   className?: string;
   inlineStyles: Record<string, string>;
   computedStyles: Record<string, string>;
+  hasStudioOwnedMotion?: boolean;
   isCompositionHost: boolean;
   isMasterView: boolean;
 }): DomEditCapabilities {
@@ -452,7 +595,8 @@ export function resolveDomEditCapabilities(args: {
   const top = parsePx(args.inlineStyles.top) ?? parsePx(args.computedStyles.top);
   const width = parsePx(args.inlineStyles.width) ?? parsePx(args.computedStyles.width);
   const height = parsePx(args.inlineStyles.height) ?? parsePx(args.computedStyles.height);
-  const hasTransformDrivenGeometry = !isIdentityTransform(args.computedStyles.transform);
+  const hasTransformDrivenGeometry =
+    !args.hasStudioOwnedMotion && !isIdentityTransform(args.computedStyles.transform);
 
   const canMove =
     (position === "absolute" || position === "fixed") &&
@@ -534,9 +678,10 @@ export function resolveDomEditSelection(
     const capabilities = resolveDomEditCapabilities({
       selector,
       tagName: current.tagName.toLowerCase(),
-      className: current.className,
+      className: getElementClassName(current),
       inlineStyles,
       computedStyles,
+      hasStudioOwnedMotion: current.hasAttribute("data-hf-motion"),
       isCompositionHost: Boolean(compositionSrc),
       isMasterView: options.isMasterView,
     });
@@ -692,23 +837,74 @@ function formatTextFields(fields: DomEditTextField[]): string {
     .join("\n");
 }
 
+function formatMotionNumber(value: number): string {
+  const normalized = Math.abs(value) < 0.0001 ? 0 : value;
+  const rounded = Math.round(normalized * 1000) / 1000;
+  return Number.isInteger(rounded)
+    ? `${rounded}`
+    : rounded.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function formatMotionTrackValue(value: number, unit: string): string {
+  return `${formatMotionNumber(value)}${unit}`;
+}
+
+function formatMotionContext(context: MotionAgentContext): string[] {
+  const lines = ["Motion context:", `State: ${context.state}`, `Summary: ${context.summary}`];
+
+  if (context.hfMotionAttribute) {
+    lines.push(`Authored HF Motion: ${context.hfMotionAttribute}`);
+  }
+
+  if (context.owners.length > 0) {
+    lines.push("Runtime owners:");
+    for (const owner of context.owners) {
+      lines.push(`- ${owner.label}: ${owner.state}${owner.editable ? " (editable)" : ""}`);
+    }
+  }
+
+  if (context.curveTracks.length > 0) {
+    lines.push("Motion curve tracks:");
+    for (const track of context.curveTracks) {
+      lines.push(
+        `- ${track.label}: ${formatMotionTrackValue(track.from, track.unit)} -> ${formatMotionTrackValue(
+          track.to,
+          track.unit,
+        )}${track.active ? "" : " (constant)"}`,
+      );
+    }
+  }
+
+  if (context.instructions.length > 0) {
+    lines.push("Motion edit guidance:");
+    for (const instruction of context.instructions) {
+      lines.push(`- ${instruction}`);
+    }
+  }
+
+  return lines;
+}
+
 export function buildElementAgentPrompt({
   selection,
   currentTime,
   tagSnippet,
   userInstruction,
   sourceFilePath,
+  motionContext,
 }: {
   selection: DomEditSelection;
   currentTime: number;
   tagSnippet?: string;
   userInstruction?: string;
   sourceFilePath?: string;
+  motionContext?: MotionAgentContext;
 }): string {
   const displayedSourceFile = sourceFilePath?.trim() || selection.sourceFile;
+  const schemaVersion = motionContext ? 2 : 1;
   const lines = [
-    "## HyperFrames element edit request v1",
-    "Schema version: 1",
+    `## HyperFrames element edit request v${schemaVersion}`,
+    `Schema version: ${schemaVersion}`,
     "",
     userInstruction?.trim() || "Edit this selected HyperFrames element.",
     "",
@@ -743,6 +939,10 @@ export function buildElementAgentPrompt({
 
   if (tagSnippet) {
     lines.push("", "Target HTML:", tagSnippet);
+  }
+
+  if (motionContext) {
+    lines.push("", ...formatMotionContext(motionContext));
   }
 
   lines.push(

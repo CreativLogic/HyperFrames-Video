@@ -8,7 +8,7 @@ import {
   lstatSync,
   realpathSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import type {
   StudioApiAdapter,
   ResolvedProject,
@@ -53,7 +53,7 @@ const THUMBNAIL_CACHE_VERSION = "v2";
 function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAdapter {
   // Lazy-load the bundler via Vite's SSR module loader
   let _bundler: ((dir: string) => Promise<string>) | null = null;
-  let _producerModulePromise: Promise<{
+  type ProducerModule = {
     createRenderJob: (config: {
       fps: 24 | 30 | 60;
       quality: "draft" | "standard" | "high";
@@ -65,7 +65,8 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
       outputPath: string,
       onProgress?: (job: { progress: number; currentStage?: string }) => void,
     ) => Promise<void>;
-  }> | null = null;
+  };
+  let _producerModuleLoader: (() => Promise<ProducerModule>) | null = null;
   const getBundler = async () => {
     if (!_bundler) {
       try {
@@ -80,8 +81,8 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
   };
 
   const getProducerModule = async () => {
-    if (!_producerModulePromise) {
-      _producerModulePromise = createRetryingModuleLoader(async () => {
+    if (!_producerModuleLoader) {
+      _producerModuleLoader = createRetryingModuleLoader(async () => {
         const { built } = ensureProducerDist({
           studioDir: __dirname,
           env: process.env,
@@ -93,9 +94,9 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
         }
         const producerPkg = "@hyperframes/producer";
         return await import(/* @vite-ignore */ producerPkg);
-      })();
+      });
     }
-    return _producerModulePromise();
+    return _producerModuleLoader();
   };
 
   return {
@@ -409,6 +410,7 @@ function devProjectApi(): Plugin {
     configureServer(server): void {
       // Load the shared module lazily via SSR (resolves hono + TypeScript)
       let _api: { fetch: (req: Request) => Promise<Response> } | null = null;
+      const recentApiWriteProjects = new Map<string, number>();
       const getApi = async () => {
         if (!_api) {
           const mod = await server.ssrLoadModule("@hyperframes/core/studio-api");
@@ -463,6 +465,7 @@ function devProjectApi(): Plugin {
           const url = new URL(req.url, `http://${req.headers.host}`);
           // Strip /api prefix — shared module routes are relative
           url.pathname = url.pathname.slice(4);
+          const apiPath = url.pathname;
 
           // Read body for non-GET/HEAD
           let body: Buffer | undefined;
@@ -483,6 +486,11 @@ function devProjectApi(): Plugin {
           });
 
           const response = await api.fetch(fetchReq);
+          const writeMatch =
+            /^\/projects\/([^/]+)\/(?:edits|history\/(?:undo|redo|record-applied))/.exec(apiPath);
+          if (writeMatch?.[1]) {
+            recentApiWriteProjects.set(decodeURIComponent(writeMatch[1]), Date.now());
+          }
           await bridgeHonoResponse(response, res);
         } catch (err) {
           console.error("[Studio API] Error:", err);
@@ -494,13 +502,13 @@ function devProjectApi(): Plugin {
       });
 
       // Watch project directories for file changes → HMR
-      const realProjectPaths: string[] = [];
+      const realProjectPaths: Array<{ id: string; dir: string }> = [];
       try {
         for (const entry of readdirSync(dataDir, { withFileTypes: true })) {
           const full = join(dataDir, entry.name);
           try {
             const real = lstatSync(full).isSymbolicLink() ? realpathSync(full) : full;
-            realProjectPaths.push(real);
+            realProjectPaths.push({ id: entry.name, dir: real });
             server.watcher.add(real);
           } catch {
             /* skip broken symlinks */
@@ -511,13 +519,44 @@ function devProjectApi(): Plugin {
       }
 
       server.watcher.on("change", (filePath: string) => {
-        const isProjectFile = realProjectPaths.some((p) => filePath.startsWith(p));
+        const project = realProjectPaths.find((p) => filePath.startsWith(p.dir));
+        const isProjectFile = Boolean(project);
         if (
           isProjectFile &&
           (filePath.endsWith(".html") || filePath.endsWith(".css") || filePath.endsWith(".js"))
         ) {
+          const relativePath = project ? relative(project.dir, filePath).split("\\").join("/") : "";
+          if (project && relativePath) {
+            const recentApiWrite = recentApiWriteProjects.get(project.id);
+            const shouldAdopt = !recentApiWrite || Date.now() - recentApiWrite > 3000;
+            if (shouldAdopt) {
+              void getApi()
+                .then((api) =>
+                  api.fetch(
+                    new Request(
+                      `http://studio/projects/${encodeURIComponent(project.id)}/history/adopt-external`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          paths: [relativePath],
+                          actor: { type: "external" },
+                        }),
+                      },
+                    ),
+                  ),
+                )
+                .catch((error) => {
+                  console.warn("[Studio] Failed to adopt external file edit:", error);
+                });
+            }
+          }
           console.log(`[Studio] File changed: ${filePath}`);
-          server.ws.send({ type: "custom", event: "hf:file-change", data: {} });
+          server.ws.send({
+            type: "custom",
+            event: "hf:file-change",
+            data: { projectId: project?.id, paths: relativePath ? [relativePath] : [] },
+          });
         }
       });
     },

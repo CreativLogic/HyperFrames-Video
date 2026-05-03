@@ -41,31 +41,36 @@ function FormatInfoTooltip({ format }: { format: "mp4" | "webm" | "mov" }) {
 
   return (
     <div className="relative" onPointerEnter={show} onPointerLeave={hide}>
-      <svg
-        width="12"
-        height="12"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-neutral-600 hover:text-neutral-400 transition-colors cursor-help"
+      <button
+        type="button"
+        aria-label={`${info.label} export details`}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-800 bg-neutral-950 text-neutral-500 transition-colors hover:border-neutral-700 hover:text-neutral-200"
       >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </button>
       {open && (
-        <div className="absolute top-full right-0 mt-1.5 w-52 p-2 rounded bg-neutral-900 border border-neutral-700 shadow-lg z-50">
-          <p className="text-[10px] font-semibold text-neutral-200 mb-0.5">{info.label}</p>
-          <p className="text-[9px] text-neutral-400 leading-tight">{info.desc}</p>
-          <div className="mt-1.5 pt-1.5 border-t border-neutral-800">
+        <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-neutral-700 bg-neutral-950 p-3 shadow-2xl">
+          <p className="mb-1 text-[11px] font-semibold text-neutral-100">{info.label}</p>
+          <p className="text-[10px] leading-4 text-neutral-400">{info.desc}</p>
+          <div className="mt-2 border-t border-neutral-800 pt-2">
             {(["mp4", "mov", "webm"] as const)
               .filter((f) => f !== format)
               .map((f) => (
-                <p key={f} className="text-[9px] text-neutral-500 leading-relaxed">
-                  <span className="text-neutral-400 font-medium">{FORMAT_INFO[f].label}</span>
+                <p key={f} className="text-[10px] leading-4 text-neutral-500">
+                  <span className="font-medium text-neutral-300">{FORMAT_INFO[f].label}</span>
                   {" — "}
                   {FORMAT_INFO[f].desc}
                 </p>
@@ -101,39 +106,72 @@ function FormatExportButton({
   const showQuality = format !== "mov";
 
   return (
-    <div className="flex items-center gap-1">
-      <FormatInfoTooltip format={format} />
+    <div className="border-b border-neutral-800 px-4 py-4">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            Export
+          </div>
+          <div className="mt-1 text-[11px] leading-5 text-neutral-400">
+            Render the current composition.
+          </div>
+        </div>
+        <FormatInfoTooltip format={format} />
+      </div>
       {showQuality && (
-        <select
-          value={quality}
-          onChange={(e) => setQuality(e.target.value as "draft" | "standard" | "high")}
-          disabled={isRendering}
-          title={QUALITY_OPTIONS.find((q) => q.value === quality)?.title}
-          className="h-5 px-1 text-[10px] rounded-l bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50"
-        >
-          {QUALITY_OPTIONS.map((q) => (
-            <option key={q.value} value={q.value} title={q.title}>
-              {q.label}
-            </option>
-          ))}
-        </select>
+        <div className="mb-4 grid gap-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+            Quality
+          </div>
+          <div className="grid grid-cols-3 rounded-xl border border-neutral-800 bg-neutral-950 p-1">
+            {QUALITY_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                title={option.title}
+                disabled={isRendering}
+                onClick={() => setQuality(option.value)}
+                className={`h-8 min-w-0 rounded-lg px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  quality === option.value
+                    ? "bg-neutral-800 text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+                    : "text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200"
+                }`}
+              >
+                <span className="block truncate">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
-      <select
-        value={format}
-        onChange={(e) => setFormat(e.target.value as "mp4" | "webm" | "mov")}
-        disabled={isRendering}
-        className={`h-5 px-1 text-[10px] bg-neutral-800 border border-neutral-700 text-neutral-300 outline-none disabled:opacity-50 ${showQuality ? "" : "rounded-l"}`}
-      >
-        <option value="mp4">MP4</option>
-        <option value="mov">MOV</option>
-        <option value="webm">WebM</option>
-      </select>
+      <div className="mb-4 grid gap-2">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+          Format
+        </div>
+        <div className="grid grid-cols-3 rounded-xl border border-neutral-800 bg-neutral-950 p-1">
+          {(["mp4", "mov", "webm"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              disabled={isRendering}
+              onClick={() => setFormat(option)}
+              className={`h-8 min-w-0 rounded-lg px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                format === option
+                  ? "bg-neutral-800 text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+                  : "text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200"
+              }`}
+            >
+              {FORMAT_INFO[option].label.replace(" (ProRes 4444)", "").replace(" (VP9)", "")}
+            </button>
+          ))}
+        </div>
+      </div>
       <button
+        type="button"
         onClick={() => onStartRender(format, quality)}
         disabled={isRendering}
-        className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-r bg-studio-accent text-[#09090B] hover:brightness-110 transition-colors disabled:opacity-50"
+        className="flex h-10 w-full items-center justify-center rounded-xl bg-studio-accent px-4 text-[12px] font-semibold text-[#09090B] transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isRendering ? "Rendering..." : "Export"}
+        {isRendering ? "Rendering..." : `Export ${FORMAT_INFO[format].label.split(" ")[0]}`}
       </button>
     </div>
   );
@@ -160,26 +198,13 @@ export const RenderQueue = memo(function RenderQueue({
   const completedCount = jobs.filter((j) => j.status !== "rendering").length;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header — no title, already shown in header button */}
-      <div className="flex items-center justify-end px-3 py-2 border-b border-neutral-800/50 flex-shrink-0">
-        <div className="flex items-center gap-1.5">
-          {completedCount > 0 && (
-            <button
-              onClick={onClearCompleted}
-              className="text-[10px] text-neutral-600 hover:text-neutral-400 transition-colors"
-            >
-              Clear
-            </button>
-          )}
-          <FormatExportButton onStartRender={onStartRender} isRendering={isRendering} />
-        </div>
-      </div>
+    <div className="flex h-full flex-col bg-neutral-900 text-neutral-100">
+      <FormatExportButton onStartRender={onStartRender} isRendering={isRendering} />
 
       {/* Job list */}
       <div ref={listRef} className="flex-1 overflow-y-auto">
         {jobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full px-4 gap-2">
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <svg
               width="20"
               height="20"
@@ -205,17 +230,38 @@ export const RenderQueue = memo(function RenderQueue({
                 strokeLinejoin="round"
               />
             </svg>
-            <p className="text-[10px] text-neutral-600 text-center">No renders yet</p>
+            <div>
+              <p className="text-[12px] font-medium text-neutral-300">No renders yet</p>
+              <p className="mt-1 text-[11px] leading-5 text-neutral-600">
+                Exports will appear here with progress, downloads, and history.
+              </p>
+            </div>
           </div>
         ) : (
-          jobs.map((job) => (
-            <RenderQueueItem
-              key={job.id}
-              job={job}
-              projectId={projectId}
-              onDelete={() => onDelete(job.id)}
-            />
-          ))
+          <div>
+            <div className="flex items-center justify-between border-b border-neutral-800/70 px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                History
+              </div>
+              {completedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearCompleted}
+                  className="rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-[10px] font-medium text-neutral-400 transition-colors hover:border-neutral-700 hover:text-neutral-100"
+                >
+                  Clear completed
+                </button>
+              )}
+            </div>
+            {jobs.map((job) => (
+              <RenderQueueItem
+                key={job.id}
+                job={job}
+                projectId={projectId}
+                onDelete={() => onDelete(job.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

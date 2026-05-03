@@ -9,6 +9,7 @@ type PlayerDeps = {
   getPlaybackRate: () => number;
   setPlaybackRate: (rate: number) => void;
   getCanonicalFps: () => number;
+  getCurrentTime?: () => number;
   onSyncMedia: (timeSeconds: number, playing: boolean) => void;
   onStatePost: (force: boolean) => void;
   onDeterministicSeek: (timeSeconds: number) => void;
@@ -97,7 +98,22 @@ export function createRuntimePlayer(deps: PlayerDeps): RuntimePlayer {
     _timeline: null,
     play: () => {
       const timeline = deps.getTimeline();
-      if (!timeline || deps.getIsPlaying()) return;
+      if (deps.getIsPlaying()) return;
+      if (!timeline) {
+        const safeDuration = Math.max(0, Number(deps.getSafeDuration?.() ?? 0) || 0);
+        const currentTime = Math.max(0, Number(deps.getCurrentTime?.() ?? 0) || 0);
+        if (safeDuration > 0 && currentTime >= safeDuration) {
+          deps.onDeterministicSeek(0);
+          deps.setIsPlaying(false);
+          deps.onSyncMedia(0, false);
+          deps.onRenderFrameSeek(0);
+        }
+        deps.onDeterministicPlay();
+        deps.setIsPlaying(true);
+        deps.onShowNativeVideos();
+        deps.onStatePost(true);
+        return;
+      }
       const safeDuration = Math.max(
         0,
         Number(deps.getSafeDuration?.() ?? timeline.duration() ?? 0) || 0,
@@ -128,7 +144,16 @@ export function createRuntimePlayer(deps: PlayerDeps): RuntimePlayer {
     },
     pause: () => {
       const timeline = deps.getTimeline();
-      if (!timeline) return;
+      if (!timeline) {
+        const time = Math.max(0, Number(deps.getCurrentTime?.() ?? 0) || 0);
+        deps.onDeterministicSeek(time);
+        deps.onDeterministicPause();
+        deps.setIsPlaying(false);
+        deps.onSyncMedia(time, false);
+        deps.onRenderFrameSeek(time);
+        deps.onStatePost(true);
+        return;
+      }
       timeline.pause();
       forEachSiblingTimeline(deps.getTimelineRegistry?.(), timeline, (tl) => {
         tl.pause();
@@ -143,8 +168,16 @@ export function createRuntimePlayer(deps: PlayerDeps): RuntimePlayer {
     },
     seek: (timeSeconds: number) => {
       const timeline = deps.getTimeline();
-      if (!timeline) return;
       const safeTime = Math.max(0, Number(timeSeconds) || 0);
+      if (!timeline) {
+        const quantized = quantizeTimeToFrame(safeTime, deps.getCanonicalFps());
+        deps.onDeterministicSeek(quantized);
+        deps.setIsPlaying(false);
+        deps.onSyncMedia(quantized, false);
+        deps.onRenderFrameSeek(quantized);
+        deps.onStatePost(true);
+        return;
+      }
       const quantized = seekMasterAndSiblingTimelinesDeterministically(
         deps.getTimelineRegistry?.(),
         timeline,
@@ -179,8 +212,8 @@ export function createRuntimePlayer(deps: PlayerDeps): RuntimePlayer {
       deps.onRenderFrameSeek(quantized);
       deps.onStatePost(true);
     },
-    getTime: () => Number(deps.getTimeline()?.time() ?? 0),
-    getDuration: () => Number(deps.getTimeline()?.duration() ?? 0),
+    getTime: () => Number(deps.getTimeline()?.time() ?? deps.getCurrentTime?.() ?? 0),
+    getDuration: () => Number(deps.getTimeline()?.duration() ?? deps.getSafeDuration?.() ?? 0),
     isPlaying: () => deps.getIsPlaying(),
     setPlaybackRate: (rate: number) => deps.setPlaybackRate(rate),
     getPlaybackRate: () => deps.getPlaybackRate(),
