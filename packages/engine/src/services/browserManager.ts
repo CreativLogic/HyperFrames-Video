@@ -260,6 +260,7 @@ export function buildChromeArgs(
     "--disable-dev-shm-usage",
     "--enable-webgl",
     "--ignore-gpu-blocklist",
+    "--enable-features=CanvasDrawElement",
     ...getBrowserGpuArgs(browserGpuMode, platform),
     "--font-render-hinting=none",
     "--force-color-profile=srgb",
