@@ -7,6 +7,8 @@ const IGNORED_FILES = new Set([".DS_Store", "Thumbs.db"]);
 const PUBLISH_CONTENT_TYPE = "application/zip";
 const PUBLISH_METADATA_TIMEOUT_MS = 30_000;
 const PUBLISH_UPLOAD_MIN_TIMEOUT_MS = 120_000;
+// Conservative floor — most connections are faster, but this prevents
+// premature aborts on slow/unstable networks (hotel wifi, tethering).
 const PUBLISH_UPLOAD_BYTES_PER_SECOND = 500_000;
 
 export interface PublishArchiveResult {
@@ -27,6 +29,7 @@ interface StagedUploadResponse {
   uploadKey: string;
   contentType: string;
   uploadHeaders: Record<string, string>;
+  expiresInSeconds: number;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -75,11 +78,14 @@ function parseStagedUploadResponse(
   const uploadKey = stringField(data, "upload_key");
   const contentType = stringField(data, "content_type") || PUBLISH_CONTENT_TYPE;
   if (!uploadUrl || !uploadKey) return null;
+  const rawExpires = data["expires_in_seconds"];
+  const expiresInSeconds = typeof rawExpires === "number" && rawExpires > 0 ? rawExpires : 1800;
   return {
     uploadUrl,
     uploadKey,
     contentType,
     uploadHeaders: getUploadHeaders(data, uploadUrl, contentType, archiveByteLength),
+    expiresInSeconds,
   };
 }
 
@@ -144,7 +150,7 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
   return text.trim() ? `${fallback}: ${text.trim().slice(0, 180)}` : fallback;
 }
 
-function uploadTimeoutMs(byteLength: number): number {
+export function uploadTimeoutMs(byteLength: number): number {
   return Math.max(
     PUBLISH_UPLOAD_MIN_TIMEOUT_MS,
     Math.ceil((byteLength / PUBLISH_UPLOAD_BYTES_PER_SECOND) * 1000),
@@ -265,11 +271,14 @@ async function publishProjectArchiveStaged(
     throw new Error(await readErrorMessage(uploadResponse, "Failed to prepare project upload"));
   }
 
+  const presignedUrlTtlMs = stagedUpload.expiresInSeconds * 1000 - PUBLISH_METADATA_TIMEOUT_MS;
   const s3Response = await fetch(stagedUpload.uploadUrl, {
     method: "PUT",
     body: new Blob([archiveArrayBuffer(archive)], { type: stagedUpload.contentType }),
     headers: stagedUpload.uploadHeaders,
-    signal: AbortSignal.timeout(uploadTimeoutMs(archive.buffer.byteLength)),
+    signal: AbortSignal.timeout(
+      Math.min(uploadTimeoutMs(archive.buffer.byteLength), presignedUrlTtlMs),
+    ),
   });
   if (!s3Response.ok) {
     throw new Error(await readErrorMessage(s3Response, "Failed to upload project archive"));
