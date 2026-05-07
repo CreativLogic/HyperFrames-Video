@@ -3,19 +3,23 @@
   "name": "vfx-cinematic-camera",
   "type": "hyperframes:block",
   "title": "Cinematic Camera",
-  "description": "Three.js cinematic camera controller — dolly zoom, crane shot, orbit, and rack focus applied to HTML content mapped onto a 3D plane",
+  "description": "Three.js cinematic camera controller with a GLTF model — dolly zoom, crane shot, orbit, and rack focus on the DamagedHelmet",
   "stability": "experimental",
   "dimensions": {
     "width": 1920,
     "height": 1080
   },
   "duration": 16,
-  "tags": ["html-in-canvas", "three-js", "camera", "cinematic"],
+  "tags": ["html-in-canvas", "three-js", "camera", "cinematic", "gltf"],
   "files": [
     {
       "path": "vfx-cinematic-camera.html",
       "target": "compositions/vfx-cinematic-camera.html",
       "type": "hyperframes:composition"
+    },
+    {
+      "path": "models/DamagedHelmet.glb",
+      "target": "models/DamagedHelmet.glb"
     }
   ]
 }

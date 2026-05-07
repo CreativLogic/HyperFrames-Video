@@ -7,34 +7,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/RGBELoader.js"></script>
     <style>
       *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
       body { background: #050510; overflow: hidden; font-family: "Inter", system-ui, sans-serif; }
       #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #050510; }
-
-      .content-source {
-        width: 1920px; height: 1080px;
-        position: absolute; top: 0; left: 0;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: linear-gradient(135deg, #0a0a2e 0%, #1a0a3e 30%, #0d1b2a 70%, #050510 100%);
-        text-align: center; padding: 0 160px; gap: 24px;
-      }
-      .content-source h1 {
-        font-size: 72px; font-weight: 800; letter-spacing: -0.03em;
-        background: linear-gradient(135deg, #00d4ff 0%, #7b2ff7 50%, #ff0080 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        line-height: 1.1;
-      }
-      .content-source p {
-        font-size: 24px; font-weight: 300; color: rgba(255,255,255,0.5);
-        line-height: 1.6; max-width: 700px;
-      }
-      .content-source .tag {
-        display: inline-block; padding: 8px 20px; border-radius: 100px;
-        font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-        border: 1px solid rgba(0,212,255,0.3); color: #00d4ff;
-      }
-
+      #three-canvas { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; }
       .move-label {
         position: absolute; bottom: 40px; left: 60px;
         font-family: "Inter", sans-serif; font-size: 14px; font-weight: 600;
@@ -43,32 +22,18 @@
       }
       .move-label .name {
         font-size: 28px; font-weight: 700; letter-spacing: 0.02em;
-        text-transform: none; color: rgba(255,255,255,0.6);
-        margin-top: 4px;
-      }
-
-      #three-canvas {
-        position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; z-index: 10;
+        text-transform: none; color: rgba(255,255,255,0.6); margin-top: 4px;
       }
     </style>
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="16" data-width="1920" data-height="1080">
+      <canvas id="three-canvas" width="1920" height="1080"></canvas>
 
-      <!-- HTML content to be captured as texture -->
-      <div id="html-content" class="content-source">
-        <div class="tag">Three.js × HyperFrames</div>
-        <h1>Cinematic Camera<br/>Controller</h1>
-        <p>Dolly zoom, crane shots, orbit paths, and rack focus — classic cinema moves applied to live HTML content in a 3D scene.</p>
-      </div>
-
-      <!-- Move labels (animated per section) -->
       <div id="move-label" class="move-label" style="opacity: 0">
         <div>Camera Move</div>
         <div id="move-name" class="name">Dolly Zoom</div>
       </div>
-
-      <canvas id="three-canvas" width="1920" height="1080"></canvas>
 
       <div id="driver" data-start="0" data-duration="16" data-track-index="0"
            style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>
@@ -81,113 +46,49 @@
       var W = 1920, H = 1080;
       var canvas = document.getElementById("three-canvas");
 
-      // ── Three.js setup ────────────────────────────────────
       var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
       renderer.setSize(W, H);
       renderer.setPixelRatio(1);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.2;
+      renderer.toneMappingExposure = 1.3;
+      renderer.outputEncoding = THREE.sRGBEncoding;
 
       var scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x050510, 0.08);
+      scene.background = new THREE.Color(0x050510);
+      scene.fog = new THREE.FogExp2(0x050510, 0.06);
 
       var camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
-      camera.position.set(0, 0, 5);
+      camera.position.set(0, 0, 4);
 
-      // ── Lighting ──────────────────────────────────────────
-      var ambient = new THREE.AmbientLight(0x1a1a3a, 0.4);
+      // ── Environment lighting ──────────────────────────────
+      var ambient = new THREE.AmbientLight(0x1a1a3a, 0.3);
       scene.add(ambient);
 
-      var keyLight = new THREE.DirectionalLight(0x00d4ff, 0.6);
+      var keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
       keyLight.position.set(3, 4, 5);
       scene.add(keyLight);
 
-      var rimLight = new THREE.PointLight(0xff0080, 0.4, 20);
-      rimLight.position.set(-4, 2, -3);
+      var fillLight = new THREE.DirectionalLight(0x4488ff, 0.4);
+      fillLight.position.set(-3, 1, 3);
+      scene.add(fillLight);
+
+      var rimLight = new THREE.PointLight(0xff0080, 0.6, 15);
+      rimLight.position.set(-3, 2, -3);
       scene.add(rimLight);
 
-      // ── Capture HTML to texture ───────────────────────────
-      var htmlEl = document.getElementById("html-content");
-      var captureCanvas = document.createElement("canvas");
-      captureCanvas.width = W;
-      captureCanvas.height = H;
-      var captureCtx = captureCanvas.getContext("2d");
+      var topLight = new THREE.PointLight(0x00d4ff, 0.4, 15);
+      topLight.position.set(0, 5, 0);
+      scene.add(topLight);
 
-      function captureHTML() {
-        captureCtx.fillStyle = "#0a0a2e";
-        captureCtx.fillRect(0, 0, W, H);
-
-        // Gradient background
-        var grad = captureCtx.createLinearGradient(0, 0, W, H);
-        grad.addColorStop(0, "#0a0a2e");
-        grad.addColorStop(0.3, "#1a0a3e");
-        grad.addColorStop(0.7, "#0d1b2a");
-        grad.addColorStop(1, "#050510");
-        captureCtx.fillStyle = grad;
-        captureCtx.fillRect(0, 0, W, H);
-
-        // Tag
-        captureCtx.save();
-        captureCtx.font = "600 13px Inter, sans-serif";
-        captureCtx.fillStyle = "#00d4ff";
-        captureCtx.textAlign = "center";
-        captureCtx.letterSpacing = "1.3px";
-        captureCtx.strokeStyle = "rgba(0,212,255,0.3)";
-        captureCtx.lineWidth = 1;
-        var tagW = captureCtx.measureText("THREE.JS × HYPERFRAMES").width + 40;
-        captureCtx.beginPath();
-        captureCtx.roundRect(W/2 - tagW/2, 380, tagW, 36, 18);
-        captureCtx.stroke();
-        captureCtx.fillText("THREE.JS × HYPERFRAMES", W/2, 403);
-        captureCtx.restore();
-
-        // Title with gradient (approximate with solid)
-        captureCtx.save();
-        captureCtx.font = "800 72px Inter, sans-serif";
-        captureCtx.textAlign = "center";
-        captureCtx.fillStyle = "#00d4ff";
-        captureCtx.fillText("Cinematic Camera", W/2, 490);
-        captureCtx.fillStyle = "#7b2ff7";
-        captureCtx.fillText("Controller", W/2, 570);
-        captureCtx.restore();
-
-        // Subtitle
-        captureCtx.save();
-        captureCtx.font = "300 24px Inter, sans-serif";
-        captureCtx.fillStyle = "rgba(255,255,255,0.5)";
-        captureCtx.textAlign = "center";
-        captureCtx.fillText("Dolly zoom, crane shots, orbit paths, and rack focus", W/2, 630);
-        captureCtx.fillText("Classic cinema moves applied to live HTML content", W/2, 665);
-        captureCtx.restore();
-      }
-
-      captureHTML();
-      var contentTex = new THREE.CanvasTexture(captureCanvas);
-      contentTex.minFilter = THREE.LinearFilter;
-      contentTex.magFilter = THREE.LinearFilter;
-
-      // ── Content plane (16:9 aspect) ───────────────────────
-      var planeW = 6.4, planeH = 3.6;
-      var planeMat = new THREE.MeshStandardMaterial({
-        map: contentTex,
-        emissive: 0xffffff,
-        emissiveMap: contentTex,
-        emissiveIntensity: 0.8,
-        roughness: 0.3,
-        metalness: 0.1,
-      });
-      var plane = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), planeMat);
-      scene.add(plane);
-
-      // ── Decorative frame around the content ───────────────
-      var frameGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(planeW + 0.15, planeH + 0.15));
-      var frameMat = new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.15 });
-      var frame = new THREE.LineSegments(frameGeo, frameMat);
-      frame.position.z = 0.01;
-      scene.add(frame);
+      // ── Ground grid ───────────────────────────────────────
+      var gridHelper = new THREE.GridHelper(20, 40, 0x1a1a3a, 0x0a0a1a);
+      gridHelper.position.y = -2;
+      gridHelper.material.transparent = true;
+      gridHelper.material.opacity = 0.25;
+      scene.add(gridHelper);
 
       // ── Floating particles ────────────────────────────────
-      var particleCount = 200;
+      var particleCount = 300;
       var particleGeo = new THREE.BufferGeometry();
       var positions = new Float32Array(particleCount * 3);
       for (var i = 0; i < particleCount; i++) {
@@ -196,23 +97,51 @@
         positions[i * 3 + 2] = (Math.random() - 0.5) * 12 - 2;
       }
       particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      var particleMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 0.03, transparent: true, opacity: 0.3 });
+      var particleMat = new THREE.PointsMaterial({
+        color: 0x00d4ff, size: 0.03, transparent: true, opacity: 0.25
+      });
       var particles = new THREE.Points(particleGeo, particleMat);
       scene.add(particles);
 
-      // ── Ground grid ───────────────────────────────────────
-      var gridHelper = new THREE.GridHelper(20, 40, 0x1a1a3a, 0x0a0a1a);
-      gridHelper.position.y = -2.5;
-      gridHelper.material.transparent = true;
-      gridHelper.material.opacity = 0.3;
-      scene.add(gridHelper);
+      // ── Load DamagedHelmet GLB ────────────────────────────
+      var helmetGroup = new THREE.Group();
+      scene.add(helmetGroup);
+
+      var loader = new THREE.GLTFLoader();
+      var modelReady = false;
+
+      loader.load("models/DamagedHelmet.glb", function (gltf) {
+        var model = gltf.scene;
+        var box = new THREE.Box3().setFromObject(model);
+        var size = box.getSize(new THREE.Vector3());
+        var scale = 2.2 / Math.max(size.x, size.y, size.z);
+        model.scale.setScalar(scale);
+        box.setFromObject(model);
+        model.position.sub(box.getCenter(new THREE.Vector3()));
+
+        model.traverse(function (child) {
+          if (child.isMesh) {
+            child.material.envMapIntensity = 1.5;
+          }
+        });
+
+        helmetGroup.add(model);
+        modelReady = true;
+        renderer.render(scene, camera);
+      }, undefined, function (err) {
+        // Fallback: show a reflective sphere if model fails to load
+        var fallbackGeo = new THREE.IcosahedronGeometry(1.2, 4);
+        var fallbackMat = new THREE.MeshPhysicalMaterial({
+          color: 0x222244, metalness: 0.9, roughness: 0.1,
+          clearcoat: 1, clearcoatRoughness: 0.05,
+        });
+        helmetGroup.add(new THREE.Mesh(fallbackGeo, fallbackMat));
+        modelReady = true;
+        renderer.render(scene, camera);
+      });
 
       // ── Camera state ──────────────────────────────────────
-      var camState = {
-        x: 0, y: 0, z: 5,
-        lookX: 0, lookY: 0, lookZ: 0,
-        fov: 50,
-      };
+      var camState = { x: 0, y: 0, z: 4, lookX: 0, lookY: 0, lookZ: 0, fov: 50 };
 
       function updateCamera() {
         camera.position.set(camState.x, camState.y, camState.z);
@@ -221,83 +150,61 @@
         camera.updateProjectionMatrix();
       }
 
-      // ── Dolly Zoom (Vertigo effect) ───────────────────────
-      // Move camera back while narrowing FOV to keep subject same size
-      // Classic Hitchcock technique — background warps while subject stays still
+      // ── Camera moves ──────────────────────────────────────
+
       function dollyZoomKeyframes(tl, startT) {
-        tl.to(camState, { z: 3.5, fov: 35, duration: 1.5, ease: "power2.inOut" }, startT);
-        tl.to(camState, { z: 8, fov: 70, duration: 2, ease: "power2.inOut" }, startT + 1.5);
-        tl.to(camState, { z: 5, fov: 50, duration: 0.5, ease: "power2.out" }, startT + 3.5);
+        tl.to(camState, { z: 2.8, fov: 30, duration: 1.5, ease: "power2.inOut" }, startT);
+        tl.to(camState, { z: 7, fov: 75, duration: 2, ease: "power2.inOut" }, startT + 1.5);
+        tl.to(camState, { z: 4, fov: 50, duration: 0.5, ease: "power2.out" }, startT + 3.5);
       }
 
-      // ── Crane Shot ────────────────────────────────────────
-      // Rise from below, arc over the subject
       function craneShotKeyframes(tl, startT) {
-        // Start low
-        tl.set(camState, { y: -2.5, z: 4, lookY: 0 }, startT);
-        // Rise and arc
-        tl.to(camState, { y: 2.5, z: 5.5, lookY: 0, duration: 3, ease: "power1.inOut" }, startT);
-        // Subtle forward push
-        tl.to(camState, { z: 4.5, duration: 1, ease: "power2.out" }, startT + 3);
+        tl.set(camState, { y: -2, z: 3.5, lookY: 0 }, startT);
+        tl.to(camState, { y: 2.5, z: 4.5, lookY: 0, duration: 3, ease: "power1.inOut" }, startT);
+        tl.to(camState, { z: 3.8, duration: 1, ease: "power2.out" }, startT + 3);
       }
 
-      // ── Orbit ─────────────────────────────────────────────
-      // Smooth 180° orbit around the content
       function orbitKeyframes(tl, startT) {
         var orbitState = { angle: 0 };
-        tl.set(camState, { x: 0, y: 0.3, z: 5 }, startT);
+        tl.set(camState, { x: 0, y: 0.3, z: 4 }, startT);
         tl.to(orbitState, {
-          angle: Math.PI,
-          duration: 4,
-          ease: "power1.inOut",
+          angle: Math.PI * 1.2,
+          duration: 4, ease: "power1.inOut",
           onUpdate: function () {
-            camState.x = Math.sin(orbitState.angle) * 5;
-            camState.z = Math.cos(orbitState.angle) * 5;
-            camState.y = 0.3 + Math.sin(orbitState.angle * 2) * 0.5;
+            camState.x = Math.sin(orbitState.angle) * 4;
+            camState.z = Math.cos(orbitState.angle) * 4;
+            camState.y = 0.3 + Math.sin(orbitState.angle * 0.7) * 0.8;
           }
         }, startT);
       }
 
-      // ── Rack Focus (simulated with DOF blur) ──────────────
-      // Push in tight, then pull back with a slight roll
       function rackFocusKeyframes(tl, startT) {
-        tl.set(camState, { x: 0, y: 0, z: 5, fov: 50 }, startT);
-        // Punch in
-        tl.to(camState, { z: 2.5, fov: 30, y: 0.2, duration: 1.5, ease: "power3.inOut" }, startT);
-        // Hold close
-        tl.to(camState, { x: 0.3, duration: 1, ease: "sine.inOut" }, startT + 1.5);
-        // Pull out dramatically
-        tl.to(camState, { z: 6, fov: 55, x: 0, y: 0, duration: 1.5, ease: "power2.in" }, startT + 2.5);
+        tl.set(camState, { x: 0, y: 0, z: 4, fov: 50 }, startT);
+        tl.to(camState, { z: 2, fov: 25, y: 0.2, x: 0.5, duration: 1.5, ease: "power3.inOut" }, startT);
+        tl.to(camState, { x: -0.3, duration: 1, ease: "sine.inOut" }, startT + 1.5);
+        tl.to(camState, { z: 5, fov: 55, x: 0, y: -0.3, duration: 1.5, ease: "power2.in" }, startT + 2.5);
       }
 
-      // ── Build master timeline ─────────────────────────────
+      // ── Build timeline ────────────────────────────────────
       var tl = gsap.timeline({
         paused: true,
         onUpdate: function () {
           updateCamera();
+          helmetGroup.rotation.y += 0.003;
           particles.rotation.y += 0.001;
           renderer.render(scene, camera);
         }
       });
 
-      // Total: 16s (4s per move)
       var moveNames = ["Dolly Zoom", "Crane Shot", "Orbit", "Rack Focus"];
       var labelEl = document.getElementById("move-label");
       var nameEl = document.getElementById("move-name");
 
-      // Section 1: Dolly Zoom (0-4s)
       dollyZoomKeyframes(tl, 0);
-
-      // Section 2: Crane Shot (4-8s)
       craneShotKeyframes(tl, 4);
-
-      // Section 3: Orbit (8-12s)
       orbitKeyframes(tl, 8);
-
-      // Section 4: Rack Focus (12-16s)
       rackFocusKeyframes(tl, 12);
 
-      // Labels — fade in/out for each move
       for (var m = 0; m < 4; m++) {
         (function (idx) {
           var s = idx * 4;
@@ -307,13 +214,8 @@
         })(m);
       }
 
-      // Ensure 16s duration
       tl.to({}, { duration: 16, ease: "none" }, 0);
-
-      // Hide HTML source, show Three.js
-      htmlEl.style.display = "none";
       renderer.render(scene, camera);
-
       window.__timelines["main"] = tl;
     })();
     </script>
