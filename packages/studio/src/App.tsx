@@ -4215,6 +4215,8 @@ export function StudioApp() {
                   <div className="min-h-0 flex-1">
                     {designPanelActive ? (
                       <PropertyPanel
+                        projectId={projectId}
+                        assets={assets}
                         element={domEditGroupSelections.length > 1 ? null : domEditSelection}
                         multiSelectCount={domEditGroupSelections.length}
                         copiedAgentPrompt={copiedAgentPrompt}
@@ -4222,11 +4224,13 @@ export function StudioApp() {
                         onSetStyle={handleDomStyleCommit}
                         onSetManualOffset={handleDomPathOffsetCommit}
                         onSetManualSize={handleDomBoxSizeCommit}
-                        onSetRotation={handleDomRotationCommit}
                         onSetText={handleDomTextCommit}
                         onSetTextFieldStyle={handleDomTextFieldStyleCommit}
+                        onAddTextField={() => null}
+                        onRemoveTextField={() => {}}
                         onResetManualEdits={handleDomManualEditsReset}
                         onAskAgent={handleAskAgent}
+                        onImportAssets={handleImportFiles}
                         fontAssets={fontAssets}
                         onImportFonts={handleImportFonts}
                       />
