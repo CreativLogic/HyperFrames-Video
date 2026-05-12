@@ -1825,9 +1825,14 @@ async function compositeHdrFrame(
 // safely without locking.
 //
 // IMPORTANT: each worker passes its own session in via the first argument
-// rather than reading from `ctx.domSession`. The transition path always uses
-// the main session because the per-scene seek+inject+mask sequence must run
-// against the same `window.__hf` state across both scenes.
+// rather than reading from `ctx.domSession`. As of the hf#732 follow-up,
+// the transition path also runs on per-worker sessions — the dual-scene
+// (seek → mask fromScene → screenshot → mask toScene → screenshot → blend)
+// pipeline is self-contained inside a single `processLayeredTransitionFrame`
+// call and only requires the same `window.__hf` state across both scenes
+// within that call. There's no inter-frame dependency on a specific
+// session, so multiple workers can each run the full transition pipeline
+// against their own browser concurrently.
 
 interface LayeredTransitionBuffers {
   bufferA: Buffer;
@@ -1900,16 +1905,20 @@ export async function processLayeredNormalFrame(
 }
 
 /**
- * Composite a single transition frame on the main DOM session. Runs the
+ * Composite a single transition frame on a given DOM session. Runs the
  * dual-scene capture (scene A and scene B with appropriate `applyDomLayerMask`
  * targeting) and applies the shader blend into `buffers.output`. Returns the
  * `output` Buffer; the caller writes it to the encoder.
  *
- * Sequential by design: the per-scene seek/inject/mask/screenshot/remove-mask
- * pattern requires the same `window.__hf` state across the two scenes, which
- * means a single browser session steps through them in order.
+ * Self-contained per call: the per-scene seek/inject/mask/screenshot/remove-mask
+ * pattern requires the same `window.__hf` state across the two scenes within
+ * one invocation, but it holds no inter-frame state on the session. As of
+ * the hf#732 follow-up the hybrid path runs transition frames in parallel
+ * across worker sessions; each worker passes its own session here.
  *
- * @param session - Always the main DOM session in the hybrid path.
+ * @param session - DOM capture session to drive. Each worker in the hybrid
+ *                  parallel pool passes its own session; the legacy
+ *                  sequential path passes the main `domSession`.
  * @param frameIdx - Composition frame index (used for warn-level error logs).
  * @param time - Seek time in seconds.
  * @param transition - The transition window that contains this frame.
@@ -2089,6 +2098,39 @@ export async function processLayeredTransitionFrame(
  * decision next to the worker-count choice, and so tests can assert the
  * exact predicate without spinning up a real render.
  */
+/**
+ * Distribute the contiguous frame range [0, totalFrames) across
+ * `workerCount` workers as roughly equal contiguous slices. Each worker's
+ * slice carries whatever mix of normal and transition frames falls inside
+ * it — the hybrid path runs both types of compositing on per-worker
+ * sessions, so the partition does not split on transition-frame boundaries.
+ *
+ * Exported so the unit test can pin the partitioning contract (e.g.
+ * "transition frames at indices 60-69 are NOT all assigned to worker 0,
+ * because contiguous chunking spreads them across whichever workers' slices
+ * cover that index range").
+ *
+ * Returns ranges with the invariant: ranges are non-overlapping, contiguous,
+ * cover exactly [0, totalFrames), and any worker beyond `totalFrames /
+ * framesPerWorker` gets a zero-width range. `workerCount` is clamped to 1
+ * for non-positive inputs.
+ */
+export function distributeLayeredHybridFrameRanges(
+  totalFrames: number,
+  workerCount: number,
+): Array<{ start: number; end: number }> {
+  const safeWorkers = Math.max(1, workerCount);
+  const safeFrames = Math.max(0, totalFrames);
+  const framesPerWorker = Math.max(1, Math.ceil(safeFrames / safeWorkers));
+  const ranges: Array<{ start: number; end: number }> = [];
+  for (let w = 0; w < safeWorkers; w++) {
+    const start = Math.min(safeFrames, w * framesPerWorker);
+    const end = Math.min(safeFrames, start + framesPerWorker);
+    ranges.push({ start, end });
+  }
+  return ranges;
+}
+
 export function shouldUseHybridLayeredPath(args: {
   hasHdrContent: boolean;
   transitionFramesCount: number;
@@ -3244,12 +3286,14 @@ export async function executeRenderJob(
           //
           // The fix here computes the transition-frame set up front and,
           // when the workload qualifies (SDR + multi-worker), spawns a pool
-          // of additional `domSession`s. The pool drains the non-transition
-          // frames in parallel; the main session steps through the
-          // transition frames sequentially. A shared `FrameReorderBuffer`
-          // gates `hdrEncoder.writeFrame` so frames hit the encoder in
-          // ascending index order regardless of which session finished
-          // them first.
+          // of additional `domSession`s. Every worker drains a contiguous
+          // slice of the timeline including any transition frames that
+          // happen to fall inside its range — see the hf#732 follow-up
+          // notes at the dispatch site below for why the dual-scene
+          // transition compositor is safe to run in parallel across
+          // sessions. A shared `FrameReorderBuffer` gates
+          // `hdrEncoder.writeFrame` so frames hit the encoder in ascending
+          // index order regardless of which session finished them first.
           //
           // HDR + shader-transitions falls back to the legacy sequential
           // loop: each worker session would need its own `dup(fd)` into the
@@ -3392,13 +3436,32 @@ export async function executeRenderJob(
             }
           };
 
-          // ── Hybrid path: parallel pool drains non-transition frames; main
-          // session walks the transition frames sequentially. Both feed into
-          // the same reorder buffer → encoder.
+          // ── Hybrid path: parallel pool drains BOTH non-transition and
+          // transition frames. Every worker owns its own browser session and
+          // per-scene transition scratch buffers, so the per-frame
+          // seek/inject/mask/screenshot pipeline runs concurrently across the
+          // pool. Both feed into the same reorder buffer → encoder.
+          //
+          // hf#732 fix-up: the prior iteration kept transition frames pinned
+          // to the main session, which left ~110s of the 171s wall-clock
+          // sitting on a single-CDP serial path (141 transition frames ×
+          // ~780 ms each). perf-summary.json showed the transition phase
+          // dominated by `domScreenshotMs` (70.8s) — fundamentally a
+          // Puppeteer round-trip cost that only parallelizes by spreading
+          // captures across additional browser sessions. Each worker now
+          // walks a contiguous slice of frame indices that includes any
+          // transition frames in its range, so the dual-scene capture
+          // pattern runs on worker-local `window.__hf` state. Correctness
+          // is preserved because the per-frame state (seek time → fromScene
+          // mask → screenshot → toScene mask → screenshot → blend) is fully
+          // self-contained inside a single `processLayeredTransitionFrame`
+          // call against a single session — there's no inter-frame
+          // dependency on the same session. The SDR gate
+          // (`hasHdrContent === false` inside `shouldUseHybridLayeredPath`)
+          // still applies; HDR renders take the sequential path below
+          // because `hdrVideoFrameSources` carries a single shared fd per
+          // raw frame source that's not safe to read concurrently.
           if (hybridEligible) {
-            // Build worker partitions: layeredWorkerCount workers split the
-            // contiguous non-transition frame range. Each worker iterates
-            // its slice and skips frames in `transitionFrames`.
             const workerSessions: CaptureSession[] = [];
             const workerCanvasesNeeded = Math.max(0, layeredWorkerCount - 1);
             try {
@@ -3418,39 +3481,45 @@ export async function executeRenderJob(
 
               const sessions: CaptureSession[] = [domSession, ...workerSessions];
               const activeWorkerCount = sessions.length;
-              const totalNonTransitionFrames = totalFrames - transitionFrameCount;
-              const framesPerWorker = Math.max(
-                1,
-                Math.ceil(totalNonTransitionFrames / activeWorkerCount),
-              );
 
-              // Per-worker canvas, allocated once and reused. Worker 0 reuses
-              // `normalCanvas` (already allocated above for the legacy path).
+              // Per-worker normal-frame canvas, allocated once and reused.
+              // Worker 0 reuses `normalCanvas` (already allocated above).
               const workerCanvases: Buffer[] = [normalCanvas];
               for (let w = 1; w < activeWorkerCount; w++) {
                 workerCanvases.push(Buffer.alloc(bufSize));
               }
 
-              // Distribute non-transition frames across workers in a
-              // contiguous, locality-preserving manner. Each worker advances
-              // through its own range and just skips transition frames.
-              const workerRanges: Array<{ start: number; end: number }> = [];
-              let cursor = 0;
-              let assigned = 0;
-              for (let w = 0; w < activeWorkerCount; w++) {
-                const targetForThisWorker = Math.min(
-                  framesPerWorker,
-                  totalNonTransitionFrames - assigned,
+              // Per-worker transition scratch buffers (bufferA + bufferB +
+              // output). Worker 0 reuses the already-allocated
+              // `transitionBuffers` from the outer scope; remaining workers
+              // get their own triple. Only allocated when the composition
+              // actually has transitions — `transitionBuffers` is null
+              // otherwise and the per-worker loop will never enter the
+              // transition branch.
+              const workerTransitionBuffers: Array<LayeredTransitionBuffers | null> = [
+                transitionBuffers,
+              ];
+              for (let w = 1; w < activeWorkerCount; w++) {
+                workerTransitionBuffers.push(
+                  hasTransitions
+                    ? {
+                        bufferA: Buffer.alloc(bufSize),
+                        bufferB: Buffer.alloc(bufSize),
+                        output: Buffer.alloc(bufSize),
+                      }
+                    : null,
                 );
-                const start = cursor;
-                let collected = 0;
-                while (cursor < totalFrames && collected < targetForThisWorker) {
-                  if (!transitionFrames.has(cursor)) collected += 1;
-                  cursor += 1;
-                }
-                workerRanges.push({ start, end: cursor });
-                assigned += collected;
               }
+
+              // Flat partition over the entire frame range — every worker
+              // gets a contiguous slice that includes whatever mix of normal
+              // and transition frames falls inside it. Ordering correctness
+              // is enforced by `reorderBuffer.waitForFrame` at the encoder
+              // gate, not by the dispatch order here.
+              const workerRanges = distributeLayeredHybridFrameRanges(
+                totalFrames,
+                activeWorkerCount,
+              );
 
               const workerTaskOf = async (w: number): Promise<void> => {
                 const session = sessions[w];
@@ -3458,71 +3527,55 @@ export async function executeRenderJob(
                 if (!session || !canvas) return;
                 const range = workerRanges[w];
                 if (!range) return;
+                const myTransitionBuffers = workerTransitionBuffers[w] ?? null;
                 for (let i = range.start; i < range.end; i++) {
-                  if (transitionFrames.has(i)) continue;
                   assertNotAborted();
                   const time = (i * job.config.fps.den) / job.config.fps.num;
-                  await processLayeredNormalFrame(
-                    session,
-                    i,
-                    time,
-                    hdrCompositeCtx,
-                    canvas,
-                    nativeHdrIds,
-                  );
-                  if (debugDumpEnabled && debugDumpDir && i % 30 === 0) {
-                    const previewPath = join(
-                      debugDumpDir,
-                      `frame_${String(i).padStart(4, "0")}_final_rgb48le.bin`,
+                  const activeTransition = transitionFrames.has(i)
+                    ? transitionRanges.find((t) => i >= t.startFrame && i <= t.endFrame)
+                    : undefined;
+
+                  if (activeTransition && myTransitionBuffers) {
+                    await processLayeredTransitionFrame(
+                      session,
+                      i,
+                      time,
+                      activeTransition,
+                      hdrCompositeCtx,
+                      sceneElements,
+                      myTransitionBuffers,
+                      assertNotAborted,
+                      nativeHdrIds,
                     );
-                    writeFileSync(previewPath, canvas);
+                    await writeEncoded(i, myTransitionBuffers.output);
+                  } else {
+                    await processLayeredNormalFrame(
+                      session,
+                      i,
+                      time,
+                      hdrCompositeCtx,
+                      canvas,
+                      nativeHdrIds,
+                    );
+                    if (debugDumpEnabled && debugDumpDir && i % 30 === 0) {
+                      const previewPath = join(
+                        debugDumpDir,
+                        `frame_${String(i).padStart(4, "0")}_final_rgb48le.bin`,
+                      );
+                      writeFileSync(previewPath, canvas);
+                    }
+                    await writeEncoded(i, canvas);
                   }
-                  await writeEncoded(i, canvas);
                 }
               };
 
-              const transitionTaskFn = async (): Promise<void> => {
-                if (!transitionBuffers) return;
-                for (let i = 0; i < totalFrames; i++) {
-                  if (!transitionFrames.has(i)) continue;
-                  assertNotAborted();
-                  const time = (i * job.config.fps.den) / job.config.fps.num;
-                  const activeTransition = transitionRanges.find(
-                    (t) => i >= t.startFrame && i <= t.endFrame,
-                  );
-                  if (!activeTransition) continue;
-                  // Transitions always run on the main session; reserve it
-                  // by waiting until any normal-frame work assigned to
-                  // worker 0 has stepped past `i`. Worker 0's range is the
-                  // first contiguous slice, so once its cursor crosses `i`
-                  // it won't issue another CDP call for the same session at
-                  // overlapping frame indices. We just need a coarse fence:
-                  // wait for the reorder buffer to advance to a point at or
-                  // before `i` (i.e. frame `i` is the next thing the encoder
-                  // expects). This naturally serializes the main session.
-                  await reorderBuffer.waitForFrame(i);
-                  await processLayeredTransitionFrame(
-                    domSession,
-                    i,
-                    time,
-                    activeTransition,
-                    hdrCompositeCtx,
-                    sceneElements,
-                    transitionBuffers,
-                    assertNotAborted,
-                    nativeHdrIds,
-                  );
-                  await writeEncoded(i, transitionBuffers.output);
-                }
-              };
-
-              // Run worker tasks + the transition processor concurrently.
-              // The reorder buffer fences ordering so the encoder never
-              // sees frame N+1 before frame N. Promise.all rethrows the
-              // first rejection, which (combined with `assertNotAborted` in
-              // the per-frame helpers) bubbles cancellation up cleanly.
+              // Run every worker concurrently. The reorder buffer fences
+              // ordering so the encoder never sees frame N+1 before frame N.
+              // `Promise.all` rethrows the first rejection, which (combined
+              // with `assertNotAborted` in the per-frame helpers) bubbles
+              // cancellation up cleanly.
               const workerPromises = sessions.map((_, w) => workerTaskOf(w));
-              await Promise.all([transitionTaskFn(), ...workerPromises]);
+              await Promise.all(workerPromises);
               await reorderBuffer.waitForAllDone();
             } finally {
               for (const session of workerSessions) {

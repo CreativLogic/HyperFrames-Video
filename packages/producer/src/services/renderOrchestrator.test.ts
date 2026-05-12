@@ -18,6 +18,7 @@ import {
   getNextRetryWorkerCount,
   isRecoverableParallelCaptureError,
   materializeExtractedFramesForCompiledDir,
+  distributeLayeredHybridFrameRanges,
   partitionTransitionFrames,
   resolveRenderWorkerCount,
   resolveCompositeTransfer,
@@ -715,6 +716,85 @@ describe("shouldUseHybridLayeredPath", () => {
         workerCount: 6,
       }),
     ).toBe(false);
+  });
+});
+
+describe("distributeLayeredHybridFrameRanges", () => {
+  it("splits a frame range into contiguous, non-overlapping, full-coverage worker slices", () => {
+    const ranges = distributeLayeredHybridFrameRanges(840, 6);
+    expect(ranges).toHaveLength(6);
+    expect(ranges[0]!.start).toBe(0);
+    expect(ranges[ranges.length - 1]!.end).toBe(840);
+    // Contiguous: each range begins where the previous ended.
+    for (let i = 1; i < ranges.length; i++) {
+      expect(ranges[i]!.start).toBe(ranges[i - 1]!.end);
+    }
+    // Full coverage: total frames == sum of slice sizes.
+    const covered = ranges.reduce((acc, r) => acc + (r.end - r.start), 0);
+    expect(covered).toBe(840);
+  });
+
+  it("hf#732 fix-up: transition frames are spread across workers, not pinned to one session", () => {
+    // Same shape as the #677 repro: 14 × 10-frame transitions on 840 frames at
+    // evenly-spaced beats. Verify that any non-trivial slice of these
+    // transition frames falls inside a NON-WORKER-ZERO slice — i.e. that the
+    // hybrid path actually drives transitions on multiple worker sessions
+    // (the prior implementation pinned all transitions to the main session
+    // and only parallelized non-transition frames).
+    const transitions: Array<{ startFrame: number; endFrame: number }> = [];
+    for (let k = 0; k < 14; k++) {
+      const startFrame = 30 + k * 50;
+      transitions.push({ startFrame, endFrame: startFrame + 9 });
+    }
+    const totalFrames = 840;
+    const ranges = distributeLayeredHybridFrameRanges(totalFrames, 6);
+    const transitionFrames = partitionTransitionFrames(transitions, totalFrames);
+
+    const transitionFramesPerWorker = ranges.map(
+      (range) => [...transitionFrames].filter((f) => f >= range.start && f < range.end).length,
+    );
+
+    // Every worker should be doing transition work (in this shape: 14 evenly
+    // spaced transitions across 6 contiguous slices, each slice covers ≥2 of
+    // them). The PRIOR behavior would have given worker 0 all 140 transition
+    // frames; the new behavior distributes them.
+    const workersWithTransitions = transitionFramesPerWorker.filter((c) => c > 0).length;
+    expect(workersWithTransitions).toBeGreaterThanOrEqual(2);
+
+    // Specifically: no single worker should own >70% of transition frames
+    // (would indicate the partition collapsed to the old shape).
+    const maxOnOneWorker = Math.max(...transitionFramesPerWorker);
+    expect(maxOnOneWorker).toBeLessThan(Math.ceil(transitionFrames.size * 0.7));
+
+    // Sanity: total transition frames covered == partition cardinality.
+    expect(transitionFramesPerWorker.reduce((a, b) => a + b, 0)).toBe(transitionFrames.size);
+  });
+
+  it("clamps workerCount to 1 for non-positive inputs", () => {
+    const ranges = distributeLayeredHybridFrameRanges(100, 0);
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]).toEqual({ start: 0, end: 100 });
+  });
+
+  it("produces zero-width tail ranges when workers outnumber frames", () => {
+    const ranges = distributeLayeredHybridFrameRanges(3, 6);
+    // framesPerWorker = ceil(3 / 6) = 1; first 3 workers get one frame each,
+    // remaining 3 get empty ranges.
+    expect(ranges).toHaveLength(6);
+    expect(ranges[0]).toEqual({ start: 0, end: 1 });
+    expect(ranges[1]).toEqual({ start: 1, end: 2 });
+    expect(ranges[2]).toEqual({ start: 2, end: 3 });
+    expect(ranges[3]).toEqual({ start: 3, end: 3 });
+    expect(ranges[4]).toEqual({ start: 3, end: 3 });
+    expect(ranges[5]).toEqual({ start: 3, end: 3 });
+  });
+
+  it("handles totalFrames = 0", () => {
+    const ranges = distributeLayeredHybridFrameRanges(0, 4);
+    expect(ranges).toHaveLength(4);
+    for (const r of ranges) {
+      expect(r).toEqual({ start: 0, end: 0 });
+    }
   });
 });
 
