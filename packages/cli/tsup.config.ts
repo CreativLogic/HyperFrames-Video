@@ -7,7 +7,20 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), 
 };
 
 export default defineConfig({
-  entry: ["src/cli.ts"],
+  // hf#732 fix-up: emit BOTH the CLI bundle and the shader-transition worker
+  // entry. The producer's `shaderTransitionWorkerPool` instantiates a Node
+  // `worker_threads` Worker via `new Worker(<path>)`, which is a filesystem
+  // load — it cannot share the parent module graph. The pool's path resolver
+  // probes for `shaderTransitionWorker.js` next to its own loaded module
+  // (which lives inside `dist/cli.js` after the producer is `noExternal`'d
+  // and bundled in). Without this entry the file would not exist at runtime
+  // and the pool would either crash or fall back to inline blends, killing
+  // the perf gain. Two entries → two `dist/*.js` files, both via the same
+  // tsup pipeline so the workspace alias / banner / externals stay aligned.
+  entry: {
+    cli: "src/cli.ts",
+    shaderTransitionWorker: "../producer/src/services/shaderTransitionWorker.ts",
+  },
   format: ["esm"],
   outDir: "dist",
   target: "node22",

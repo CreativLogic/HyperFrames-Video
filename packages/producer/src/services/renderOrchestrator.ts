@@ -1920,47 +1920,65 @@ export async function processLayeredNormalFrame(
 }
 
 /**
- * Composite a single transition frame on a given DOM session. Runs the
- * dual-scene capture (scene A and scene B with appropriate `applyDomLayerMask`
- * targeting) and applies the shader blend into `buffers.output`. Returns the
- * `output` Buffer; the caller writes it to the encoder.
+ * Metadata describing a captured-but-not-yet-blended transition frame. Used
+ * to hand a unit of blend work off from the DOM-capture phase to the
+ * `worker_threads` pool. Carries `frameIdx` so the reorder buffer at the
+ * encoder gate can fence ordering, and `shader`/`progress` so the blend
+ * dispatch is fully self-contained (the pool need not understand transition
+ * windows).
+ */
+export interface CapturedTransitionFrame {
+  frameIdx: number;
+  /** Width in pixels (854 etc.). Matches `ctx.width`. */
+  width: number;
+  /** Height in pixels (480 etc.). Matches `ctx.height`. */
+  height: number;
+  /** Transition progress in [0, 1]. */
+  progress: number;
+  /** Shader id from the transition metadata; unknowns fall back to crossfade. */
+  shader: string;
+  /** Filled by the capture: from-scene rgb48le pixels. */
+  buffers: LayeredTransitionBuffers;
+}
+
+/**
+ * Capture both scenes of a transition frame into `buffers.bufferA` and
+ * `buffers.bufferB`. Does NOT run the shader blend — the caller dispatches
+ * that synchronously (HDR / single-worker fallback) or via the
+ * `worker_threads` pool (hybrid path, hf#732 follow-up to close the JS
+ * event-loop ceiling).
  *
- * Self-contained per call: the per-scene seek/inject/mask/screenshot/remove-mask
- * pattern requires the same `window.__hf` state across the two scenes within
- * one invocation, but it holds no inter-frame state on the session. As of
- * the hf#732 follow-up the hybrid path runs transition frames in parallel
- * across worker sessions; each worker passes its own session here.
+ * Splitting capture from blend is the linchpin of the new dispatcher
+ * contract: each DOM worker can capture its next frame while the previous
+ * frame's blend runs on a worker thread, so the pool sees up to
+ * `N_dom × K` concurrent tasks instead of a single in-flight blend per DOM
+ * worker. K is bounded by a small per-worker buffer-triple ring (default 2)
+ * to cap memory; the encoder reorder buffer fences ordering downstream so
+ * out-of-order blend completions still hit the muxer in ascending index
+ * order.
  *
- * @param session - DOM capture session to drive. Each worker in the hybrid
- *                  parallel pool passes its own session; the legacy
- *                  sequential path passes the main `domSession`.
- * @param frameIdx - Composition frame index (used for warn-level error logs).
+ * Self-contained per call: the per-scene seek/inject/mask/screenshot/remove-
+ * mask pattern requires the same `window.__hf` state across both scenes
+ * within ONE invocation, but holds no inter-frame state on the session.
+ *
+ * @param session - DOM capture session to drive. The hybrid path passes the
+ *                  worker's own session; the legacy sequential / HDR fallback
+ *                  passes the main `domSession`.
+ * @param frameIdx - Composition frame index (used for warn-level error logs
+ *                   and the returned metadata).
  * @param time - Seek time in seconds.
  * @param transition - The transition window that contains this frame.
  * @param ctx - Layered-composite context (HDR layer maps, transfer, etc.).
- * @param sceneElements - Scene-id → element-id list, computed once at render
- *                        start from `.scene` DOM nodes.
- * @param buffers - Pre-allocated dual-scene buffers and shared output buffer.
- *                  All three are zero-filled by this helper as needed.
- * @param assertNotAborted - Render-level abort check, called between scene
- *                           A and scene B so an abort that lands mid-frame
- *                           tears down promptly instead of after the
- *                           second scene's full composite.
- * @param nativeHdrIds - Set of HDR element ids; passed to mask helpers so HDR
- *                       elements stay inline-hidden behind the screenshot
- *                       (their pixels arrive via `blitHdrVideoLayer` etc.).
- * @param shaderPool - Optional Node `worker_threads` pool to which the
- *                     per-pixel shader-blend is dispatched (hf#677 follow-up
- *                     to close the JS event-loop ceiling). When provided,
- *                     bufferA/bufferB/output ArrayBuffers are detached via
- *                     `transferList`, blended on a Worker, and transferred
- *                     back; the function reassigns the fields on `buffers`
- *                     to the returned Buffer views before returning. When
- *                     omitted (e.g. legacy sequential path / single-worker
- *                     SDR / HDR fallback), the blend runs synchronously on
- *                     the calling thread — bit-for-bit identical output.
+ * @param sceneElements - Scene-id → element-id list.
+ * @param buffers - Pre-allocated dual-scene buffers + output buffer. bufferA
+ *                  and bufferB are zero-filled before each scene composite;
+ *                  `output` is untouched here (filled by the blend step).
+ * @param assertNotAborted - Render-level abort check between scenes.
+ * @param nativeHdrIds - Set of HDR element ids.
+ *
+ * @returns Captured-frame descriptor the caller passes to the blend step.
  */
-export async function processLayeredTransitionFrame(
+export async function captureTransitionFrame(
   session: CaptureSession,
   frameIdx: number,
   time: number,
@@ -1970,8 +1988,7 @@ export async function processLayeredTransitionFrame(
   buffers: LayeredTransitionBuffers,
   assertNotAborted: () => void,
   nativeHdrIds: Set<string>,
-  shaderPool?: ShaderTransitionWorkerPool | null,
-): Promise<void> {
+): Promise<CapturedTransitionFrame> {
   const {
     log,
     beforeCaptureHook,
@@ -1992,7 +2009,7 @@ export async function processLayeredTransitionFrame(
 
   if (hdrPerf) hdrPerf.frames += 1;
   if (hdrPerf) hdrPerf.transitionFrames += 1;
-  const transitionTimingStart = Date.now();
+  const transitionCaptureStart = Date.now();
 
   let timingStart = Date.now();
   await session.page.evaluate((t: number) => {
@@ -2103,42 +2120,94 @@ export async function processLayeredTransitionFrame(
     }
   }
 
-  // Shader-blend dispatch. When a `shaderPool` is provided (hf#677 follow-up
-  // for the JS event-loop ceiling), the per-pixel blend runs on a Node
-  // `worker_threads` Worker via zero-copy `transferList`. The pool
-  // detaches the bufferA/B/output ArrayBuffers, runs the blend, and
-  // transfers them back; we reattach the returned Buffers onto the
-  // caller's `buffers` slot so the next iteration of the worker's frame
-  // loop sees the same shape.
-  //
-  // Without a pool, the blend runs synchronously on the main thread — the
-  // legacy path. Both branches produce byte-identical output because the
-  // worker imports the same `TRANSITIONS` table from `@hyperframes/engine`.
-  if (shaderPool) {
-    const blendStart = Date.now();
-    const result = await shaderPool.run({
-      shader: transition.shader,
-      bufferA: buffers.bufferA,
-      bufferB: buffers.bufferB,
-      output: buffers.output,
-      width,
-      height,
-      progress,
-    });
-    // The originals are detached; swap in the transferred-back views so
-    // the caller's `LayeredTransitionBuffers` stay valid for the next
-    // frame. Same underlying memory, fresh Buffer headers.
-    buffers.bufferA = result.bufferA;
-    buffers.bufferB = result.bufferB;
-    buffers.output = result.output;
-    addHdrTiming(hdrPerf, "transitionShaderBlendMs", blendStart);
-  } else {
-    const blendStart = Date.now();
-    const transitionFn: TransitionFn = TRANSITIONS[transition.shader] ?? crossfade;
-    transitionFn(buffers.bufferA, buffers.bufferB, buffers.output, width, height, progress);
-    addHdrTiming(hdrPerf, "transitionShaderBlendMs", blendStart);
-  }
-  addHdrTiming(hdrPerf, "transitionCompositeMs", transitionTimingStart);
+  // `transitionCaptureMs` is the dual-scene capture cost only — the blend is
+  // accounted for separately in `transitionShaderBlendMs`. Their sum is no
+  // longer equal to `transitionCompositeMs` (which now covers capture only
+  // along this path); perf-summary.json viewers should treat capture + blend
+  // as the per-frame composite cost in the decoupled pipeline.
+  addHdrTiming(hdrPerf, "transitionCompositeMs", transitionCaptureStart);
+
+  return {
+    frameIdx,
+    width,
+    height,
+    progress,
+    shader: transition.shader,
+    buffers,
+  };
+}
+
+/**
+ * Synchronous inline blend, identical to the pool's per-worker behavior but
+ * running on the calling thread. Used by:
+ *
+ * - the legacy sequential / HDR fallback path (no pool spawned)
+ * - the hybrid path if the pool spawn fails at render start
+ * - the hybrid path if a pool task rejects mid-render (best-effort
+ *   correctness preservation; the render falls back to inline blending for
+ *   that frame rather than aborting)
+ *
+ * Mutates `buffers.output` in place. `buffers.bufferA` and `buffers.bufferB`
+ * are read-only inputs.
+ */
+function blendTransitionFrameInline(
+  captured: CapturedTransitionFrame,
+  hdrPerf: HdrPerfCollector | undefined,
+): void {
+  const { buffers, width, height, progress, shader } = captured;
+  const blendStart = Date.now();
+  const transitionFn: TransitionFn = TRANSITIONS[shader] ?? crossfade;
+  transitionFn(buffers.bufferA, buffers.bufferB, buffers.output, width, height, progress);
+  addHdrTiming(hdrPerf, "transitionShaderBlendMs", blendStart);
+}
+
+/**
+ * Composite a single transition frame on a given DOM session — combined
+ * capture + blend. Retained for the legacy sequential path / HDR fallback /
+ * single-worker SDR, which call this directly and write `buffers.output` to
+ * the encoder synchronously after the function resolves.
+ *
+ * The hybrid parallel path does NOT call this helper. It calls
+ * `captureTransitionFrame` and dispatches the blend asynchronously to the
+ * `worker_threads` pool, so capture pipelines with blend across frames.
+ *
+ * Self-contained per call: the per-scene seek/inject/mask/screenshot/remove-
+ * mask pattern requires the same `window.__hf` state across the two scenes
+ * within one invocation, but it holds no inter-frame state on the session.
+ *
+ * @param session - DOM capture session to drive.
+ * @param frameIdx - Composition frame index.
+ * @param time - Seek time in seconds.
+ * @param transition - The transition window that contains this frame.
+ * @param ctx - Layered-composite context.
+ * @param sceneElements - Scene-id → element-id list.
+ * @param buffers - Pre-allocated dual-scene buffers + output buffer.
+ * @param assertNotAborted - Render-level abort check between scenes.
+ * @param nativeHdrIds - Set of HDR element ids.
+ */
+export async function processLayeredTransitionFrame(
+  session: CaptureSession,
+  frameIdx: number,
+  time: number,
+  transition: TransitionRange,
+  ctx: HdrCompositeContext,
+  sceneElements: Record<string, string[]>,
+  buffers: LayeredTransitionBuffers,
+  assertNotAborted: () => void,
+  nativeHdrIds: Set<string>,
+): Promise<void> {
+  const captured = await captureTransitionFrame(
+    session,
+    frameIdx,
+    time,
+    transition,
+    ctx,
+    sceneElements,
+    buffers,
+    assertNotAborted,
+    nativeHdrIds,
+  );
+  blendTransitionFrameInline(captured, ctx.hdrPerf);
 }
 
 /**
@@ -3581,26 +3650,83 @@ export async function executeRenderJob(
                 workerCanvases.push(Buffer.alloc(bufSize));
               }
 
-              // Per-worker transition scratch buffers (bufferA + bufferB +
-              // output). Worker 0 reuses the already-allocated
-              // `transitionBuffers` from the outer scope; remaining workers
-              // get their own triple. Only allocated when the composition
-              // actually has transitions — `transitionBuffers` is null
-              // otherwise and the per-worker loop will never enter the
-              // transition branch.
-              const workerTransitionBuffers: Array<LayeredTransitionBuffers | null> = [
-                transitionBuffers,
-              ];
-              for (let w = 1; w < activeWorkerCount; w++) {
-                workerTransitionBuffers.push(
-                  hasTransitions
-                    ? {
-                        bufferA: Buffer.alloc(bufSize),
-                        bufferB: Buffer.alloc(bufSize),
-                        output: Buffer.alloc(bufSize),
-                      }
-                    : null,
-                );
+              // Per-worker transition scratch buffer RING. Each entry is a
+              // triple (bufferA + bufferB + output); the DOM worker
+              // round-robins through the ring so it can capture frames
+              // N+1..N+K-1 while the pool is still blending earlier frames
+              // from the older ring slots. Ring depth K trades memory for
+              // pool utilization:
+              //
+              // - K=1: worker awaits each blend before the next capture →
+              //   pool sees max 1 task per worker → empirically ~135s
+              //   wall on the hf#677 fixture with N=6 workers (no
+              //   improvement over the un-decoupled `bde9b886` baseline).
+              // - K=2: covers the average transition cluster well enough
+              //   to keep the pool with 2-4 concurrent tasks → ~135s.
+              // - K=4-5: pool saturates around max busy ≈ pool size during
+              //   peak transition clusters → ~100s wall. This is the
+              //   sweet spot per empirical sweep.
+              // - K≥10: diminishing returns; pool already saturated, so
+              //   adding more in-flight tasks just adds memory.
+              //
+              // The right K, mathematically, is `blend_per_frame /
+              // capture_per_frame`. For 854×480 rgb48le with complex
+              // shaders this is ~910ms / ~175ms ≈ 5. K=4 strikes the
+              // balance between perf and memory. Override at runtime via
+              // `HF_TRANSITION_RING_DEPTH` if a workload's blend/capture
+              // ratio is very different (e.g. simpler shaders that blend
+              // in 100ms can drop K to 1-2 with no perf loss).
+              //
+              // Memory budget: 6 workers × 4 × 3 buffers × 854×480×6 bytes
+              // ≈ 180MB peak; safely within the SDR render budget. With
+              // K=10 it's ~450MB, still fine but unnecessary.
+              //
+              // hf#732 follow-up rationale: the prior fix-up
+              // (`bde9b886`) awaited each `pool.run` inline inside
+              // `processLayeredTransitionFrame`, which serialized every
+              // DOM worker through one in-flight blend. With N=6 DOM
+              // workers walking contiguous frame slices and transition
+              // windows being temporally localized, typically only 1-2
+              // DOM workers held a transition at a time — so the pool
+              // only ever had ≤2 tasks in flight, fed through slots 0-1
+              // with postMessage overhead on top. CPU graphs showed
+              // workers 0-1 active and workers 2-5 idle. Decoupling +
+              // the K-deep ring is the fix: each DOM worker fires off the
+              // blend without awaiting, then on its (K+1)-th transition
+              // frame awaits the oldest in-flight blend on this worker.
+              // The pool sustains up to min(N_workers × K, poolSize)
+              // concurrent blends.
+              const DEFAULT_TRANSITION_RING_DEPTH = 4;
+              const TRANSITION_RING_DEPTH = Math.max(
+                1,
+                Number(
+                  process.env.HF_TRANSITION_RING_DEPTH ?? String(DEFAULT_TRANSITION_RING_DEPTH),
+                ),
+              );
+              const workerTransitionRings: Array<LayeredTransitionBuffers[] | null> = [];
+              for (let w = 0; w < activeWorkerCount; w++) {
+                if (!hasTransitions) {
+                  workerTransitionRings.push(null);
+                  continue;
+                }
+                const ring: LayeredTransitionBuffers[] = [];
+                // Slot 0 of worker 0 reuses the already-allocated outer-scope
+                // `transitionBuffers` so the legacy sequential branch's buffer
+                // allocation is not wasted when both branches share the
+                // hasTransitions path. The remaining K-1 slots for worker 0
+                // plus all slots for workers 1..N are freshly allocated.
+                for (let k = 0; k < TRANSITION_RING_DEPTH; k++) {
+                  if (w === 0 && k === 0 && transitionBuffers) {
+                    ring.push(transitionBuffers);
+                  } else {
+                    ring.push({
+                      bufferA: Buffer.alloc(bufSize),
+                      bufferB: Buffer.alloc(bufSize),
+                      output: Buffer.alloc(bufSize),
+                    });
+                  }
+                }
+                workerTransitionRings.push(ring);
               }
 
               // Flat partition over the entire frame range — every worker
@@ -3613,13 +3739,25 @@ export async function executeRenderJob(
                 activeWorkerCount,
               );
 
+              // Snapshot the pool into a non-null local for the closure. The
+              // pool reference is mutated to `null` on spawn failure; once
+              // we're past that point, the closure can safely treat it as
+              // a definite value (or fall back to inline blend).
+              const poolRef = shaderPool;
+
               const workerTaskOf = async (w: number): Promise<void> => {
                 const session = sessions[w];
                 const canvas = workerCanvases[w];
                 if (!session || !canvas) return;
                 const range = workerRanges[w];
                 if (!range) return;
-                const myTransitionBuffers = workerTransitionBuffers[w] ?? null;
+                const ring = workerTransitionRings[w] ?? null;
+                // Per-ring-slot in-flight promise. When a slot is mid-blend,
+                // its promise is non-null; before reusing the slot for a
+                // new capture we await it (backpressure → bounds memory).
+                const ringInFlight: Array<Promise<void> | null> = ring ? ring.map(() => null) : [];
+                let nextRingIdx = 0;
+
                 for (let i = range.start; i < range.end; i++) {
                   assertNotAborted();
                   const time = (i * job.config.fps.den) / job.config.fps.num;
@@ -3627,20 +3765,90 @@ export async function executeRenderJob(
                     ? transitionRanges.find((t) => i >= t.startFrame && i <= t.endFrame)
                     : undefined;
 
-                  if (activeTransition && myTransitionBuffers) {
-                    await processLayeredTransitionFrame(
+                  if (activeTransition && ring) {
+                    // Pick the next ring slot. If it's still in flight from
+                    // an earlier capture, wait for it to drain before
+                    // reusing its buffer triple.
+                    const slot = nextRingIdx;
+                    nextRingIdx = (nextRingIdx + 1) % TRANSITION_RING_DEPTH;
+                    const prev = ringInFlight[slot];
+                    if (prev) await prev;
+                    const buffers = ring[slot];
+                    if (!buffers) continue;
+
+                    // CAPTURE on the DOM worker (this thread). Fills
+                    // bufferA / bufferB synchronously w.r.t. this loop —
+                    // we can't pipeline DOM work because the per-worker
+                    // browser session is single-threaded.
+                    const captured = await captureTransitionFrame(
                       session,
                       i,
                       time,
                       activeTransition,
                       hdrCompositeCtx,
                       sceneElements,
-                      myTransitionBuffers,
+                      buffers,
                       assertNotAborted,
                       nativeHdrIds,
-                      shaderPool,
                     );
-                    await writeEncoded(i, myTransitionBuffers.output);
+
+                    // BLEND + ENCODE without awaiting. The promise drains
+                    // back into `ringInFlight[slot]`; the next iteration
+                    // that picks `slot` will await it. The encoder reorder
+                    // buffer fences ordering so out-of-order blend
+                    // completion is fine.
+                    const dispatch: Promise<void> = (async () => {
+                      if (poolRef) {
+                        const blendStart = Date.now();
+                        try {
+                          const result = await poolRef.run({
+                            shader: captured.shader,
+                            bufferA: buffers.bufferA,
+                            bufferB: buffers.bufferB,
+                            output: buffers.output,
+                            width: captured.width,
+                            height: captured.height,
+                            progress: captured.progress,
+                          });
+                          // The originals were detached. Swap in the
+                          // re-attached views so the ring slot stays
+                          // usable for the next round-trip.
+                          buffers.bufferA = result.bufferA;
+                          buffers.bufferB = result.bufferB;
+                          buffers.output = result.output;
+                          addHdrTiming(
+                            hdrCompositeCtx.hdrPerf,
+                            "transitionShaderBlendMs",
+                            blendStart,
+                          );
+                        } catch (err) {
+                          // Pool task failed (worker crash / detach race).
+                          // The transferred ArrayBuffers are lost; we
+                          // cannot recover them, so we surface this as a
+                          // fatal render error. The outer Promise.all
+                          // rejects and the finally block tears down.
+                          log.warn("[Render] Shader-blend pool task failed; aborting render", {
+                            frameIndex: captured.frameIdx,
+                            shader: captured.shader,
+                            error: err instanceof Error ? err.message : String(err),
+                          });
+                          throw err;
+                        }
+                      } else {
+                        // No pool (spawn failed) — synchronous fallback.
+                        blendTransitionFrameInline(captured, hdrCompositeCtx.hdrPerf);
+                      }
+                      await writeEncoded(captured.frameIdx, buffers.output);
+                    })();
+
+                    // Catch on a separate handle so an unhandled-rejection
+                    // can't fire if no one awaits this slot before the
+                    // worker exits. The settled error is re-thrown when
+                    // the slot is reused OR at the drain at function end.
+                    ringInFlight[slot] = dispatch.catch((err: unknown) => {
+                      // Re-throw on next await so the worker task rejects.
+                      throw err instanceof Error ? err : new Error(String(err));
+                    });
                   } else {
                     await processLayeredNormalFrame(
                       session,
@@ -3659,6 +3867,12 @@ export async function executeRenderJob(
                     }
                     await writeEncoded(i, canvas);
                   }
+                }
+
+                // Drain any blends still in flight on this worker before
+                // returning. If any rejected, the rejection bubbles here.
+                for (const pending of ringInFlight) {
+                  if (pending) await pending;
                 }
               };
 

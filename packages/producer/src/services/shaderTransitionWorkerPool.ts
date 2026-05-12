@@ -78,6 +78,10 @@ interface PendingTask {
   req: ShaderBlendRequest;
   resolve: (r: ShaderBlendResult) => void;
   reject: (err: Error) => void;
+  /** Set when `HF_SHADER_POOL_TRACE=1`; used to log dispatch latency. */
+  enqueuedAtMs?: number;
+  /** Set when `HF_SHADER_POOL_TRACE=1`; assigned at dispatch. */
+  traceId?: number;
 }
 
 interface WorkerSlot {
@@ -171,6 +175,14 @@ export async function createShaderTransitionWorkerPool(
   const queue: PendingTask[] = [];
   let terminated = false;
 
+  // hf#732 follow-up: instrumentation flag to log per-task dispatch /
+  // completion timestamps so we can confirm the pool actually runs blends
+  // concurrently when N DOM workers each dispatch K tasks. Enabled by
+  // setting `HF_SHADER_POOL_TRACE=1`. Off by default — the per-task log
+  // line is high-volume on long shader-transition renders.
+  const traceEnabled = process.env.HF_SHADER_POOL_TRACE === "1";
+  let nextTaskId = 0;
+
   // Bind the parent's execArgv (e.g. tsx's `--import tsx/esm` loader) into
   // every Worker so a `.ts` entry point loads under tsx in dev without a
   // separate loader registration step. In the bundled prod build the
@@ -185,6 +197,19 @@ export async function createShaderTransitionWorkerPool(
     if (!task) return;
     slot.busy = true;
     slot.current = task;
+    if (traceEnabled) {
+      const slotIdx = slots.indexOf(slot);
+      const waitMs = task.enqueuedAtMs ? Date.now() - task.enqueuedAtMs : 0;
+      const busyCount = slots.filter((s) => s.busy).length;
+      log.info?.("[shaderPool] dispatch", {
+        task: task.traceId,
+        slot: slotIdx,
+        shader: task.req.shader,
+        waitMs,
+        busyCount,
+        queueDepth: queue.length,
+      });
+    }
     const { bufferA, bufferB, output, shader, width, height, progress } = task.req;
     // `Buffer.alloc` always returns a Buffer over a plain ArrayBuffer (not
     // SharedArrayBuffer) at runtime — TS narrows `.buffer` to the union
@@ -291,7 +316,9 @@ export async function createShaderTransitionWorkerPool(
         throw new Error("shader-blend pool already terminated");
       }
       return new Promise<ShaderBlendResult>((resolve, reject) => {
-        const task: PendingTask = { req, resolve, reject };
+        const task: PendingTask = traceEnabled
+          ? { req, resolve, reject, enqueuedAtMs: Date.now(), traceId: ++nextTaskId }
+          : { req, resolve, reject };
         // Find an idle slot; otherwise queue.
         const idle = slots.find((s) => !s.busy);
         if (idle) {
