@@ -306,8 +306,21 @@ export function registerFileRoutes(api: Hono, adapter: StudioApiAdapter): void {
       const skipped: string[] = [];
       const invalid: Array<{ name: string; reason: string }> = [];
 
-      for (const [, value] of formData.entries()) {
-        if (!(value instanceof File)) continue;
+      // @types/node v25 narrows the ambient `FormData.entries()` to
+      // `[string, string]` in workspaces where another dep declares an
+      // `onmessage` global (it trips the worker branch of v25's conditional
+      // File type). At runtime the value is still `File | string` — cast the
+      // iterator so the rest of this block keeps type-checking on every
+      // bun-install layout (hoisted on Windows surfaces this; isolated on
+      // Linux happens to keep v24 in scope).
+      type FileLike = {
+        readonly name: string;
+        readonly size: number;
+        arrayBuffer(): Promise<ArrayBuffer>;
+      };
+      const entries = formData.entries() as unknown as Iterable<[string, FileLike | string]>;
+      for (const [, value] of entries) {
+        if (typeof value === "string") continue;
 
         // Strip path separators — browsers may include directory components
         const name = value.name.split("/").pop()?.split("\\").pop() ?? "";
