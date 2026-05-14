@@ -64,9 +64,13 @@ export function scaleIframeToFit(
   compositionWidth: number,
   compositionHeight: number,
 ): void {
-  const rect = playerElement.getBoundingClientRect();
-  if (rect.width === 0 || rect.height === 0) return;
-  const scale = Math.min(rect.width / compositionWidth, rect.height / compositionHeight);
+  // Use offsetWidth/offsetHeight (layout dimensions) instead of getBoundingClientRect(),
+  // which returns visual dimensions inflated by ancestor CSS zoom. Using the zoomed rect
+  // would double-scale the iframe when an ancestor has CSS zoom applied.
+  const width = playerElement.offsetWidth;
+  const height = playerElement.offsetHeight;
+  if (width === 0 || height === 0) return;
+  const scale = Math.min(width / compositionWidth, height / compositionHeight);
   iframe.style.width = `${compositionWidth}px`;
   iframe.style.height = `${compositionHeight}px`;
   iframe.style.transform = `translate(-50%, -50%) scale(${scale})`;
