@@ -90,7 +90,6 @@ export const NLEPreview = memo(function NLEPreview({
     const s = toDomPrecision(state.zoomPercent / 100);
     const px = toDomPrecision(state.panX);
     const py = toDomPrecision(state.panY);
-    stage.style.zoom = "";
     stage.style.transform = `translate(${px}px, ${py}px) scale(${s})`;
   }, []);
 
@@ -278,6 +277,7 @@ export const NLEPreview = memo(function NLEPreview({
           style={{
             transform: `translate(${toDomPrecision(initial.panX)}px, ${toDomPrecision(initial.panY)}px) scale(${toDomPrecision(initial.zoomPercent / 100)})`,
             transformOrigin: "50% 50%",
+            willChange: "transform",
             outline: "1px solid rgba(255,255,255,0.3)",
             outlineOffset: "0px",
             boxShadow: "0 4px 32px rgba(0,0,0,0.7)",
