@@ -36,13 +36,22 @@ Read these before generating options — they define the rules your options must
 
 Each architecture object must include a `preview_html` field — the HTML that renders in the preview panel. Use token placeholders that the template replaces at runtime: `{{bg}}`, `{{fg}}`, `{{ac}}`, `{{mt}}`, `{{hf}}`, `{{hw}}`, `{{bf}}`, `{{bw}}`, `{{cr}}` (corner radius), `{{pad}}`, `{{gap}}`, `{{shadow}}`, `{{g}}` (grid line color), `{{fg3}}`/`{{fg6}}`/`{{fg8}}`/`{{fg15}}` (fg at opacity), `{{ac3}}`/`{{ac5}}`/`{{ac25}}` (accent at opacity).
 
-**Every token must be used.** Apply `{{cr}}` to all cards, buttons, and containers. Apply `{{shadow}}` to elevated elements (cards, buttons, code blocks). Apply `{{pad}}` and `{{gap}}` to control spacing. If a token isn't used in the preview_html, that option will have no visible effect.
+**Use tokens where they apply.** Not every architecture needs every token — a minimal layout won't have cards or buttons. Tokens that aren't used simply won't have a visible effect when changed in Phase 2.
 
-**Density matters.** Each architecture preview must include 15+ distinct elements to give the user a real sense of the layout. Include: headline, subhead, body paragraph, label/overline, stat with number, secondary stat, quote/testimonial, attribution, card with title+body, second card (different treatment), code/command block, primary button, secondary button, list or tags, accent divider/rule, and a data element (table row, progress bar, or chart).
+**Density matches the concept.** The preview should look like a real frame from the actual video — not a UI component showcase. A single-stat direction has 2-3 elements. A data-grid direction has 12+. Match the architecture's intent.
 
-Optionally include `components` (component styling rules) and `dos` (do's and don'ts) as strings — these appear in the generated design.md.
+**Build preview frames like real compositions.** Read [video-composition.md](video-composition.md), [../house-style.md](../house-style.md), and [motion-principles.md](motion-principles.md) when generating preview frame HTML. The frames are static but should look like they were paused mid-animation:
+- Apply accent color to exactly the focal element per frame
+- Use video-scale typography (80-140px heroes, 24-36px body, 14-20px labels)
+- Respect the density philosophy — high-energy frames earn more elements, contemplative frames earn fewer
+- Each of the 4 frames should represent a distinct beat: hook (grab attention), proof (deliver the message), action (what to do), close (final frame)
+- Use real content from the prompt, not "Headline Goes Here" placeholders
 
-**Layout constraint:** All preview HTML must use percentage widths or `max-width: 100%`. Use `flex-wrap: wrap` on all flex rows. Absolute-positioned decoratives must stay within a parent with `overflow: hidden`.
+The user judges the entire video based on these 4 frames. If they look generic, the user assumes the video will too.
+
+Optionally include `components` and `dos` as strings — these appear in the generated design.md.
+
+**Layout constraint:** Each frame is 1920×1080px. Content can use flex, grid, absolute positioning — any CSS that works in inline styles. Avoid `max-width: 100%` on frame content (the frame IS 1920px).
 
 **Security:** Architecture `preview_html` must not contain `<script>` tags, event handlers (`onclick`, `onerror`, etc.), or `javascript:` URLs. It is injected via `innerHTML`.
 

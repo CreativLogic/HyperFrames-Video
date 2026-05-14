@@ -241,13 +241,180 @@
       .panel-right {
         flex: 1;
         height: 100%;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
         background: #0e0e0e;
       }
-      .panel-right * {
+      .panel-right > *:not(.showcase) {
         max-width: 100%;
         box-sizing: border-box;
       }
+      .showcase *, .showcase *::before, .showcase *::after {
+        box-sizing: border-box;
+      }
+      .scene-frame, .scene-frame * {
+        max-width: none !important;
+      }
+
+      /* ── Showcase ── */
+      .showcase {
+        padding: 0;
+        --sc-bg: #0e0e0e;
+        --sc-fg: #eee;
+        --sc-ac: #888;
+        --sc-mt: #555;
+      }
+      .showcase-section {
+        padding: 48px 40px;
+        border-bottom: 1px solid var(--sc-mt, #1a1a1a);
+        background: var(--sc-bg);
+        color: var(--sc-fg);
+      }
+      .showcase-eyebrow {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--sc-ac);
+        margin: 0 0 12px;
+        font-family: ui-monospace, "SF Mono", monospace;
+      }
+      .showcase-heading {
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--sc-fg);
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .showcase-lead {
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--sc-mt);
+        margin: 0 0 24px;
+        max-width: 600px;
+      }
+
+      /* Palette swatches */
+      .swatch-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+      .swatch-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        background: rgba(128,128,128,0.06);
+        border: 1px solid rgba(128,128,128,0.12);
+        border-radius: 8px;
+        min-width: 180px;
+      }
+      .swatch-chip {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        flex-shrink: 0;
+        border: 1px solid rgba(128,128,128,0.1);
+      }
+      .swatch-name { font-size: 13px; font-weight: 600; color: var(--sc-fg); }
+      .swatch-hex { font-size: 11px; color: var(--sc-mt); font-family: ui-monospace, monospace; }
+      .swatch-role { font-size: 11px; color: var(--sc-mt); margin-top: 2px; opacity: 0.7; }
+
+      /* Type specimens */
+      .type-specimen-row {
+        display: flex;
+        gap: 20px;
+        padding: 16px 0;
+        border-bottom: 1px solid rgba(128,128,128,0.1);
+        align-items: baseline;
+      }
+      .type-meta {
+        width: 120px;
+        flex-shrink: 0;
+        font-size: 11px;
+        color: var(--sc-mt);
+        font-family: ui-monospace, monospace;
+        line-height: 1.4;
+      }
+      .type-meta strong { color: var(--sc-ac); display: block; margin-bottom: 2px; }
+      .type-sample { flex: 1; color: var(--sc-fg); }
+
+      /* Scene grid */
+      .scene-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+      }
+      .scene-cell {
+        position: relative;
+        overflow: hidden;
+        border-radius: 6px;
+        aspect-ratio: 16/9;
+        border: 1px solid rgba(128,128,128,0.12);
+      }
+      .scene-cell-label {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        font-size: 9px;
+        color: var(--sc-mt);
+        font-family: ui-monospace, monospace;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        z-index: 2;
+      }
+      .scene-frame {
+        width: 1920px;
+        height: 1080px;
+        transform-origin: top left;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      /* Motion preview */
+      .ease-preview-track {
+        width: 100%;
+        height: 40px;
+        background: rgba(128,128,128,0.06);
+        border-radius: 6px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(128,128,128,0.12);
+      }
+      .ease-preview-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        position: absolute;
+        top: 14px;
+        left: 10px;
+      }
+
+      /* Elevation */
+      .elevation-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+      .elevation-card {
+        width: 140px;
+        height: 80px;
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 11px;
+      }
+      .elevation-label { font-size: 10px; color: var(--sc-mt); }
+
+      /* Radius */
+      .radius-grid { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+      .radius-chip-preview {
+        width: 48px;
+        height: 48px;
+        border: 1px solid var(--sc-mt);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .radius-label { font-size: 10px; color: var(--sc-mt); text-align: center; margin-top: 4px; font-family: ui-monospace, monospace; }
+
       .tune-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -806,6 +973,56 @@
       </div>
       <div class="panel-right" id="preview">
         <div class="preview-empty">Pick a structure to preview</div>
+        <div class="showcase" id="showcase" style="display:none;">
+
+          <div class="showcase-section" id="sc-overview">
+            <div class="showcase-eyebrow">/ 01 / Overview</div>
+            <h2 class="showcase-heading" id="sc-overview-title"></h2>
+            <p class="showcase-lead" id="sc-overview-lead"></p>
+          </div>
+
+          <div class="showcase-section" id="sc-palette">
+            <div class="showcase-eyebrow">/ 02 / Palette</div>
+            <h2 class="showcase-heading">Color Palette</h2>
+            <p class="showcase-lead" id="sc-palette-lead"></p>
+            <div class="swatch-grid" id="sc-swatches"></div>
+          </div>
+
+          <div class="showcase-section" id="sc-type">
+            <div class="showcase-eyebrow">/ 03 / Typography</div>
+            <h2 class="showcase-heading">Typography Scale</h2>
+            <p class="showcase-lead" id="sc-type-lead"></p>
+            <div id="sc-type-specimens"></div>
+          </div>
+
+          <div class="showcase-section" id="sc-scenes">
+            <div class="showcase-eyebrow">/ 04 / Composition</div>
+            <h2 class="showcase-heading">Scene Frames</h2>
+            <p class="showcase-lead">Four key moments from the composition — hook, proof, action, close.</p>
+            <div class="scene-grid" id="sc-scene-grid"></div>
+          </div>
+
+          <div class="showcase-section" id="sc-motion">
+            <div class="showcase-eyebrow">/ 05 / Motion</div>
+            <h2 class="showcase-heading">Motion Personality</h2>
+            <p class="showcase-lead" id="sc-motion-lead"></p>
+            <div id="sc-ease-preview"></div>
+          </div>
+
+          <div class="showcase-section" id="sc-elevation">
+            <div class="showcase-eyebrow">/ 06 / Surface & Depth</div>
+            <h2 class="showcase-heading">Elevation</h2>
+            <p class="showcase-lead" id="sc-elevation-lead"></p>
+            <div class="elevation-grid" id="sc-elevation-grid"></div>
+          </div>
+
+          <div class="showcase-section" id="sc-radius">
+            <div class="showcase-eyebrow">/ 07 / Border Radius</div>
+            <h2 class="showcase-heading">Radius Scale</h2>
+            <div class="radius-grid" id="sc-radius-grid"></div>
+          </div>
+
+        </div>
       </div>
     </div>
 
@@ -1327,99 +1544,151 @@
 
       function renderPreview() {
         var pv = document.getElementById("preview");
+        var sc = document.getElementById("showcase");
+        var empty = pv.querySelector(".preview-empty");
         if (picks.arch === null) {
-          pv.innerHTML = '<div class="preview-empty">Pick a structure to preview</div>';
+          if (empty) empty.style.display = "";
+          sc.style.display = "none";
           return;
         }
+        if (empty) empty.style.display = "none";
+        sc.style.display = "";
+
         var a = ARCHITECTURES[picks.arch];
         var th = picks.theme !== null ? THEMES[picks.theme] : THEMES[0];
-        var p =
-          picks.palette !== null ? PALETTES[picks.palette] : { accent: "#888", muted: "#555" };
-        var t =
-          picks.type !== null
-            ? TYPEPAIRS[picks.type]
-            : {
-                headline: { family: "system-ui", weight: 600 },
-                body: { family: "system-ui", weight: 400 },
-              };
-        var cr = picks.corners !== null ? CORNERS[picks.corners].value : "0px";
+        var p = picks.palette !== null ? PALETTES[picks.palette] : { accent: "#888", muted: "#555", name: "Default" };
+        var t = picks.type !== null ? TYPEPAIRS[picks.type] : { headline: { family: "system-ui", weight: "600" }, body: { family: "system-ui", weight: "400" }, name: "Default" };
+        var cr = picks.corners !== null ? CORNERS[picks.corners] : { name: "Slight", value: "4px" };
         var dn = picks.density !== null ? picks.density : 1;
-        var dp = picks.depth !== null ? picks.depth : 0;
+        var dp = picks.depth !== null ? DEPTHS[picks.depth] : DEPTHS[0];
+        var easeObj = picks.easing !== null ? EASINGS[picks.easing] : null;
         var bg, fg;
-        if (th.id === "palette" && p.background) {
-          bg = p.background;
-          fg = p.foreground;
-        } else {
-          bg = th.bg;
-          fg = th.fg;
-        }
-        var ac = p.accent,
-          mt = p.muted || al(fg, 0.4);
-        var pad = [12, 20, 36][dn] + "px",
-          gap = [8, 16, 28][dn] + "px";
+        if (th.id === "palette" && p.background) { bg = p.background; fg = p.foreground; }
+        else { bg = th.bg; fg = th.fg; }
+        var ac = p.accent, mt = p.muted || al(fg, 0.4);
         var isDark = bg && bg[0] === "#" ? parseInt(bg.slice(1, 3), 16) < 80 : true;
+        var pad = [12, 20, 36][dn] + "px", gap = [8, 16, 28][dn] + "px";
         var shCol = isDark ? ac : fg;
-        var shadow = [
-          "none",
-          "0 2px 16px " + al(shCol, isDark ? 0.15 : 0.1),
-          "0 4px 32px " + al(shCol, isDark ? 0.3 : 0.18),
-        ][dp];
+        var shadow = ["none", "0 2px 16px " + al(shCol, isDark ? 0.15 : 0.1), "0 4px 32px " + al(shCol, isDark ? 0.3 : 0.18)][picks.depth || 0];
+
+        // Token map for frame rendering
         var tokens = {
-          "{{bg}}": bg,
-          "{{fg}}": fg,
-          "{{ac}}": ac,
-          "{{mt}}": mt,
-          "{{sf}}": al(fg, 0.06),
-          "{{hf}}": t.headline.family,
-          "{{hw}}": t.headline.weight,
-          "{{bf}}": t.body.family,
-          "{{bw}}": t.body.weight,
-          "{{cr}}": cr,
-          "{{pad}}": pad,
-          "{{gap}}": gap,
-          "{{shadow}}": shadow,
-          "{{g}}": al(fg, 0.06),
-          "{{fg3}}": al(fg, 0.03),
-          "{{fg6}}": al(fg, 0.06),
-          "{{fg8}}": al(fg, 0.08),
-          "{{fg15}}": al(fg, 0.15),
-          "{{ac3}}": al(ac, 0.03),
-          "{{ac5}}": al(ac, 0.05),
-          "{{ac25}}": al(ac, 0.25),
+          "{{bg}}": bg, "{{fg}}": fg, "{{ac}}": ac, "{{mt}}": mt,
+          "{{hf}}": t.headline.family, "{{hw}}": t.headline.weight,
+          "{{bf}}": t.body.family, "{{bw}}": t.body.weight,
+          "{{cr}}": cr.value, "{{pad}}": pad, "{{gap}}": gap, "{{shadow}}": shadow,
+          "{{sf}}": al(fg, 0.06), "{{g}}": al(fg, 0.06),
+          "{{fg3}}": al(fg, 0.03), "{{fg6}}": al(fg, 0.06), "{{fg8}}": al(fg, 0.08), "{{fg15}}": al(fg, 0.15),
+          "{{ac3}}": al(ac, 0.03), "{{ac5}}": al(ac, 0.05), "{{ac25}}": al(ac, 0.25),
           "{{prompt_headline}}": (PROMPT && PROMPT.headline) || "Your Headline",
           "{{prompt_sub}}": (PROMPT && PROMPT.subline) || "Subline.",
         };
+
+        // Set CSS variables for the showcase
+        sc.style.setProperty("--sc-bg", bg);
+        sc.style.setProperty("--sc-fg", fg);
+        sc.style.setProperty("--sc-ac", ac);
+        sc.style.setProperty("--sc-mt", mt);
+
+        // ── Overview ──
+        document.getElementById("sc-overview-title").textContent = (PROMPT && PROMPT.title) || "Untitled";
+        document.getElementById("sc-overview-lead").textContent = (a.mood || "") + " " + (a.description || "") + ". " + (isDark ? "Dark" : "Light") + " canvas, " + t.headline.family + " headlines, " + t.body.family + " body.";
+        // Overview inherits from CSS variables set on .showcase
+
+        // ── Palette ──
+        var swatchData = [
+          { name: "Canvas", hex: bg, role: "Frame background" },
+          { name: "Text", hex: fg, role: "Primary readable text" },
+          { name: "Accent", hex: ac, role: "Hero stats, focal elements" },
+          { name: "Muted", hex: mt, role: "Captions, labels, secondary" },
+        ];
+        document.getElementById("sc-palette-lead").textContent = p.name + " palette. Accent (" + ac + ") carries every focal element. Use it scarcely.";
+        var swatchHtml = swatchData.map(function(s) {
+          return '<div class="swatch-card"><span class="swatch-chip" style="background:' + s.hex + ';"></span><div><div class="swatch-name">' + s.name + '</div><div class="swatch-hex">' + s.hex + '</div><div class="swatch-role">' + s.role + '</div></div></div>';
+        }).join("");
+        document.getElementById("sc-swatches").innerHTML = swatchHtml;
+
+        // ── Typography ──
+        document.getElementById("sc-type-lead").textContent = t.headline.family + " (weight " + t.headline.weight + ") for headlines. " + t.body.family + " (weight " + t.body.weight + ") for body. Cross-category pairing.";
+        var typeRows = [
+          { token: "hero-slam", size: "96px", weight: t.headline.weight, family: t.headline.family, sample: (PROMPT && PROMPT.headline) || "Hero Headline", lh: "0.95", ls: "-0.03em" },
+          { token: "section", size: "48px", weight: t.headline.weight, family: t.headline.family, sample: "Section Headline", lh: "1.1", ls: "-0.02em" },
+          { token: "body", size: "28px", weight: t.body.weight, family: t.body.family, sample: "Body text at video scale — readable at 3 seconds on screen.", lh: "1.5", ls: "0" },
+          { token: "label", size: "14px", weight: t.body.weight, family: t.body.family, sample: "OVERLINE LABEL · UPPERCASE · WIDE TRACKING", lh: "1.4", ls: "0.1em" },
+          { token: "data", size: "64px", weight: t.headline.weight, family: t.body.family, sample: "2,481,000", lh: "1.0", ls: "-0.02em" },
+        ];
+        var typeHtml = typeRows.map(function(r) {
+          return '<div class="type-specimen-row"><div class="type-meta"><strong>' + r.token + '</strong></div><div class="type-sample" style="font-family:\'' + r.family + '\',sans-serif;font-weight:' + r.weight + ';font-size:' + r.size + ';line-height:' + r.lh + ';letter-spacing:' + r.ls + ';color:' + fg + ';">' + r.sample + '</div></div>';
+        }).join("");
+        document.getElementById("sc-type-specimens").innerHTML = typeHtml;
+
+        // ── Scenes ──
         var frames = a.preview_frames || [a.preview_html || ""];
-        var resolved = frames.map(function(f) {
+        var sceneLabels = ["/ Scene 1 · Hook", "/ Scene 2 · Proof", "/ Scene 3 · Action", "/ Scene 4 · Close"];
+        var sceneHtml = frames.map(function(f, fi) {
           var r = f || "";
-          Object.keys(tokens).forEach(function (k) {
-            r = r.split(k).join(tokens[k]);
+          Object.keys(tokens).forEach(function(k) { r = r.split(k).join(tokens[k]); });
+          return '<div class="scene-cell" style="background:' + bg + ';"><div class="scene-cell-label">' + (sceneLabels[fi] || "/ Scene " + (fi+1)) + '</div><div class="scene-frame">' + r + '</div></div>';
+        }).join("");
+        document.getElementById("sc-scene-grid").innerHTML = sceneHtml;
+
+        // Scale scene frames — retry until cells have width
+        function scaleScenes() {
+          var allDone = true;
+          document.querySelectorAll(".scene-cell").forEach(function(cell) {
+            var f = cell.querySelector(".scene-frame");
+            if (!f) return;
+            var cw = cell.offsetWidth;
+            if (cw <= 0) { allDone = false; return; }
+            var s = cw / 1920;
+            f.style.transform = "scale(" + s + ")";
+            f.style.background = bg;
+            console.log("scene scale:", s.toFixed(3), "cell:", cw + "x" + cell.offsetHeight, "frame visual:", Math.round(1920*s) + "x" + Math.round(1080*s));
           });
-          return r;
-        });
-        var gridHtml = resolved.map(function(r) {
-          return '<div class="tune-cell"><div class="tune-frame" style="background:' + bg + ';">' + r + '</div></div>';
+          if (!allDone) setTimeout(scaleScenes, 50);
+        }
+        setTimeout(scaleScenes, 100);
+        window.removeEventListener("resize", scaleScenes);
+        window.addEventListener("resize", scaleScenes);
+
+        // ── Motion ──
+        var motionLead = easeObj ? easeObj.name + " energy. Entry easing: " + easeObj.value + " — " + easeObj.desc + "." : "Select an easing to preview.";
+        document.getElementById("sc-motion-lead").textContent = motionLead;
+        var easePreview = document.getElementById("sc-ease-preview");
+        easePreview.innerHTML = '<div class="ease-preview-track"><div class="ease-preview-dot" id="sc-ease-dot" style="background:' + ac + ';"></div></div>';
+        if (easeObj && typeof gsap !== "undefined") {
+          var dot = document.getElementById("sc-ease-dot");
+          function animateDot() {
+            gsap.fromTo(dot, { left: 10 }, { left: "calc(100% - 22px)", duration: 1.2, ease: easeObj.value, delay: 0.5, onComplete: function() {
+              gsap.to(dot, { left: 10, duration: 0.3, ease: "power1.in", delay: 1, onComplete: animateDot });
+            }});
+          }
+          animateDot();
+        }
+
+        // ── Elevation ──
+        document.getElementById("sc-elevation-lead").textContent = dp.name + " — " + dp.desc + ".";
+        var elvGrid = document.getElementById("sc-elevation-grid");
+        elvGrid.innerHTML = [
+          { name: "Flat", style: "background:" + (isDark ? "#141414" : "#f5f5f5") + ";border:none;" },
+          { name: "Hairline", style: "background:" + (isDark ? "#141414" : "#f5f5f5") + ";border:1px solid " + al(fg, 0.06) + ";" },
+          { name: "Shadow", style: "background:" + (isDark ? "#1a1a1a" : "#fff") + ";border:none;box-shadow:" + shadow + ";" },
+        ].map(function(e) {
+          return '<div class="elevation-card" style="' + e.style + 'border-radius:' + cr.value + ';"><span style="color:' + fg + ';">' + e.name + '</span><span class="elevation-label">' + (e.name === dp.name.split(" ")[0] ? "✓ active" : "") + '</span></div>';
         }).join("");
 
-        pv.style.background = bg;
-        pv.style.overflow = 'hidden';
-        pv.innerHTML = '<div class="tune-grid">' + gridHtml + '</div>';
-        // Scale frames to fit cells — retry until cells have size
-        function scaleTuneFrames() {
-          var cells = pv.querySelectorAll('.tune-cell');
-          var done = true;
-          cells.forEach(function(cell) {
-            cell.style.background = bg;
-            var f = cell.querySelector('.tune-frame');
-            f.style.background = bg;
-            var cw = cell.offsetWidth;
-            if (cw <= 0) { done = false; return; }
-            f.style.transform = 'scale(' + (cw / 1920) + ')';
-          });
-          if (!done) setTimeout(scaleTuneFrames, 50);
-        }
-        scaleTuneFrames();
-        window.addEventListener('resize', scaleTuneFrames);
+        // ── Radius ──
+        var radii = [
+          { name: "none", val: "0px" },
+          { name: "sm", val: "4px" },
+          { name: "md", val: cr.value },
+          { name: "lg", val: Math.max(parseInt(cr.value) * 2, 12) + "px" },
+          { name: "pill", val: "9999px" },
+        ];
+        document.getElementById("sc-radius-grid").innerHTML = radii.map(function(r) {
+          var active = r.val === cr.value ? " border-color:" + ac + ";" : "";
+          return '<div><div class="radius-chip-preview" style="border-radius:' + r.val + ';background:' + (isDark ? "#1a1a1a" : "#f0f0f0") + ';border-color:' + (r.val === cr.value ? ac : "#333") + ';' + active + '"></div><div class="radius-label"><strong>' + r.name + '</strong><br>' + r.val + '</div></div>';
+        }).join("");
       }
 
       // ── Output ──
