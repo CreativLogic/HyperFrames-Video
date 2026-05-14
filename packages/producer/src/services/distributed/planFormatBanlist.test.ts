@@ -1,0 +1,143 @@
+/**
+ * Unit tests for the distributed format banlist.
+ *
+ * Two formats `plan()` refuses up front:
+ *   - webm — VP9 + matroska concat-copy is fragile across libvpx-vp9 builds.
+ *   - mp4 + HDR (`hdrMode === "force-hdr"`) — chunked HDR pre-extract +
+ *     HDR signaling re-apply on the assembled file is not implemented.
+ *
+ * The banlist must trip BEFORE any other work runs (file server, browser,
+ * ffprobe) — otherwise a banned config can leak a partial planDir on disk.
+ * Each case asserts `existsSync(planDir)` is `false` after the throw to
+ * pin the early-exit contract.
+ */
+
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED,
+  FormatNotSupportedInDistributedError,
+  plan,
+  rejectUnsupportedDistributedFormat,
+  type DistributedRenderConfig,
+} from "./plan.js";
+
+const FIXTURE_HTML = `<!doctype html>
+<html><body>
+  <div data-composition-id="root" data-width="320" data-height="240" data-duration="1">hi</div>
+</body></html>`;
+
+let runRoot: string;
+let projectDir: string;
+
+beforeAll(() => {
+  runRoot = mkdtempSync(join(tmpdir(), "hf-plan-format-ban-"));
+  projectDir = join(runRoot, "project");
+  mkdirSync(projectDir, { recursive: true });
+  writeFileSync(join(projectDir, "index.html"), FIXTURE_HTML, "utf-8");
+});
+
+afterAll(() => {
+  rmSync(runRoot, { recursive: true, force: true });
+});
+
+describe("rejectUnsupportedDistributedFormat (pure)", () => {
+  it("accepts the v1-supported formats (mp4 / mov / png-sequence)", () => {
+    expect(() => rejectUnsupportedDistributedFormat({ format: "mp4" })).not.toThrow();
+    expect(() => rejectUnsupportedDistributedFormat({ format: "mov" })).not.toThrow();
+    expect(() => rejectUnsupportedDistributedFormat({ format: "png-sequence" })).not.toThrow();
+    expect(() =>
+      rejectUnsupportedDistributedFormat({ format: "mp4", hdrMode: "auto" }),
+    ).not.toThrow();
+    expect(() =>
+      rejectUnsupportedDistributedFormat({ format: "mp4", hdrMode: "force-sdr" }),
+    ).not.toThrow();
+  });
+
+  it("rejects webm with FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED", () => {
+    let caught: unknown;
+    try {
+      // Cast forces the runtime check even though the type narrows webm out.
+      rejectUnsupportedDistributedFormat({
+        format: "webm" as DistributedRenderConfig["format"],
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FormatNotSupportedInDistributedError);
+    expect((caught as FormatNotSupportedInDistributedError).code).toBe(
+      FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED,
+    );
+    expect((caught as FormatNotSupportedInDistributedError).format).toBe("webm");
+    expect((caught as Error).message).toMatch(/webm/);
+    expect((caught as Error).message).toMatch(/in-process|executeRenderJob/);
+  });
+
+  it('rejects HDR mp4 (`hdrMode === "force-hdr"`)', () => {
+    let caught: unknown;
+    try {
+      rejectUnsupportedDistributedFormat({
+        format: "mp4",
+        hdrMode: "force-hdr" as DistributedRenderConfig["hdrMode"],
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FormatNotSupportedInDistributedError);
+    expect((caught as FormatNotSupportedInDistributedError).code).toBe(
+      FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED,
+    );
+    expect((caught as FormatNotSupportedInDistributedError).format).toBe("mp4-hdr");
+    expect((caught as Error).message).toMatch(/HDR/);
+  });
+});
+
+describe("plan() banlist (end-to-end)", () => {
+  it("throws on webm and does not create the planDir", async () => {
+    const planDir = join(runRoot, "plandir-webm-bans");
+    // Don't pre-create planDir — plan() shouldn't create it on the throw path.
+    let caught: unknown;
+    try {
+      await plan(
+        projectDir,
+        {
+          format: "webm" as DistributedRenderConfig["format"],
+          fps: 30,
+          width: 320,
+          height: 240,
+        },
+        planDir,
+      );
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FormatNotSupportedInDistributedError);
+    expect((caught as FormatNotSupportedInDistributedError).format).toBe("webm");
+    expect(existsSync(planDir)).toBe(false);
+  });
+
+  it("throws on HDR mp4 and does not create the planDir", async () => {
+    const planDir = join(runRoot, "plandir-hdr-bans");
+    let caught: unknown;
+    try {
+      await plan(
+        projectDir,
+        {
+          format: "mp4",
+          fps: 30,
+          width: 320,
+          height: 240,
+          hdrMode: "force-hdr" as DistributedRenderConfig["hdrMode"],
+        },
+        planDir,
+      );
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FormatNotSupportedInDistributedError);
+    expect((caught as FormatNotSupportedInDistributedError).format).toBe("mp4-hdr");
+    expect(existsSync(planDir)).toBe(false);
+  });
+});

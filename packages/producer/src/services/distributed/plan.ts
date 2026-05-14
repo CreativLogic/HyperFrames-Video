@@ -171,11 +171,81 @@ export class PlanTooLargeError extends Error {
   }
 }
 
+/**
+ * Non-retryable error code raised when `plan()` is asked for an output
+ * format that distributed mode doesn't support (webm, HDR mp4). The same
+ * config would fail on every retry, so the failure must not auto-retry.
+ */
+export const FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED = "FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED";
+
+/**
+ * Typed error raised by `plan()` for outputs that distributed mode
+ * refuses to ship.
+ *
+ *   - webm — VP9 + matroska concat-copy is fragile across libvpx-vp9
+ *     builds, and the chunked pipeline can't guarantee bit-identical
+ *     concat output across worker versions.
+ *   - mp4 + HDR (PQ / HLG) — chunked HDR pre-extract + HDR signaling
+ *     re-apply on the assembled file is not implemented yet.
+ *
+ * The in-process renderer (`executeRenderJob`) handles both natively.
+ */
+export class FormatNotSupportedInDistributedError extends Error {
+  readonly code: typeof FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED = FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED;
+  readonly format: string;
+  readonly reason: string;
+  constructor(format: string, reason: string) {
+    super(
+      `[plan] format ${JSON.stringify(format)} is not supported in distributed mode: ${reason}. ` +
+        `Render with the in-process renderer (\`executeRenderJob\`) — it has full format ` +
+        `support — or pick a distributed-supported format: mp4 SDR, mov ProRes 4444, or ` +
+        `png-sequence.`,
+    );
+    this.name = "FormatNotSupportedInDistributedError";
+    this.format = format;
+    this.reason = reason;
+  }
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
+}
+
+/**
+ * Reject formats the distributed pipeline cannot ship (webm + HDR mp4).
+ * Throws {@link FormatNotSupportedInDistributedError} with a message
+ * naming the rejected format. Runs at the very top of `plan()` so a
+ * banned input never produces a partial planDir.
+ *
+ * Exported so adapters can call the same gate at their own input layer
+ * (Step Functions input validation, Temporal workflow start) before the
+ * activity even runs — the resulting non-retryable error then matches
+ * what `plan()` would have thrown.
+ */
+export function rejectUnsupportedDistributedFormat(
+  config: Pick<DistributedRenderConfig, "format" | "hdrMode">,
+): void {
+  // The TypeScript type for `DistributedRenderConfig.format` already
+  // excludes webm, but a JS caller (or a caller that built the config
+  // dynamically from JSON) can still pass it. Belt-and-suspenders runtime
+  // check at the gate.
+  if ((config.format as string) === "webm") {
+    throw new FormatNotSupportedInDistributedError(
+      "webm",
+      "VP9 + matroska concat-copy is fragile across libvpx-vp9 builds, so chunked output " +
+        "can't be guaranteed byte-identical across workers",
+    );
+  }
+  if ((config.hdrMode as string) === "force-hdr") {
+    throw new FormatNotSupportedInDistributedError(
+      "mp4-hdr",
+      "HDR (PQ / HLG) requires per-source HDR pre-extract + HDR signaling re-apply on the " +
+        "assembled file; neither is implemented for the distributed pipeline",
+    );
+  }
 }
 
 /**
@@ -373,9 +443,11 @@ export async function plan(
   config: DistributedRenderConfig,
   planDir: string,
 ): Promise<PlanResult> {
-  // ── Plan-time validation ──
-  // Rejections here surface as typed `PlanValidationError`s with non-retryable
-  // codes so workflow adapters don't waste retry budget on banned configs.
+  // Plan-time validation. Rejections here surface as typed errors with
+  // non-retryable codes so workflow adapters don't waste retry budget on
+  // banned configs. Runs BEFORE any directory creation so a banned input
+  // never produces a partial planDir.
+  rejectUnsupportedDistributedFormat(config);
   validateNoGpuEncode({
     useGpu: false,
     browserGpuMode: "software",
