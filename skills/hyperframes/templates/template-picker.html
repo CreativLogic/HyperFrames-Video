@@ -154,6 +154,56 @@ body {
   border: 1px solid #333;
   color: #777;
 }
+.motion-row {
+  padding: 20px 32px 0;
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.motion-row:empty { display: none; }
+.motion-row-label {
+  font-size: 10px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 4px;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+}
+.motion-card {
+  flex-shrink: 0;
+  width: 280px;
+  background: #161616;
+  border: 1px solid #222;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.motion-card:hover { border-color: #444; }
+.motion-card img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.motion-card .mc-info {
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.motion-card .mc-name { font-size: 12px; font-weight: 600; }
+.motion-card .mc-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border: 1px solid #333;
+  color: #4ade80;
+}
 .transition-overlay {
   position: fixed;
   inset: 0;
@@ -200,6 +250,7 @@ body {
   <div id="pchips"></div>
 </div>
 <div id="phase1">
+  <div class="motion-row" id="motion-row"></div>
   <div class="grid" id="grid"></div>
 </div>
 
@@ -212,6 +263,7 @@ var PALETTES = __PALETTES_JSON__;
 var PROMPT_TEXT = __PROMPT_TEXT_JSON__;
 
 var ALL_TEMPLATES = __TEMPLATES_JSON__;
+var MOTION_TEMPLATES = __MOTION_TEMPLATES_JSON__;
 
 var states = {};
 var activePal = 0;
@@ -555,6 +607,38 @@ function buildGrid() {
   document.getElementById("loading").textContent = "Loading 0/" + ALL_TEMPLATES.length + "...";
 }
 
+function buildMotionRow() {
+  var row = document.getElementById("motion-row");
+  if (!MOTION_TEMPLATES || !MOTION_TEMPLATES.length) return;
+  row.innerHTML = '<span class="motion-row-label">MOTION</span>';
+  MOTION_TEMPLATES.forEach(function(m) {
+    var card = document.createElement("div");
+    card.className = "motion-card";
+    card.innerHTML =
+      '<img src="' + m.thumbnail + '" alt="' + m.name + '">' +
+      '<div class="mc-info">' +
+        '<span class="mc-name">' + m.name + '</span>' +
+        '<span class="mc-badge">video</span>' +
+      '</div>';
+    card.onclick = function() {
+      var msg = {
+        type: "templatePick",
+        slug: m.slug,
+        name: m.name,
+        tagline: m.description || "",
+        scheme: "dark",
+        tone: "dark",
+        promptText: PROMPT_TEXT,
+        palette: null,
+        motionTemplate: true,
+        compositionSrc: m.src
+      };
+      if (window.parent !== window) window.parent.postMessage(msg, "*");
+    };
+    row.appendChild(card);
+  });
+}
+
 var selectedSlug = null;
 var customColors = {bg:"#FFFFFF", fg:"#000000", ac:"#0000FF", mt:"#666666"};
 var selectedCorner = 0;
@@ -605,6 +689,7 @@ function selectTemplate(slug) {
 }
 
 buildPalChips();
+buildMotionRow();
 buildGrid();
 </script>
 </body>

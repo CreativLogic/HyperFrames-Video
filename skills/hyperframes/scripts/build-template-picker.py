@@ -58,6 +58,7 @@ def main():
     html = html.replace('__PALETTES_JSON__', json.dumps(data['palettes']))
     html = html.replace('__PROMPT_TEXT_JSON__', json.dumps(data['prompt_text']))
     html = html.replace('__TEMPLATES_JSON__', json.dumps(templates))
+    html = html.replace('__MOTION_TEMPLATES_JSON__', json.dumps(data.get('motion_templates', [])))
     html = html.replace('__PROMPT_DESC__', data.get('prompt_desc', ''))
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
