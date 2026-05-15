@@ -41,9 +41,25 @@ jobs:
               - "bun.lock"
               - ".github/workflows/preview-regression.yml"
 
+  preflight:
+    name: Preflight (lint + format)
+    needs: changes
+    if: needs.changes.outputs.preview == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run format:check
+
   preview-parity:
     name: Preview parity
-    needs: changes
+    needs: [changes, preflight]
     if: needs.changes.outputs.preview == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
