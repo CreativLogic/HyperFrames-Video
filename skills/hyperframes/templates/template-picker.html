@@ -483,7 +483,8 @@ function injectText(slug) {
     return true;
   }
 
-  var slides = doc.querySelectorAll(".slide");
+  var slides = doc.querySelectorAll(".slide, deck-stage > section, section.slide");
+  if (slides.length === 0) slides = doc.querySelectorAll("section[class]");
   slides.forEach(function(slide) {
     var els = slide.querySelectorAll("*");
     els.forEach(function(el) {
