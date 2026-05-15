@@ -388,17 +388,12 @@ function showSlide(doc, slides, mode, idx) {
   var target = slides[idx];
   if (!target) return;
 
-  // Universal: scroll to the target slide
-  target.scrollIntoView({behavior: "instant", inline: "start", block: "start"});
-
-  // Also set active class and ensure visibility
   slides.forEach(function(sl, i) {
     if (i === idx) {
       sl.classList.add("active");
       sl.style.visibility = "visible";
       sl.style.opacity = "1";
       sl.style.display = "";
-      // Reset animation start states within this slide
       sl.querySelectorAll("*").forEach(function(el) {
         try {
           var w = target.ownerDocument.defaultView;
@@ -407,8 +402,20 @@ function showSlide(doc, slides, mode, idx) {
       });
     } else {
       sl.classList.remove("active");
+      sl.style.visibility = "hidden";
     }
   });
+
+  // Position to the target slide without scrollIntoView (which bubbles)
+  var parent = target.parentElement;
+  if (parent) {
+    parent.scrollTop = target.offsetTop;
+    parent.scrollLeft = target.offsetLeft;
+  }
+  doc.documentElement.scrollTop = target.offsetTop;
+  doc.documentElement.scrollLeft = target.offsetLeft;
+  doc.body.scrollTop = target.offsetTop;
+  doc.body.scrollLeft = target.offsetLeft;
 }
 
 function goSlide(slug, delta) {
