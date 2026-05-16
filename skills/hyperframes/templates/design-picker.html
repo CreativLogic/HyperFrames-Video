@@ -2696,17 +2696,7 @@
         var bgpObj = (picks.bg_mode > 0 && BG_PRESETS[picks.bg_mode]) ? BG_PRESETS[picks.bg_mode] : null;
         var bgColors = bgpObj ? getBgColors() : [];
 
-        // Find template structure data
         var templateSlug = window._currentTemplateSlug || "";
-        var templateStructure = null;
-        if (templateSlug && ALL_TEMPLATES) {
-          for (var ti = 0; ti < ALL_TEMPLATES.length; ti++) {
-            if (ALL_TEMPLATES[ti].slug === templateSlug && ALL_TEMPLATES[ti].structure) {
-              templateStructure = ALL_TEMPLATES[ti].structure;
-              break;
-            }
-          }
-        }
 
         var spec = {
           name: (PROMPT && PROMPT.title) || "Untitled",
@@ -2726,7 +2716,6 @@
             camera: { distance: bgpObj.camDist, azimuth: bgpObj.camAz, polar: bgpObj.camPol, zoom: bgpObj.zoom || 1 },
             position: [bgpObj.posX || 0, bgpObj.posY || 0, bgpObj.posZ || 0]
           } : null,
-          structure: templateStructure,
           density: { level: dn.name, desc: dn.desc },
           dos: [
             "Use accent (" + p.accent + ") for exactly the element the viewer should remember",
@@ -2821,6 +2810,25 @@
           h += '  renderAt(window.__hfThreeTime||0);\n';
           h += '}\n';
           h += '<\/script>\n\n';
+        }
+
+        // Embed the original template HTML (from ALL_TEMPLATES data, not the mutated iframe DOM)
+        if (templateSlug) {
+          var tmplData = null;
+          for (var ti = 0; ti < ALL_TEMPLATES.length; ti++) {
+            if (ALL_TEMPLATES[ti].slug === templateSlug) { tmplData = ALL_TEMPLATES[ti]; break; }
+          }
+          if (tmplData) {
+            // Fetch the original template file
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "templates/" + templateSlug + "/template.html", false);
+            xhr.send();
+            if (xhr.status === 200) {
+              h += '\n<script type="text/html" id="template-source">\n';
+              h += xhr.responseText;
+              h += '\n<\/script>\n\n';
+            }
+          }
         }
 
         h += '</body>\n</html>';
