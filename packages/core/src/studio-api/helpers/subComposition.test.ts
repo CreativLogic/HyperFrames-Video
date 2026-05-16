@@ -24,6 +24,8 @@ describe("buildSubCompositionHtml", () => {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <link rel="stylesheet" href="../styles/theme.css" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
       .map { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -66,6 +68,37 @@ describe("buildSubCompositionHtml", () => {
     expect(html).toContain("gsap@3.14.2");
     // Body script content preserved
     expect(html).toContain('__timelines["map-block"]');
+    // <link> and <meta> from composition head must not be dropped
+    expect(html).toContain('rel="stylesheet"');
+    expect(html).toContain('href="styles/theme.css"');
+    expect(html).toContain('name="viewport"');
+    // <html lang="en"> attribute forwarded to the output
+    expect(html).toContain('lang="en"');
+  });
+
+  it("handles raw fragment compositions (no template, no full document)", () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head><title>Host</title></head><body></body></html>`,
+      "compositions/card.html": `<div data-composition-id="card" data-width="400" data-height="300">
+  <img src="../icon.svg" alt="" />
+  <p>Hello</p>
+</div>`,
+    });
+
+    const html = buildSubCompositionHtml(
+      dir,
+      "compositions/card.html",
+      "/api/runtime.js",
+      "/api/projects/demo/preview/",
+    );
+
+    expect(html).not.toBeNull();
+    expect(html).toContain('<base href="/api/projects/demo/preview/">');
+    // ../icon.svg from compositions/ rewrites to icon.svg at project root
+    expect(html).toContain('src="icon.svg"');
+    expect(html).not.toContain('src="../icon.svg"');
+    expect(html).toContain("<p>Hello</p>");
   });
 
   it("rewrites sub-composition asset paths against the project root preview base", () => {
