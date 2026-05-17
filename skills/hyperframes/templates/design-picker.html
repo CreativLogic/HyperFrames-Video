@@ -3463,7 +3463,10 @@ void main(){
     let activeRenderers = [];
 
     function destroyRenderers() {
-      activeRenderers.forEach(r => { r.renderer.dispose(); r.renderer.forceContextLoss(); });
+      activeRenderers.forEach(r => {
+        try { r.renderer.dispose(); r.renderer.forceContextLoss(); } catch(e) {}
+        if (r.composer) try { r.composer.renderTarget1?.dispose(); r.composer.renderTarget2?.dispose(); } catch(e) {}
+      });
       activeRenderers = [];
     }
 
@@ -3592,6 +3595,7 @@ void main(){
         function animate() {
           const t = performance.now() * 0.001;
           activeRenderers.forEach(s => {
+            if (s.renderer.getContext().isContextLost()) return;
             const w = s.canvas.offsetWidth, h = s.canvas.offsetHeight;
             if (w <= 0) return;
             s.renderer.setSize(w, h, false);
