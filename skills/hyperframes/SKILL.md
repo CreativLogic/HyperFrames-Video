@@ -30,17 +30,22 @@ Most prompts already answer 2-3 of these — a typical brief is 2-3 questions, n
 
 ### Step 1: Design system
 
-If `design.md` or `DESIGN.md` exists in the project, read it first (check both casings — they're different files on Linux). It's the source of truth for brand colors, fonts, and constraints. Use its exact values — don't invent colors or substitute fonts. Any format works (YAML frontmatter, prose, tables — just extract the values).
+Check for a design system file in the project. These are the source of truth for brand colors, fonts, slide layouts, shader backgrounds, and constraints. Use exact values — don't invent colors or substitute fonts.
 
-If it names fonts you can't find locally (no `fonts/` directory with `.woff2` files, not a built-in font), warn the user before writing HTML: "design.md specifies [font name] but no font files found. Please add .woff2 files to `fonts/` or I'll fall back to [closest built-in alternative]."
+**Supported formats (check in this order):**
 
-If no `design.md` exists, offer the user a choice:
+1. **`DESIGN.html`** — the full design system document. A self-contained HTML file with rendered sections for palette, typography, surface, motion, background shader, guidelines, and template slide gallery. Read [references/design-html.md](references/design-html.md) for how to parse it.
+2. **`design.md` or `DESIGN.md`** — a simpler format with YAML frontmatter or prose. Extract palette, font, and constraint values directly.
+
+If a design file names fonts you can't find locally (no `fonts/` directory with `.woff2` files, not a built-in font), warn the user before writing HTML: "The design specifies [font name] but no font files found. Please add .woff2 files to `fonts/` or I'll fall back to [closest built-in alternative]."
+
+If no design file exists, offer the user a choice:
 
 1. **User named a style or mood?** → Read [visual-styles.md](./visual-styles.md) for the 8 named presets. Pick the closest match.
-2. **Want to browse options visually?** → Run the design picker: read [references/design-picker.md](references/design-picker.md) for the full workflow. This serves a visual picker page. The user configures mood, palette, typography, and motion in the browser, then copies the generated design.md and pastes it back into the conversation.
+2. **Want to browse options visually?** → Run the design picker: read [references/design-picker.md](references/design-picker.md) for the full workflow. This serves a visual picker page. The user configures mood, palette, typography, and motion in the browser, then exports a DESIGN.html.
 3. **Want to skip and go fast?** → Ask: mood, light or dark, any brand colors/fonts? Then pick a palette from [house-style.md](./house-style.md).
 
-**design.md defines the brand. It does not define video composition rules.** Those come from [references/video-composition.md](references/video-composition.md) and [house-style.md](./house-style.md). Use brand colors at video-appropriate scale — not at web-UI opacity.
+**The design file defines the brand. It does not define video composition rules.** Those come from [references/video-composition.md](references/video-composition.md) and [house-style.md](./house-style.md). Use brand colors at video-appropriate scale — not at web-UI opacity.
 
 ### Step 2: Prompt expansion
 
