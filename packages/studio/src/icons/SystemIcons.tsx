@@ -86,8 +86,6 @@ export const Eye = makeIcon(PhEye);
 export const EyeOff = makeIcon(EyeClosed);
 export const File = makeIcon(PhFile);
 export const FileCode = makeIcon(PhFileCode);
-// FileIcon alias (lucide exports both `File` and `FileIcon`)
-export const FileIcon = makeIcon(PhFile);
 export const FileText = makeIcon(PhFileText);
 export const Film = makeIcon(FilmStrip);
 export const Heart = makeIcon(PhHeart);

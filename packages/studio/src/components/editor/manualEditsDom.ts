@@ -464,13 +464,6 @@ export function applyStudioRotationDraft(element: HTMLElement, rotation: { angle
   );
 }
 
-// Clear functions live in manualEditsSnapshot.ts (they depend on restoreInline* helpers).
-export {
-  clearStudioPathOffset,
-  clearStudioRotation,
-  clearStudioBoxSize,
-} from "./manualEditsSnapshot";
-
 /* ── HTML patch builders ──────────────────────────────────────────── */
 import type { PatchOperation } from "../../utils/sourcePatcher";
 

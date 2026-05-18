@@ -26,9 +26,6 @@ export {
   applyStudioBoxSizeDraft,
   applyStudioRotation,
   applyStudioRotationDraft,
-  clearStudioPathOffset,
-  clearStudioRotation,
-  clearStudioBoxSize,
   reapplyPositionEditsAfterSeek,
   buildMotionPatches,
   buildClearMotionPatches,
@@ -41,6 +38,9 @@ export {
   restoreStudioBoxSize,
   restoreStudioRotation,
   restoreStudioPathOffset,
+  clearStudioPathOffset,
+  clearStudioRotation,
+  clearStudioBoxSize,
 } from "./manualEditsSnapshot";
 
 import type { StudioManualEditSeekWindow } from "./manualEditsTypes";

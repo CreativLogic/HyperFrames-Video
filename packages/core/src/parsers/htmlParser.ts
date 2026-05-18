@@ -17,7 +17,7 @@ import {
   gsapAnimationsToKeyframes,
   getAnimationsForElement,
 } from "./gsapParser";
-import type { ValidationResult } from "./gsapParser";
+import type { ValidationResult } from "../core.types";
 
 const MEDIA_TYPES = new Set<string>(["video", "image", "audio"]);
 
