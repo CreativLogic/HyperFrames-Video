@@ -1711,6 +1711,8 @@
       buildPalOpts();
 
       function updateDefaultPaletteFromIframe(ifr) {
+        // Skip if NATIVE_PALETTES already set the correct values
+        if (PALETTES[0]._native) return;
         if (!ifr || !ifr.contentWindow) return;
         var cs = ifr.contentWindow.getComputedStyle(ifr.contentDocument.documentElement);
         var primary = cs.getPropertyValue("--tp-primary").trim();
@@ -2449,6 +2451,7 @@
       }
 
       function sel(key, idx, container, cls) {
+        console.log("[PICKER] sel:", key, "=", idx);
         container.querySelectorAll(cls || ".opt").forEach(function (c) {
           c.classList.remove("selected");
         });
@@ -2483,6 +2486,7 @@
         if (!iframe) return;
 
         var p = picks.palette !== null ? PALETTES[picks.palette] : PALETTES[0];
+        console.log("[PICKER] palette:", picks.palette, "→", p.name, p.primary, p.secondary, p.tertiary, p.accent);
         var t = picks.type !== null ? TYPEPAIRS[picks.type] : TYPEPAIRS[0];
         var e = picks.easing !== null ? EASINGS[picks.easing] : EASINGS[0];
         var cr = picks.corners !== null ? CORNERS[picks.corners] : CORNERS[1];
