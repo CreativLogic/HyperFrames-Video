@@ -164,9 +164,12 @@ describe("plan() — golden planDir + planHash determinism", () => {
     async () => {
       const planDir = join(runRoot, "plan-layout");
       mkdirSync(planDir, { recursive: true });
+      // Pin chunkSize=240 so this fixture exercises the single-chunk path
+      // (totalFrames=30 → ceil(30/240)=1 chunk). The auto-sized variant
+      // (chunkSize=undefined) is exercised by the dedicated test below.
       const result = await plan(
         projectDir,
-        { fps: 30, width: 320, height: 240, format: "mp4" },
+        { fps: 30, width: 320, height: 240, format: "mp4", chunkSize: 240 },
         planDir,
       );
 
@@ -185,7 +188,7 @@ describe("plan() — golden planDir + planHash determinism", () => {
       // ── PlanResult contract ─────────────────────────────────────────────
       expect(result.planDir).toBe(planDir);
       expect(result.planHash).toMatch(/^[0-9a-f]{64}$/);
-      expect(result.chunkCount).toBeGreaterThanOrEqual(1);
+      expect(result.chunkCount).toBe(1);
       expect(result.totalFrames).toBe(30); // 1s @ 30fps
       expect(result.width).toBe(320);
       expect(result.height).toBe(240);
@@ -214,6 +217,37 @@ describe("plan() — golden planDir + planHash determinism", () => {
       expect(planJson.planHash).toBe(result.planHash);
       expect(planJson.hasAudio).toBe(false);
       expect(planJson.totalFrames).toBe(result.totalFrames);
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "auto-sizes chunkSize end-to-end when caller omits it",
+    async () => {
+      // Integration check that the auto-sizer wired through plan() actually
+      // produces multi-chunk output for the same fixture that single-chunks
+      // when chunkSize is pinned. With totalFrames=30 and the default
+      // maxParallelChunks=16, the auto-sizer picks
+      // max(MIN_CHUNK_SIZE=10, ceil(30/16)=2) = 10 → ceil(30/10) = 3 chunks.
+      const planDir = join(runRoot, "plan-autosized");
+      mkdirSync(planDir, { recursive: true });
+      const result = await plan(
+        projectDir,
+        { fps: 30, width: 320, height: 240, format: "mp4" },
+        planDir,
+      );
+      expect(result.chunkCount).toBe(3);
+      const chunks = JSON.parse(
+        readFileSync(join(planDir, "meta", "chunks.json"), "utf-8"),
+      ) as Array<{ index: number; startFrame: number; endFrame: number }>;
+      expect(chunks).toHaveLength(3);
+      // Encoder gopSize must follow the auto-sized chunk so chunk-boundary
+      // IDR keyframes still land at frame 0 of each chunk.
+      const encoder = JSON.parse(
+        readFileSync(join(planDir, "meta", "encoder.json"), "utf-8"),
+      ) as Record<string, unknown>;
+      expect(encoder.gopSize).toBe(10);
+      expect(encoder.chunkSize).toBe(10);
     },
     TIMEOUT_MS,
   );

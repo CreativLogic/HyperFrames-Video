@@ -109,6 +109,13 @@ export interface DistributedRenderConfig {
    * ceil(totalFrames / maxParallelChunks))`. The auto-size floor
    * (`MIN_CHUNK_SIZE = 10`) keeps per-chunk fixed overhead from
    * swamping the parallelism gain on tiny renders.
+   *
+   * `effectiveChunkSize` also drives `LockedRenderConfig.gopSize` — every
+   * chunk's first frame is an IDR keyframe, so smaller chunks mean a
+   * tighter GOP and larger encoded files. Callers who optimize for
+   * output bytes (rather than wall-clock parallelism) should pass an
+   * explicit `chunkSize` matching their target GOP — e.g. `240` for the
+   * old 8-second-GOP behavior.
    */
   chunkSize?: number;
   /** Default `16`. Caps long renders to fewer-but-longer chunks for operational fairness. */
@@ -350,22 +357,22 @@ export function measurePlanDirBytes(planDir: string): number {
 
 /**
  * Compute `(chunkCount, effectiveChunkSize)` from total frames and the
- * caller's chunking knobs:
+ * caller's chunking knobs. The operative chunk size is
+ * `resolvedChunkSize` — equal to `configChunkSize` when the caller
+ * passes one, otherwise auto-sized from `maxParallelChunks`:
  *
- *     chunkCount = min(maxParallelChunks, ceil(totalFrames / chunkSize))
- *     effectiveChunkSize = max(configChunkSize, ceil(totalFrames / maxParallelChunks))
+ *     resolvedChunkSize   = configChunkSize ?? max(MIN_CHUNK_SIZE, ceil(totalFrames / maxParallelChunks))
+ *     chunkCount          = min(maxParallelChunks, ceil(totalFrames / resolvedChunkSize))
+ *     effectiveChunkSize  = max(resolvedChunkSize, ceil(totalFrames / chunkCount))
  *
  * Long renders auto-rescale to fewer-but-longer chunks rather than
  * fragmenting infinitely. Returned `chunkCount >= 1` (`totalFrames === 0`
- * is rejected upstream); `effectiveChunkSize >= configChunkSize`.
+ * is rejected upstream); `effectiveChunkSize >= resolvedChunkSize`.
  *
- * When `configChunkSize` is `undefined`, the input is auto-sized from
- * `maxParallelChunks`: `max(MIN_CHUNK_SIZE, ceil(totalFrames /
- * maxParallelChunks))`. This honors the caller's fan-out intent — passing
- * `maxParallelChunks=16` without `chunkSize` now produces 16 chunks
- * (subject to the `MIN_CHUNK_SIZE` floor on tiny renders) instead of
- * silently clamping to a 240-frame default. Explicit numbers, including
- * `240`, take precedence over the auto-sizer.
+ * The auto-sizer (triggered when `configChunkSize` is `undefined`) honors
+ * the caller's fan-out intent: passing `maxParallelChunks=16` without
+ * `chunkSize` produces 16 chunks (subject to the `MIN_CHUNK_SIZE` floor
+ * on tiny renders). Explicit numbers, including `240`, take precedence.
  */
 export function resolveChunkPlan(
   totalFrames: number,
