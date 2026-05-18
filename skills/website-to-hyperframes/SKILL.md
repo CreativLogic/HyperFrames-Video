@@ -50,9 +50,11 @@ Run the capture, read ALL extracted data (screenshots, tokens, design styles, te
 
 **Read:** [references/step-1-design.md](references/step-1-design.md)
 
-Write DESIGN.md — a brand cheat sheet with 8 sections: Visual Theme, Color Palette, Typography, Component Stylings (buttons + cards), Layout Principles, Depth & Elevation, Do's/Don'ts, Agent Prompt Guide. Use `design-styles.json` for exact computed values.
+Write DESIGN.md — a brand cheat sheet covering the visual identity: colors, typography, component styles, layout principles. Use `design-styles.json` for exact computed values.
 
-**Gate:** `DESIGN.md` exists in the project directory with all 9 sections complete. User review done (colors/fonts/tone confirmed or corrected).
+**Speed option:** For fast-pacing videos (billboard-per-beat), DESIGN.md can be a 50-line summary of colors + fonts + do's/don'ts — not a 300-line document. The sub-agent prompt in Step 5 pastes brand values directly, so DESIGN.md depth only matters for complex compositions.
+
+**Gate:** `DESIGN.md` exists (any length) with at minimum: color palette, font choices, and do's/don'ts.
 
 ---
 
@@ -91,7 +93,7 @@ If the Creative Brief says no narration — ask about background music, then ski
 **Read:** The `hyperframes` skill (load it — every rule matters)
 **Read:** [references/step-5-build.md](references/step-5-build.md)
 
-Build index.html and each beat composition. Use captured screenshots at full frame size, not CSS recreations. Hero beats use HTML-in-Canvas for cinematic treatment. Every beat needs 25+ GSAP calls with continuous motion.
+Build index.html and compositions following the architecture and pacing chosen in the storyboard (Step 3). See step-5 for code patterns for both architectures (stacked beats vs HyperShader sub-compositions).
 
 **Gate:** Every composition self-reviewed. Frames are full, elements readable, concept clear.
 

@@ -483,23 +483,7 @@ export async function captureWebsite(
       writeFileSync(join(outputDir, "extracted", "visible-text.txt"), visibleTextContent, "utf-8");
     }
 
-    // Save cataloged assets as JSON for AI agent
-    if (catalogedAssets.length > 0) {
-      writeFileSync(
-        join(outputDir, "extracted", "assets-catalog.json"),
-        JSON.stringify(catalogedAssets, null, 2),
-        "utf-8",
-      );
-    }
-
-    // Save detected libraries
-    if (detectedLibraries.length > 0) {
-      writeFileSync(
-        join(outputDir, "extracted", "detected-libraries.json"),
-        JSON.stringify(detectedLibraries, null, 2),
-        "utf-8",
-      );
-    }
+    // detected-libraries and assets-catalog removed — 0/8 agents read them in v6 testing
 
     // AI-powered image captioning via Gemini (optional — enriches asset descriptions)
     const geminiCaptions = await captionImagesWithGemini(outputDir, progress, warnings);

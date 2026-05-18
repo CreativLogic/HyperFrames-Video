@@ -48,17 +48,9 @@ export function generateAgentPrompt(
   hasLottie?: boolean,
   hasShaders?: boolean,
   _catalogedAssets?: CatalogedAsset[], // reserved for future asset inventory
-  detectedLibraries?: string[],
+  _detectedLibraries?: string[],
 ): void {
-  const prompt = buildPrompt(
-    outputDir,
-    url,
-    tokens,
-    hasScreenshot,
-    hasLottie,
-    hasShaders,
-    detectedLibraries,
-  );
+  const prompt = buildPrompt(outputDir, url, tokens, hasScreenshot, hasLottie, hasShaders);
   writeFileSync(join(outputDir, "AGENTS.md"), prompt, "utf-8");
   writeFileSync(join(outputDir, "CLAUDE.md"), prompt, "utf-8");
   writeFileSync(join(outputDir, ".cursorrules"), prompt, "utf-8");
@@ -71,7 +63,6 @@ function buildPrompt(
   hasScreenshot: boolean,
   hasLottie?: boolean,
   hasShaders?: boolean,
-  detectedLibraries?: string[],
 ): string {
   const title = tokens.title || new URL(url).hostname.replace(/^www\./, "");
 
@@ -124,9 +115,6 @@ function buildPrompt(
     tableRows.push(
       "| `screenshots/scroll-*.png` | Individual viewport screenshots if you need detail on a specific section. |",
     );
-    tableRows.push(
-      "| `screenshots/full-page.png` | Entire page as one tall image. For scrolling website animation videos. |",
-    );
   }
   tableRows.push(
     `| \`extracted/tokens.json\` | Design tokens: ${tokens.colors.length} colors, ${tokens.fonts.length} fonts, ${tokens.headings?.length ?? 0} headings, ${tokens.ctas?.length ?? 0} CTAs |`,
@@ -147,11 +135,6 @@ function buildPrompt(
   }
   if (hasShaders) {
     tableRows.push("| `extracted/shaders.json` | WebGL shader source (GLSL). |");
-  }
-  if (detectedLibraries && detectedLibraries.length > 0) {
-    tableRows.push(
-      `| \`extracted/detected-libraries.json\` | Libraries: ${detectedLibraries.join(", ")} |`,
-    );
   }
 
   // Asset contact sheets — dynamically list all pages
@@ -188,9 +171,6 @@ function buildPrompt(
   const brandLines: string[] = [];
   brandLines.push(`- **Colors**: ${colorSummary || "see tokens.json"}`);
   brandLines.push(`- **Fonts**: ${fontSummary}`);
-  if (detectedLibraries && detectedLibraries.length > 0) {
-    brandLines.push(`- **Built with**: ${detectedLibraries.join(", ")}`);
-  }
 
   return `# ${title}
 

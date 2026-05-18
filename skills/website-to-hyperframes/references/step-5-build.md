@@ -92,12 +92,65 @@ SFX were assigned in the storyboard (Step 3) — implement exactly what STORYBOA
 
 **Choose architecture based on pacing (from Step 3)**
 
-| Pacing                        | Architecture                                                                                                                                                                    | Why                                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Fast** (billboard-per-beat) | Single `index.html`, stacked `<div class="beat">` elements, GSAP opacity sequencing. NO sub-compositions, NO HyperShader. Hard cuts via `tl.set()`. Load `/launch-video` skill. | Sub-compositions add latency; hard cuts need instant swaps. One file = zero load delay. |
-| **Moderate / Slow / Arc**     | Sub-compositions with `HyperShader.init()`. Each beat in `compositions/beat-N.html`. CSS crossfades or shader transitions between scenes.                                       | Transitions need HyperShader's compositing. Sub-agents build each beat independently.   |
+| Pacing                        | Architecture                                                                                                                                                                         | Why                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Fast** (billboard-per-beat) | Single `index.html`, stacked `<div class="beat">` elements, GSAP opacity sequencing. NO sub-compositions, NO HyperShader. Hard cuts via `tl.set()`. See stacked-beats pattern below. | Sub-compositions add latency; hard cuts need instant swaps. One file = zero load delay. |
+| **Moderate / Slow / Arc**     | Sub-compositions with `HyperShader.init()`. Each beat in `compositions/beat-N.html`. CSS crossfades or shader transitions between scenes.                                            | Transitions need HyperShader's compositing. Sub-agents build each beat independently.   |
 
-If the storyboard says "fast" pacing: use the stacked-beats pattern from `/launch-video`. Do not use HyperShader — it adds scene registration overhead that creates gaps between hard cuts. Every frame is content, no transition frames.
+If the storyboard says "fast" pacing: use the stacked-beats pattern below. Do not use HyperShader — it adds scene registration overhead that creates gaps between hard cuts. Every frame is content, no transition frames.
+
+**Stacked-beats pattern (fast pacing):**
+
+```html
+<div
+  data-composition-id="video"
+  data-width="1920"
+  data-height="1080"
+  data-start="0"
+  data-duration="TOTAL"
+  style="position:relative;width:1920px;height:1080px;"
+>
+  <div class="beat" id="b01" style="opacity:1;">
+    <!-- first beat visible by default -->
+    <div class="mega">Opening statement</div>
+  </div>
+  <div class="beat" id="b02">
+    <img src="capture/assets/hero-image.jpg" style="width:100%;height:100%;object-fit:cover" />
+  </div>
+  <!-- more beats... -->
+</div>
+```
+
+```css
+.beat {
+  position: absolute;
+  inset: 0;
+  width: 1920px;
+  height: 1080px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  overflow: hidden;
+}
+```
+
+```javascript
+var beats = [
+  { id: "b01", at: 0, dur: 1.8 },
+  { id: "b02", at: 1.8, dur: 1.0 },
+  // ...
+];
+beats.forEach(function (b) {
+  var el = document.getElementById(b.id);
+  if (b.id !== "b01") tl.set(el, { opacity: 1 }, b.at);
+  gsap.set(el, { scale: 1.012 });
+  tl.to(el, { scale: 1, duration: 0.25, ease: "power2.out" }, b.at);
+  if (b !== beats[beats.length - 1]) tl.set(el, { opacity: 0 }, b.at + b.dur);
+});
+```
+
+Each beat gets its own visual world — different background, different color, different energy. No two consecutive beats should look alike. Scale pulse (1.012→1.0) on every beat entry is subtle but felt.
 
 If the storyboard says "slow" or "cinematic": build each beat as a sub-composition. Use long crossfades (0.8–1.2s `duration` with no `shader` key = CSS crossfade). Inside each beat, use continuous subtle motion — nothing is static:
 
@@ -311,6 +364,28 @@ Brand values are in the BRAND VALUES section above — no need to read DESIGN.md
 - Use tl.fromTo() not tl.from() for entrance animations
 - No CSS transform for centering — use flexbox
 - Never stack two transform tweens on same element
+
+═══ EASING — stop using power2.out on everything ═══
+Generic power2.out on every tween is the hallmark of AI-generated video.
+Pick easing per INTENT:
+
+| Intent              | GSAP Ease              | When to use                                    |
+|---------------------|------------------------|------------------------------------------------|
+| Snap (iOS-like)     | power4.out             | Hero text landing, UI elements clicking in     |
+| Whip overshoot      | back.out(1.7)          | Numbers, badges, anything that needs impact    |
+| Soft land           | expo.out               | Per-word text reveals, gentle entrances         |
+| Mechanical          | power1.out or "none"   | Terminal text, code typing, linear motion      |
+| Bounce settle       | elastic.out(1, 0.5)    | Stats, counters, CTA pills                    |
+| Dramatic entrance   | expo.inOut             | Full-screen statements, hero reveals           |
+| Subtle drift        | "none"                 | Background parallax, Ken Burns, camera drift   |
+
+Apply per beat type:
+- Statement text → expo.out (dramatic) or power4.out (snap)
+- Product screenshots → no easing on Ken Burns (linear drift)
+- Numbers/stats → back.out(1.7) (whip overshoot for impact)
+- Rapid-fire category words → tl.set() (hard cut, no easing)
+- CTA pill → elastic.out(1, 0.5) (bounce settle, last thing viewer sees)
+- Staggered items → power4.out with 0.08-0.15s stagger
 ```
 
 The storyboard beat already contains everything — the concept, the visual choreography with exact timings, the CSS values, the SFX cues. The sub-agent's job is to translate that description into working HTML/CSS/GSAP, not to re-invent the creative direction. If you want, you can also paste any other relative and useful context to subagents if think it's good, why not.
