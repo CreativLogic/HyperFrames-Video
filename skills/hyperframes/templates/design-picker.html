@@ -1775,6 +1775,7 @@
       buildTypeOpts();
 
       function updateDefaultTypeFromIframe(ifr) {
+        if (PALETTES[0]._native) return; // Skip if NATIVE_FONTS already set
         if (!ifr || !ifr.contentDocument) return;
         var doc = ifr.contentDocument;
         // Extract fonts from Google Fonts link in the template
@@ -2532,6 +2533,42 @@
           "studio":["#FAFAF7","#050505","#ABABAB","#F6FF1F"],
           "vellum":["#FCFAF1","#0F1A2E","#6D9CA1","#F4E2A4"]
         };
+        var NATIVE_FONTS = {
+          "8-bit-orbit":["Press Start 2P",400,"VT323",400],
+          "biennale-yellow":["Newsreader",700,"Inter",400],
+          "block-frame":["Anton",400,"Inter",500],
+          "blue-professional":["Geist",700,"Geist",400],
+          "bold-poster":["Shrikhand",400,"IBM Plex Sans",500],
+          "broadside":["Barlow",900,"IBM Plex Mono",300],
+          "capsule":["Outfit",900,"DM Sans",500],
+          "cartesian":["EB Garamond",700,"EB Garamond",400],
+          "cobalt-grid":["Space Grotesk",700,"Manrope",500],
+          "coral":["Bebas Neue",400,"Manrope",400],
+          "creative-mode":["Archivo Black",400,"Manrope",500],
+          "daisy-days":["DM Serif Display",700,"Quicksand",500],
+          "editorial-forest":["Cormorant Garamond",700,"Inter",400],
+          "editorial-tri-tone":["Instrument Serif",700,"Bricolage Grotesque",500],
+          "emerald-editorial":["Playfair Display",700,"Inter",400],
+          "grove":["Playfair Display",700,"Source Sans 3",400],
+          "long-table":["Lora",700,"Inter",400],
+          "mat":["Source Serif 4",500,"Source Sans 3",400],
+          "monochrome":["Lora",700,"Jost",400],
+          "neo-grid-bold":["Bricolage Grotesque",800,"Inter",500],
+          "peoples-platform":["Alfa Slab One",400,"Source Sans 3",500],
+          "pin-and-paper":["Crimson Pro",700,"Crimson Pro",400],
+          "pink-script":["Instrument Serif",700,"Inter",300],
+          "playful":["Syne",800,"Sora",500],
+          "raw-grid":["Space Grotesk",700,"Manrope",500],
+          "retro-windows":["VT323",400,"VT323",400],
+          "retro-zine":["Bebas Neue",400,"PT Sans",400],
+          "sakura-chroma":["Oswald",700,"Noto Sans",500],
+          "scatterbrain":["Shrikhand",400,"Zilla Slab",500],
+          "signal":["Spectral",600,"Inter",400],
+          "soft-editorial":["Cormorant Garamond",700,"Cormorant Garamond",400],
+          "stencil-tablet":["Big Shoulders Stencil Display",900,"Inter",500],
+          "studio":["Anton",400,"Inter",400],
+          "vellum":["Cormorant Garamond",500,"Cormorant Garamond",400]
+        };
         if (PALETTES[0]._native !== slug && NATIVE_PALETTES[slug]) {
           var np = NATIVE_PALETTES[slug];
           PALETTES[0].primary = np[0];
@@ -2541,6 +2578,23 @@
           PALETTES[0].name = "Template Default";
           PALETTES[0]._native = slug;
           buildPalOpts();
+          // Also set native fonts as Template Default
+          if (NATIVE_FONTS[slug]) {
+            var nf = NATIVE_FONTS[slug];
+            TYPEPAIRS[0] = {
+              name: "Template Default",
+              headline: { family: nf[0], weight: nf[1] },
+              body: { family: nf[2], weight: nf[3] },
+              preview: (PROMPT && PROMPT.headline) || "TITLE",
+              body_preview: "Template typography."
+            };
+            buildTypeOpts();
+            // Load the native fonts
+            var fl = document.createElement("link");
+            fl.rel = "stylesheet";
+            fl.href = "https://fonts.googleapis.com/css2?family=" + nf[0].replace(/ /g,"+") + ":wght@" + nf[1] + "&family=" + nf[2].replace(/ /g,"+") + ":wght@" + nf[3] + "&display=swap";
+            document.head.appendChild(fl);
+          }
         }
 
         // Fetch design template
