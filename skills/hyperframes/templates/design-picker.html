@@ -3881,6 +3881,46 @@
             iframe.contentWindow.scrollY || iframe.contentDocument.documentElement.scrollTop || 0;
         } catch (e) {}
 
+        // Inject hero entrance animation only on init or when easing changes
+        var _easingKey = e.name + "|" + (picks.easing || 0);
+        var _shouldAnimate = !window._lastHeroEasing || window._lastHeroEasing !== _easingKey;
+        window._lastHeroEasing = _easingKey;
+        var heroAnim = '';
+        if (_shouldAnimate) {
+        var isCustomEase = e.value && e.value.indexOf('M') === 0;
+        heroAnim = '<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"><\/script>\n' +
+          (isCustomEase ? '<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"><\/script>\n' : '') +
+          '<script>\n' +
+          'window.addEventListener("load",function(){\n' +
+          '  setTimeout(function(){\n' +
+          (isCustomEase ? '  if(typeof CustomEase!=="undefined"){gsap.registerPlugin(CustomEase);CustomEase.create("_heroCustom","' + e.value.replace(/"/g, '\\"') + '");}\n' : '') +
+          '  var ease=' + (isCustomEase ? '"_heroCustom"' : '"' + e.value + '"') + ';\n' +
+          '  var els=[];\n' +
+          '  var cover=document.querySelector("[data-screen-label=\\"00 Cover\\"]")||document.querySelector(".cover")||document.querySelector("header");\n' +
+          '  if(cover){\n' +
+          '    cover.querySelectorAll("*").forEach(function(el){\n' +
+          '      if(el.tagName==="STYLE"||el.tagName==="SCRIPT"||el.tagName==="CANVAS"||el.tagName==="TEMPLATE")return;\n' +
+          '      var r=el.getBoundingClientRect();\n' +
+          '      if(r.width<1||r.height<1)return;\n' +
+          '      var hasVisChild=false;\n' +
+          '      for(var c=el.firstElementChild;c;c=c.nextElementSibling){\n' +
+          '        var cr=c.getBoundingClientRect();\n' +
+          '        if(cr.width>0&&cr.height>0&&c.tagName!=="STYLE"&&c.tagName!=="SCRIPT"){hasVisChild=true;break}\n' +
+          '      }\n' +
+          '      if(!hasVisChild)els.push(el);\n' +
+          '    });\n' +
+          '  }\n' +
+          '  var vw=window.innerWidth;\n' +
+          '  els.forEach(function(el,i){\n' +
+          '    gsap.set(el,{x:vw,force3D:true});\n' +
+          '    gsap.to(el,{x:0,duration:0.9,ease:ease,delay:0.05+i*0.08});\n' +
+          '  });\n' +
+          '  },300);\n' +
+          '});\n' +
+          '<\/script>';
+        }
+        if (heroAnim) h = h.replace('</body>', heroAnim + '\n</body>');
+
         // Use blob URL for smooth transition
         if (iframe._blobUrl) URL.revokeObjectURL(iframe._blobUrl);
         var blob = new Blob([h], { type: "text/html" });
