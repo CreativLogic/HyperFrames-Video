@@ -150,6 +150,38 @@ Returns `{ "images": { "node:id": "https://...s3.amazonaws.com/..." } }`. Downlo
 - Color-modified via CSS (fill, stroke attributes)
 - Animated via GSAP (path morphing, drawing, transforms)
 
+**SVG color tokenization:** Figma exports SVGs with hardcoded hex fills (`fill="#88E655"`). For the picker's palette controls to affect SVGs in slides, replace hardcoded colors with `currentColor` and set the color via CSS vars on the parent container:
+
+```html
+<!-- WRONG — picker can't change this -->
+<svg>
+  <rect fill="#88E655" />
+  <text fill="#0A0A0A">Label</text>
+</svg>
+
+<!-- RIGHT — responds to palette changes -->
+<div style="color:var(--tp-accent)">
+  <svg>
+    <rect fill="currentColor" />
+    <text fill="var(--tp-primary)">Label</text>
+  </svg>
+</div>
+```
+
+For multi-color SVGs, use CSS class selectors on SVG elements:
+
+```css
+.brand-fill {
+  fill: var(--tp-accent);
+}
+.ink-fill {
+  fill: var(--tp-primary);
+}
+.ink-stroke {
+  stroke: var(--tp-primary);
+}
+```
+
 For raster-only assets (photographs, complex textures), export as PNG at 2x and note in the DESIGN.html that the asset requires a file reference rather than inline SVG.
 
 ### Step 7: Build slides as component references

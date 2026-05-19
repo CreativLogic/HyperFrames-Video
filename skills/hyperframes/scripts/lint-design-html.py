@@ -55,8 +55,20 @@ RULES = [
     {
         'name': 'inline-hardcoded-hex',
         'pattern': r'style="[^"]*(?:background|color|border):[^"]*#[0-9a-fA-F]{3,8}',
-        'message': 'Inline style with hardcoded hex color — use var(--bg/--fg/--ac/--mt) instead',
+        'message': 'Inline style with hardcoded hex color — use var(--tp-primary/--tp-secondary/--tp-accent/--tp-tertiary)',
         'exclude': r'var\(--|color-mix\(',
+    },
+    {
+        'name': 'svg-hardcoded-fill',
+        'pattern': r'\bfill="(#[0-9a-fA-F]{3,8})"',
+        'message': 'SVG fill="{match}" hardcoded — use fill="currentColor" or fill="var(--tp-accent)" so palette switching works',
+        'exclude': r'fill="none"|fill="currentColor"|fill="var\(',
+    },
+    {
+        'name': 'svg-hardcoded-stroke',
+        'pattern': r'\bstroke="(#[0-9a-fA-F]{3,8})"',
+        'message': 'SVG stroke="{match}" hardcoded — use stroke="currentColor" or stroke="var(--tp-primary)"',
+        'exclude': r'stroke="none"|stroke="currentColor"|stroke="var\(',
     },
     {
         'name': 'missing-token-sentinels',
