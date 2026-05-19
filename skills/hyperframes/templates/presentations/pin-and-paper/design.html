@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__NAME__ — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Caveat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500__FONT_LINK_EXTRA__&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"}}
+</script>
+
+<style id="ds-tokens">
+:root{
+  --primary:__PRIMARY__; --secondary:__SECONDARY__; --tertiary:__TERTIARY__; --accent:__ACCENT__;
+  --paper:var(--primary); --paper-2:#FAF3D8;
+  --ink:var(--secondary); --ink-blue:var(--accent);
+  --ochre:var(--tertiary);
+  --ink-dim:color-mix(in srgb,var(--ink) 70%,var(--paper));
+  --ink-fade:color-mix(in srgb,var(--ink) 35%,var(--paper));
+  --hairline:color-mix(in srgb,var(--ink) 22%,transparent);
+  --f-disp:"Crimson Pro",serif;
+  --f-hand:"Caveat",cursive;
+  --f-body:"Crimson Pro",serif;
+  --f-mono:"JetBrains Mono",monospace;
+  --pad-x:clamp(28px,5vw,80px); --pad-y:clamp(48px,7vh,120px);
+}
+</style>
+
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper)}
+body{color:var(--ink);font:400 16px/1.65 var(--f-body);overflow-x:hidden}
+::selection{background:var(--ink-blue);color:var(--paper)}
+
+/* Paper grain */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(circle,rgba(20,33,59,0.07) 1px,transparent 1px),radial-gradient(circle,rgba(20,33,59,0.04) 2px,transparent 2px);background-size:5px 5px,17px 17px;opacity:.7}
+
+#design-bg{position:fixed;inset:0;width:100%;height:100%;z-index:-2;opacity:.55;pointer-events:none}
+#bg-veil{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 30% 20%,transparent 0%,var(--paper) 75%)}
+
+/* Safety pin SVG used inline & in decorations */
+.pin-svg{display:inline-block}
+
+.rail{position:fixed;top:0;left:0;right:0;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 var(--pad-x);background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--hairline);z-index:100;font:500 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+.rail .brand{display:inline-flex;align-items:center;gap:12px;color:var(--ink-blue)}
+.rail .brand b{font-family:var(--f-disp);font-style:italic;font-weight:600;letter-spacing:0;text-transform:none;font-size:22px;color:var(--ink)}
+.rail .brand svg{width:22px;height:22px;color:var(--ink-blue)}
+.rail nav{display:flex;gap:24px}
+.rail nav a{color:var(--ink-dim);text-decoration:none;transition:color .15s}
+.rail nav a:hover{color:var(--ink-blue)}
+.rail .meta{font-family:var(--f-hand);font-size:22px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink-blue);transform:rotate(-2deg)}
+@media(max-width:760px){.rail nav{display:none}}
+
+section{position:relative;padding:var(--pad-y) var(--pad-x)}
+.section-head{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:baseline;border-top:1px dashed var(--hairline);padding-top:36px;margin-bottom:clamp(40px,6vh,72px);position:relative}
+.section-head .num{font-family:var(--f-hand);font-size:28px;font-weight:700;color:var(--ink-blue);transform:rotate(-3deg);justify-self:start}
+.section-head h2{margin:0;font:italic 600 clamp(48px,8vw,116px)/.95 var(--f-disp);letter-spacing:-.005em;color:var(--ink)}
+.section-head h2 em{font-style:normal;color:var(--ink-blue)}
+.section-head .lede{grid-column:2;max-width:54ch;margin-top:18px;font:italic 400 17px/1.7 var(--f-body);color:var(--ink-dim)}
+.section-head .pin-deco{position:absolute;top:-12px;right:0;color:var(--ink-blue);width:48px;height:48px;transform:rotate(28deg)}
+
+/* Cover */
+.cover{min-height:100vh;padding:96px var(--pad-x) 56px;display:grid;grid-template-rows:auto 1fr auto;position:relative;overflow:hidden}
+.cover-chrome{display:flex;justify-content:space-between;font:500 11px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-fade)}
+.cover-chrome .accent{color:var(--ink-blue)}
+.cover-headline{align-self:center;margin:0;font:italic 600 clamp(80px,15vw,240px)/.92 var(--f-disp);letter-spacing:-.02em;color:var(--ink);text-align:center}
+.cover-headline em{font-style:normal;color:var(--ink-blue)}
+.cover-hand{text-align:center;font-family:var(--f-hand);font-weight:700;font-size:48px;color:var(--ink-blue);margin-top:18px;transform:rotate(-2deg);letter-spacing:.02em}
+.cover-foot{margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding-top:24px;border-top:1px dashed var(--hairline)}
+.cover-foot .cell{display:flex;flex-direction:column;gap:6px}
+.cover-foot .k{font:500 10px/1.4 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-fade)}
+.cover-foot .v{font:italic 600 22px/1.15 var(--f-disp);color:var(--ink-blue)}
+.cover-foot .v.hand{font-family:var(--f-hand);font-style:normal;font-size:26px;color:var(--ink-blue);transform:rotate(-2deg);display:inline-block;font-weight:700;letter-spacing:.02em}
+.cover-foot .v.plain{font-family:var(--f-body);font-style:normal;font-weight:500;font-size:14px;color:var(--ink);letter-spacing:.04em}
+@media(max-width:760px){.cover-foot{grid-template-columns:1fr 1fr}}
+.cover-pin{position:absolute;pointer-events:none}
+.cover-pin.p1{top:120px;left:6%;width:80px;height:80px;color:var(--ink-blue);transform:rotate(35deg)}
+.cover-pin.p2{bottom:200px;right:8%;width:90px;height:90px;color:var(--ochre);transform:rotate(-20deg)}
+.cover-pin.p3{top:30%;right:14%;width:48px;height:48px;color:var(--ink-blue);transform:rotate(60deg)}
+
+/* Manifesto */
+.manifesto{padding:clamp(60px,9vh,120px) var(--pad-x);background:var(--ink);color:var(--paper);border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);position:relative;overflow:hidden}
+.manifesto-grid{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:start;position:relative;z-index:1}
+.manifesto-grid .num{font-family:var(--f-hand);font-size:32px;font-weight:700;color:var(--paper);transform:rotate(-3deg)}
+.manifesto p{font:italic 600 clamp(32px,4.5vw,68px)/1.15 var(--f-disp);max-width:24ch;margin:0;color:var(--paper)}
+.manifesto p em{font-style:normal;font-family:var(--f-hand);font-weight:700;color:var(--paper);transform:rotate(-2deg);display:inline-block;letter-spacing:.02em;background:var(--ink-blue);padding:0 .15em}
+.manifesto-pin{position:absolute;top:30%;right:8%;width:160px;height:160px;color:var(--paper);transform:rotate(-15deg);opacity:.18}
+
+/* Palette */
+.palette{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:880px){.palette{grid-template-columns:repeat(2,1fr)}}
+.swatch{aspect-ratio:3/4;padding:24px 22px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid var(--ink);background:var(--paper-2);transition:transform .3s;position:relative}
+.swatch:nth-child(1){transform:rotate(-1.5deg)}
+.swatch:nth-child(2){transform:rotate(1deg)}
+.swatch:nth-child(3){transform:rotate(-1deg)}
+.swatch:nth-child(4){transform:rotate(1.5deg)}
+.swatch::before{content:"";position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(20deg);width:24px;height:24px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2314213B' stroke-width='1.6'><circle cx='8' cy='8' r='3.5'/><path d='M11 9 L20 18 M9.5 10.5 L18.5 19.5'/></svg>") no-repeat center/contain}
+.swatch .role{font:500 11px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)}
+.swatch .name{font:italic 600 clamp(20px,2.2vw,32px)/.95 var(--f-disp);letter-spacing:-.005em;margin-top:auto;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swatch .name em{font-style:normal;color:var(--ink-blue)}
+.swatch .hex{font:500 12px/1 var(--f-mono);margin-top:8px}
+.swatch .usage{font:italic 400 13px/1.6 var(--f-body);margin-top:6px;color:var(--ink-dim)}
+.swatch--paper{background:var(--paper);color:var(--ink)}
+.swatch--ink{background:var(--ink);color:var(--paper)}
+.swatch--ink .role,.swatch--ink .usage{color:color-mix(in srgb,var(--paper) 70%,transparent)}
+.swatch--ochre{background:var(--ochre);color:var(--ink)}
+.swatch--blue{background:var(--ink-blue);color:var(--paper)}
+.swatch--blue .role,.swatch--blue .usage{color:color-mix(in srgb,var(--paper) 70%,transparent)}
+
+/* Type specimen */
+.specimen{display:flex;flex-direction:column;border:1px solid var(--ink);background:var(--paper-2)}
+.spec-row{display:grid;grid-template-columns:13em 1fr;gap:32px;padding:28px 32px;border-bottom:1px dashed var(--hairline);align-items:baseline}
+.spec-row:last-child{border:0}
+.spec-row .meta{font:500 11px/1.5 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);display:flex;flex-direction:column;gap:6px}
+.spec-row .meta b{color:var(--ink-blue);font-weight:600;font-family:var(--f-hand);font-size:22px;letter-spacing:0;text-transform:none}
+.spec-display{font:italic 600 clamp(56px,10vw,148px)/.92 var(--f-disp);letter-spacing:-.015em;color:var(--ink)}
+.spec-display em{font-style:normal;color:var(--ink-blue)}
+.spec-h1{font:italic 600 clamp(40px,7vw,96px)/.95 var(--f-disp);letter-spacing:-.012em;color:var(--ink-blue)}
+.spec-h2{font:italic 600 clamp(28px,4vw,56px)/1.1 var(--f-disp);color:var(--ink)}
+.spec-hand{font-family:var(--f-hand);font-weight:700;font-size:clamp(36px,5vw,72px);line-height:1;color:var(--ink-blue);transform:rotate(-2deg);display:inline-block;letter-spacing:.02em}
+.spec-lead{font:italic 400 clamp(18px,2vw,28px)/1.55 var(--f-body);color:var(--ink);max-width:38ch}
+.spec-body{font:400 17px/1.75 var(--f-body);color:var(--ink);max-width:60ch}
+.spec-label{font:500 12px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-blue)}
+
+/* Surface */
+.surface-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:32px}
+@media(max-width:880px){.surface-grid{grid-template-columns:1fr}}
+.demo-card{background:var(--paper-2);color:var(--ink);padding:36px 40px;display:flex;flex-direction:column;gap:18px;border:1px solid var(--ink);position:relative;transform:rotate(-.8deg)}
+.demo-card .pin{position:absolute;top:-14px;left:48px;width:48px;height:48px;color:var(--ink-blue);transform:rotate(28deg)}
+.demo-card .tag{align-self:flex-start;font-family:var(--f-hand);font-weight:700;font-size:24px;color:var(--ink-blue);transform:rotate(-2deg);letter-spacing:.02em}
+.demo-card h3{margin:0;font:italic 600 42px/1 var(--f-disp);letter-spacing:-.005em}
+.demo-card p{margin:0;font:400 16px/1.75 var(--f-body)}
+.demo-card .num-stat{font:italic 600 88px/1 var(--f-disp);color:var(--ink-blue);letter-spacing:-.015em}
+.tokens{list-style:none;padding:0;margin:0;border:1px solid var(--ink);background:var(--paper-2);transform:rotate(.5deg)}
+.tokens li{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:16px 22px;border-bottom:1px dashed var(--hairline)}
+.tokens li:last-child{border:0}
+.tokens .name{font:500 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+.tokens .val{font:italic 600 22px/1 var(--f-disp);color:var(--ink-blue)}
+.tokens .bar{height:1px;background:var(--ink-blue)}
+
+/* Motion */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+@media(max-width:880px){.two-col{grid-template-columns:1fr}}
+.panel{background:var(--paper-2);border:1px solid var(--ink);padding:32px;display:flex;flex-direction:column;gap:18px;position:relative}
+.panel:first-child{transform:rotate(-.4deg)}
+.panel:last-child{transform:rotate(.4deg)}
+.panel .label-row{font-family:var(--f-hand);font-weight:700;font-size:24px;color:var(--ink-blue);align-self:flex-start;transform:rotate(-2deg);letter-spacing:.02em}
+.panel h4{margin:0;font:italic 600 36px/1 var(--f-disp);color:var(--ink)}
+.panel h4 em{font-style:normal;color:var(--ink-blue)}
+.panel p{margin:0;font:400 14px/1.75 var(--f-body);color:var(--ink);max-width:38ch}
+.panel pre{margin:0;padding:14px;border:1px solid var(--ink);background:var(--paper);font:500 12px/1.6 var(--f-mono);color:var(--ink);overflow-x:auto}
+
+/* Background */
+.bg-preview{border:1px solid var(--hairline);aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--paper)}
+.bg-preview canvas{width:100%;height:100%;display:block}
+.bg-preview .badge{position:absolute;bottom:12px;left:12px;font:500 10px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;background:color-mix(in srgb,var(--paper) 75%,transparent);padding:6px 10px;backdrop-filter:blur(8px)}
+details.code-block{border:1px solid var(--hairline);background:color-mix(in srgb,var(--paper) 60%,transparent);margin-top:12px}
+details.code-block summary{cursor:pointer;padding:14px 18px;list-style:none;font:500 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-blue);display:flex;justify-content:space-between}
+details.code-block summary::-webkit-details-marker{display:none}
+details.code-block summary::after{content:"+";font:800 18px/1 var(--f-disp);color:var(--ink-blue)}
+details.code-block[open] summary::after{content:"\2212"}
+details.code-block pre{margin:0;padding:16px 18px;border-top:1px solid var(--hairline);font:11px/1.6 var(--f-mono);color:var(--ink-dim);background:transparent;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto}
+
+/* Guidelines */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+@media(max-width:880px){.rules-grid{grid-template-columns:1fr}}
+.rules-col{padding:32px;border:1px solid var(--ink);background:var(--paper-2)}
+.rules-col.do{transform:rotate(-.5deg)}
+.rules-col.dont{transform:rotate(.5deg)}
+.rules-col h3{font:italic 600 56px/1 var(--f-disp);margin:0 0 24px;letter-spacing:-.005em;color:var(--ink-blue)}
+.rules-col.dont h3{color:var(--ochre)}
+.rules-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rules-col li{display:grid;grid-template-columns:2.4em 1fr;gap:12px;padding:14px 16px;background:var(--paper);border:1px solid var(--ink);font:400 16px/1.55 var(--f-body);color:var(--ink)}
+.rules-col li::before{font-family:var(--f-hand);font-weight:700;font-size:24px;line-height:1;align-self:center;text-align:center;letter-spacing:.02em}
+.rules-col.do li::before{content:"yes!";color:var(--ink-blue)}
+.rules-col.dont li::before{content:"no.";color:var(--ochre);font-size:20px}
+
+/* Templates */
+.templates-wrap{border-top:1px dashed var(--hairline);background:color-mix(in srgb,var(--paper) 92%,var(--ochre))}
+.templates-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+@media(max-width:1100px){.templates-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.templates-grid{grid-template-columns:1fr}}
+.tmpl{background:var(--paper-2);border:1px solid var(--ink);overflow:hidden;transition:transform .2s cubic-bezier(.16,1,.3,1)}
+.tmpl:hover{transform:translateY(-3px) rotate(-.5deg)}
+.tmpl-thumb{width:100%;aspect-ratio:16/9;overflow:hidden;position:relative;background:var(--paper);border-bottom:1px dashed var(--hairline)}
+.tmpl-thumb .scale-wrap{width:1920px;height:1080px;transform-origin:top left}
+.tmpl-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 18px}
+.tmpl-foot .name{color:var(--ink);font:italic 600 22px/1 var(--f-disp);letter-spacing:-.005em}
+.tmpl-foot .idx{font-family:var(--f-hand);font-size:22px;font-weight:700;color:var(--ink-blue);letter-spacing:.02em}
+
+/* Endcap */
+footer.endcap{padding:96px var(--pad-x) 56px;background:var(--ink-blue);color:var(--paper);border-top:1px solid var(--ink);display:grid;grid-template-columns:1fr auto;gap:48px;align-items:end}
+footer.endcap .endmark{font:italic 600 clamp(60px,13vw,220px)/.88 var(--f-disp);letter-spacing:-.018em;margin:0;color:var(--paper)}
+footer.endcap .endmark em{font-style:normal;font-family:var(--f-hand);color:var(--paper);font-weight:700;letter-spacing:.02em;display:inline-block;transform:rotate(-3deg)}
+footer.endcap .meta{font-family:var(--f-hand);font-size:24px;font-weight:600;text-align:right;color:color-mix(in srgb,var(--paper) 80%,transparent);line-height:1.6;letter-spacing:.02em}
+footer.endcap .meta b{color:var(--paper);font:italic 600 18px/1 var(--f-disp);letter-spacing:0}
+</style>
+
+<!-- TEMPLATE STYLES -->
+<style id="template-css">
+__TEMPLATE_CSS__
+</style>
+</head>
+<body>
+
+<canvas id="design-bg"></canvas>
+<div id="bg-veil"></div>
+
+<!-- Reusable safety pin -->
+<svg width="0" height="0" style="position:absolute" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+    <circle cx="8" cy="8" r="3.5"/>
+    <path d="M11 9 L20 18 M9.5 10.5 L18.5 19.5"/>
+    <circle cx="19" cy="18.5" r="1.2" fill="currentColor"/>
+  </symbol>
+</svg>
+
+<div class="rail">
+  <div class="brand">
+    <svg width="22" height="22"><use href="#pin"/></svg>
+    <b>__NAME__</b>
+  </div>
+  <nav><a href="#palette">i.</a><a href="#type">ii.</a><a href="#surface">iii.</a><a href="#motion">iv.</a><a href="#background">v.</a><a href="#guidelines">vi.</a><a href="#templates">vii.</a></nav>
+  <div class="meta">field notes —</div>
+</div>
+
+<header class="cover" data-screen-label="00 Cover">
+  <svg class="cover-pin p1"><use href="#pin"/></svg>
+  <svg class="cover-pin p2"><use href="#pin"/></svg>
+  <svg class="cover-pin p3"><use href="#pin"/></svg>
+  <div class="cover-chrome">
+    <div>Design System · № 016</div>
+    <div class="accent">__ACCENT_LABEL__</div>
+  </div>
+  <h1 class="cover-headline">__NAME__.</h1>
+  <div class="cover-hand">— small things, pinned —</div>
+  <div class="cover-foot">
+    <div class="cell"><span class="k">Discipline</span><span class="v plain">Research · Essay · Reflection</span></div>
+    <div class="cell"><span class="k">Display</span><span class="v">Crimson <em style="font-style:italic">italic</em></span></div>
+    <div class="cell"><span class="k">Hand</span><span class="v hand">Caveat</span></div>
+    <div class="cell"><span class="k">Volume</span><span class="v plain">07 sections · __SLIDE_COUNT__ frames</span></div>
+  </div>
+</header>
+
+<section class="manifesto" data-screen-label="00 Manifesto">
+  <svg class="manifesto-pin"><use href="#pin"/></svg>
+  <div class="manifesto-grid">
+    <div class="num">— manifesto</div>
+    <p>the page is a <em>scrapbook</em>. notes are <em>pinned</em>, never typed. nothing is finished — the truth is in the margin.</p>
+  </div>
+</section>
+
+<section id="palette" data-screen-label="01 Palette">
+  <svg class="pin-deco"><use href="#pin"/></svg>
+  <div class="section-head">
+    <div class="num">i — palette</div>
+    <h2>Yellow paper,<br/><em>ink-blue thread.</em></h2>
+    <p class="lede">__PALETTE_LEDE__</p>
+  </div>
+  <div class="palette">
+    <div class="swatch swatch--paper"><div class="role">i · paper</div><div><div class="name">__PRIMARY_NAME__</div><div class="hex">__PRIMARY__</div><div class="usage">Yellow notebook stock.</div></div></div>
+    <div class="swatch swatch--ink"><div class="role">ii · ink</div><div><div class="name">__SECONDARY_NAME__</div><div class="hex">__SECONDARY__</div><div class="usage">Deepest blue. Type and lines.</div></div></div>
+    <div class="swatch swatch--ochre"><div class="role">iii · ochre</div><div><div class="name">__TERTIARY_NAME__</div><div class="hex">__TERTIARY__</div><div class="usage">Aged margin warning tone.</div></div></div>
+    <div class="swatch swatch--blue"><div class="role">iv · pen</div><div><div class="name">__ACCENT_NAME__</div><div class="hex">__ACCENT__</div><div class="usage">Pen ink — the handwriting voice.</div></div></div>
+  </div>
+</section>
+
+<section id="type" data-screen-label="02 Type">
+  <svg class="pin-deco"><use href="#pin"/></svg>
+  <div class="section-head">
+    <div class="num">ii — typography</div>
+    <h2>Crimson italic,<br/><em>and a hand.</em></h2>
+    <p class="lede">Crimson Pro italic carries every headline and lead. Caveat handles the handwritten asides — pinned notes in the margin. JetBrains Mono runs labels.</p>
+  </div>
+  <div class="specimen">
+    <div class="spec-row"><div class="meta"><span>Display</span><b>Crimson italic 600</b><span>10vw · −0.025em</span></div><div class="spec-display"><em>small</em> things.</div></div>
+    <div class="spec-row"><div class="meta"><span>Heading I</span><b>Crimson italic 600</b><span>7vw · pen blue</span></div><div class="spec-h1">chapter one</div></div>
+    <div class="spec-row"><div class="meta"><span>Heading II</span><b>Crimson italic 600</b><span>4vw</span></div><div class="spec-h2">A subhead pins the section.</div></div>
+    <div class="spec-row"><div class="meta"><span>Hand</span><b>Caveat 700</b><span>5vw · pen blue · tilt</span></div><div class="spec-hand">— a handwritten note —</div></div>
+    <div class="spec-row"><div class="meta"><span>Lead</span><b>Crimson italic 400</b><span>2vw · 1.55</span></div><div class="spec-lead">The lead pins the argument in one slow, sweetened breath.</div></div>
+    <div class="spec-row"><div class="meta"><span>Body</span><b>Crimson 400</b><span>17px · 1.75 · 60ch</span></div><p class="spec-body">Pack my box with five dozen liquor jugs. Body type sets quietly — Crimson at 400, large for an essay feel. Below 24px is forbidden in 1080p compositions.</p></div>
+    <div class="spec-row"><div class="meta"><span>Label</span><b>JetBrains Mono 500</b><span>12px · 0.18em</span></div><div class="spec-label">// pinned · folio · 04 / 16</div></div>
+  </div>
+</section>
+
+<section id="surface" data-screen-label="03 Surface">
+  <svg class="pin-deco"><use href="#pin"/></svg>
+  <div class="section-head">
+    <div class="num">iii — surface</div>
+    <h2>Pinned,<br/>not <em>printed.</em></h2>
+    <p class="lede">Every card is a pearl paper-2 surface pinned to the yellow page with a tilted safety pin. Cards tilt ±1°. Nothing aligns.</p>
+  </div>
+  <div class="surface-grid">
+    <div class="demo-card">
+      <svg class="pin"><use href="#pin"/></svg>
+      <span class="tag">— a pinned thought —</span>
+      <h3><em>example.</em></h3>
+      <p>Pearl card pinned to yellow paper. 1px ink border, gentle tilt, a safety pin on the corner. The accent voice is always the handwritten one, never the typed.</p>
+      <div class="num-stat">+42%</div>
+    </div>
+    <ul class="tokens">
+      <li><span class="name">Corners</span><span class="val">__CORNER_RADIUS__</span><span class="bar" style="width:8px"></span></li>
+      <li><span class="name">Padding</span><span class="val">__PADDING__</span><span class="bar" style="width:64px"></span></li>
+      <li><span class="name">Gap</span><span class="val">__GAP__</span><span class="bar" style="width:18px"></span></li>
+      <li><span class="name">Elevation</span><span class="val">__ELEVATION__</span><span class="bar" style="width:22px"></span></li>
+      <li><span class="name">Density</span><span class="val">__DENSITY__</span><span class="bar" style="width:20px"></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="motion" data-screen-label="04 Motion">
+  <svg class="pin-deco"><use href="#pin"/></svg>
+  <div class="section-head">
+    <div class="num">iv — motion</div>
+    <h2>__EASING_HEADLINE__</h2>
+    <p class="lede">__EASING_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="panel">
+      <span class="label-row">— easing —</span>
+      <h4>__EASING_NAME__</h4>
+      <p>__EASING_DESC__</p>
+      <pre>__EASING_VALUE__</pre>
+    </div>
+    <div class="panel">
+      <span class="label-row">— duration —</span>
+      <h4>__DURATION_DEFAULT__</h4>
+      <p>__DURATION_DESC__</p>
+      <pre>__DURATION_VALUES__</pre>
+    </div>
+  </div>
+</section>
+
+<section id="background" data-screen-label="05 Background">
+  <svg class="pin-deco"><use href="#pin"/></svg>
+  <div class="section-head">
+    <div class="num">v — background</div>
+    <h2>__BG_HEADLINE__</h2>
+    <p class="lede">__BG_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="bg-preview"><canvas id="bg-preview-canvas"></canvas><span class="badge">// __BG_BADGE__</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <ul class="tokens" style="border-top:none">
+        <li><span class="name">Geometry</span><span class="val">__BG_TYPE__</span><span class="bar" style="width:36px"></span></li>
+        <li><span class="name">Density</span><span class="val">__BG_DENSITY__</span><span class="bar" style="width:42px"></span></li>
+        <li><span class="name">Speed</span><span class="val">__BG_SPEED__</span><span class="bar" style="width:18px;opacity:.7"></span></li>
+        <li><span class="name">Strength</span><span class="val">__BG_STRENGTH__</span><span class="bar" style="width:52px"></span></li>
+        <li><span class="name">Grain</span><span class="val">__BG_GRAIN__</span><span class="bar" style="width:24px"></span></li>
+      </ul>
+      <details class="code-block"><summary>// shader config (json)</summary>
+<pre>__SHADER_CONFIG__</pre>
+      </details>
+      <details class="code-block"><summary>// vertex shader (glsl)</summary>
+<pre id="vtx-src">__SHADER_VERTEX__</pre>
+      </details>
+      <details class="code-block"><summary>// fragment shader (glsl)</summary>
+<pre id="frg-src">__SHADER_FRAGMENT__</pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="guidelines" data-screen-label="06 Guidelines">
+  <svg class="pin-deco"><use href="#pin"/></svg>
+  <div class="section-head">
+    <div class="num">vi — guidelines</div>
+    <h2>yes please.<br/><em>no thank you.</em></h2>
+    <p class="lede">A short list. The scrapbook tears the moment any are broken.</p>
+  </div>
+  <div class="rules-grid">
+    <div class="rules-col do"><h3><em>yes please.</em></h3><ul>__DOS__</ul></div>
+    <div class="rules-col dont"><h3><em>no thank you.</em></h3><ul>__DONTS__</ul></div>
+  </div>
+</section>
+
+<section id="templates" class="templates-wrap" data-screen-label="07 Templates">
+  <div class="section-head">
+    <div class="num">vii — templates</div>
+    <h2>__SLIDE_COUNT_WORD__<br/><em>pinned pages.</em></h2>
+    <p class="lede">The full library at 1920×1080. Each thumbnail is the live slide, scaled.</p>
+  </div>
+  <div class="templates-grid" id="templates-grid"></div>
+</section>
+
+<template id="tmpl-source">
+__SLIDE_CARDS__
+</template>
+
+<footer class="endcap" data-screen-label="08 End">
+  <h2 class="endmark">thank <em>you</em>.</h2>
+  <div class="meta">
+    <div><b>__NAME__</b></div>
+    <div>Crimson Pro · Caveat · JetBrains Mono</div>
+    <div>__DATE__</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.getElementById('templates-grid').appendChild(document.getElementById('tmpl-source').content.cloneNode(true));
+  function rescale(){document.querySelectorAll('.tmpl-thumb').forEach(t=>{const w=t.querySelector('.scale-wrap');if(w)w.style.transform='scale('+(t.clientWidth/1920)+')'})}
+  addEventListener('load',rescale);addEventListener('resize',rescale);requestAnimationFrame(rescale);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(rescale);
+})();
+</script>
+
+__SHADER_SCRIPT__
+
+</body>
+</html>

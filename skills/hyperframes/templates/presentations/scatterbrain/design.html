@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__NAME__ — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Zilla+Slab:wght@400;500;600;700&family=Caveat:wght@400;600;700&family=JetBrains+Mono:wght@500__FONT_LINK_EXTRA__&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"}}
+</script>
+
+<style id="ds-tokens">
+:root{
+  --primary:__PRIMARY__; --secondary:__SECONDARY__; --tertiary:__TERTIARY__; --accent:__ACCENT__;
+  --paper:var(--primary); --ink:var(--secondary);
+  --yellow:var(--accent); --pink:#FFB5C5; --blue:#B5E0F2; --green:#C5E8B5; --orange:var(--accent);
+  --ink-dim:color-mix(in srgb,var(--ink) 65%,var(--paper));
+  --ink-fade:color-mix(in srgb,var(--ink) 32%,var(--paper));
+  --hairline:color-mix(in srgb,var(--ink) 16%,transparent);
+  --note-shadow:6px 6px 0 rgba(31,27,22,0.18);
+  --f-disp:"Shrikhand",cursive;
+  --f-body:"Zilla Slab",serif;
+  --f-hand:"Caveat",cursive;
+  --f-mono:"JetBrains Mono",monospace;
+  --pad-x:clamp(28px,5vw,80px); --pad-y:clamp(48px,7vh,120px);
+}
+</style>
+
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--paper)}
+body{color:var(--ink);font:500 15px/1.65 var(--f-body);overflow-x:hidden}
+::selection{background:var(--yellow);color:var(--ink)}
+
+/* Subtle paper grain */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(circle,rgba(31,27,22,0.05) 1px,transparent 1px);background-size:5px 5px;opacity:.6}
+
+#design-bg{position:fixed;inset:0;width:100%;height:100%;z-index:-2;opacity:.55;pointer-events:none}
+#bg-veil{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 30% 20%,transparent 0%,var(--paper) 75%)}
+
+.rail{position:fixed;top:0;left:0;right:0;height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 var(--pad-x);background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:blur(14px);border-bottom:1px dashed var(--hairline);z-index:100;font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim)}
+.rail .brand{display:inline-flex;align-items:center;gap:12px;color:var(--ink)}
+.rail .brand b{font-family:var(--f-disp);font-weight:400;letter-spacing:0;text-transform:none;font-size:24px;color:var(--orange)}
+.rail .brand .notes{display:inline-flex;gap:3px}
+.rail .brand .notes span{width:10px;height:10px;display:inline-block;transform:rotate(-3deg)}
+.rail .brand .notes span:nth-child(1){background:var(--yellow);transform:rotate(-6deg)}
+.rail .brand .notes span:nth-child(2){background:var(--pink);transform:rotate(3deg)}
+.rail .brand .notes span:nth-child(3){background:var(--blue);transform:rotate(-2deg)}
+.rail nav{display:flex;gap:20px;font-family:var(--f-hand);font-size:22px;font-weight:700;letter-spacing:.02em}
+.rail nav a{color:var(--ink-dim);text-decoration:none;transition:color .15s}
+.rail nav a:hover{color:var(--orange)}
+.rail .meta{font-family:var(--f-hand);font-size:22px;font-weight:700;color:var(--orange);transform:rotate(-2deg);letter-spacing:.02em}
+@media(max-width:760px){.rail nav{display:none}}
+
+section{position:relative;padding:var(--pad-y) var(--pad-x)}
+.section-head{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:end;border-top:2px dashed var(--ink);padding-top:32px;margin-bottom:clamp(40px,6vh,72px);position:relative}
+.section-head .num{font-family:var(--f-hand);font-size:32px;font-weight:700;color:var(--orange);transform:rotate(-3deg);justify-self:start;letter-spacing:.02em}
+.section-head h2{margin:0;font:400 clamp(56px,9vw,128px)/.95 var(--f-disp);letter-spacing:.005em;color:var(--ink)}
+.section-head h2 em{font-style:normal;color:var(--orange)}
+.section-head .lede{grid-column:2;max-width:54ch;margin-top:18px;font:500 16px/1.65 var(--f-body);color:var(--ink-dim)}
+
+/* Cover */
+.cover{min-height:100vh;padding:96px var(--pad-x) 56px;display:grid;grid-template-rows:auto 1fr auto;position:relative;overflow:hidden}
+.cover-chrome{display:flex;justify-content:space-between;font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+.cover-chrome .accent{font-family:var(--f-hand);font-size:24px;font-weight:700;color:var(--orange);transform:rotate(-2deg);letter-spacing:.02em;text-transform:none}
+.cover-headline{align-self:center;margin:0;font:400 clamp(72px,12vw,180px)/.92 var(--f-disp);letter-spacing:.005em;color:var(--ink);text-align:center}
+.cover-headline em{font-style:normal;color:var(--orange)}
+.cover-hand{text-align:center;font-family:var(--f-hand);font-weight:700;font-size:42px;color:var(--ink);margin-top:18px;transform:rotate(-2deg);letter-spacing:.02em}
+.cover-foot{margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.cover-foot .cell{padding:20px 22px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--note-shadow);border:1px solid var(--ink)}
+.cover-foot .cell:nth-child(1){background:var(--yellow);transform:rotate(-1.5deg)}
+.cover-foot .cell:nth-child(2){background:var(--pink);transform:rotate(1deg)}
+.cover-foot .cell:nth-child(3){background:var(--blue);transform:rotate(-1deg)}
+.cover-foot .cell:nth-child(4){background:var(--green);transform:rotate(1.5deg)}
+.cover-foot .k{font:600 11px/1.4 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim)}
+.cover-foot .v{font:400 22px/1.2 var(--f-disp);letter-spacing:.005em;color:var(--ink)}
+.cover-foot .v.hand{font-family:var(--f-hand);font-weight:700;font-size:26px;color:var(--ink);transform:rotate(-2deg);display:inline-block;letter-spacing:.02em}
+.cover-foot .v.plain{font-family:var(--f-body);font-weight:600;font-size:14px;letter-spacing:.02em}
+@media(max-width:760px){.cover-foot{grid-template-columns:1fr 1fr}}
+.cover-deco{position:absolute;pointer-events:none}
+.cover-deco.d1{top:120px;left:5%;width:80px;height:80px;background:var(--yellow);transform:rotate(15deg);border:1px solid var(--ink);box-shadow:var(--note-shadow);display:flex;align-items:center;justify-content:center;font-family:var(--f-hand);font-size:32px;font-weight:700;color:var(--ink)}
+.cover-deco.d2{bottom:200px;right:8%;width:80px;height:80px;background:var(--pink);transform:rotate(-10deg);border:1px solid var(--ink);box-shadow:var(--note-shadow);display:flex;align-items:center;justify-content:center;font-family:var(--f-hand);font-size:36px;font-weight:700;color:var(--ink)}
+
+/* Manifesto */
+.manifesto{padding:clamp(60px,9vh,120px) var(--pad-x);background:var(--yellow);color:var(--ink);border-top:2px dashed var(--ink);border-bottom:2px dashed var(--ink);position:relative;overflow:hidden}
+.manifesto-grid{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:start}
+.manifesto-grid .num{font-family:var(--f-hand);font-size:32px;font-weight:700;color:var(--orange);transform:rotate(-3deg);letter-spacing:.02em}
+.manifesto p{font:400 clamp(32px,5vw,72px)/1.1 var(--f-disp);max-width:22ch;margin:0;color:var(--ink);letter-spacing:.005em}
+.manifesto p em{font-style:normal;color:var(--orange)}
+.manifesto p strong{font-family:var(--f-hand);font-weight:700;font-style:normal;color:var(--ink);font-size:.8em;transform:rotate(-2deg);display:inline-block;letter-spacing:.02em}
+
+/* Palette */
+.palette{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@media(max-width:880px){.palette{grid-template-columns:repeat(2,1fr)}}
+.swatch{aspect-ratio:3/4;padding:24px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid var(--ink);box-shadow:var(--note-shadow);position:relative;transition:transform .2s}
+.swatch:nth-child(1){transform:rotate(-2deg)}
+.swatch:nth-child(2){transform:rotate(1deg)}
+.swatch:nth-child(3){transform:rotate(-1deg)}
+.swatch:nth-child(4){transform:rotate(2deg)}
+.swatch:hover{transform:translateY(-3px)}
+.swatch::before{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%) rotate(15deg);width:24px;height:8px;background:color-mix(in srgb,var(--ink) 30%,transparent);border-radius:2px}
+.swatch .role{font-family:var(--f-hand);font-size:22px;font-weight:700;color:var(--ink);letter-spacing:.02em}
+.swatch .name{font:400 clamp(20px,2.2vw,32px)/.95 var(--f-disp);letter-spacing:.005em;margin-top:auto;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swatch .hex{font:600 13px/1 var(--f-mono);margin-top:8px;color:var(--ink)}
+.swatch .usage{font:500 13px/1.5 var(--f-body);margin-top:6px;color:var(--ink);opacity:.8}
+.swatch--yellow{background:var(--yellow);color:var(--ink)}
+.swatch--pink{background:var(--pink);color:var(--ink)}
+.swatch--blue{background:var(--blue);color:var(--ink)}
+.swatch--green{background:var(--green);color:var(--ink)}
+
+/* Type specimen */
+.specimen{display:flex;flex-direction:column;gap:14px}
+.spec-row{display:grid;grid-template-columns:13em 1fr;gap:32px;padding:28px 32px;background:var(--paper);border:1px solid var(--ink);box-shadow:var(--note-shadow);align-items:baseline}
+.spec-row:nth-child(odd){transform:rotate(-.3deg)}
+.spec-row:nth-child(even){transform:rotate(.3deg)}
+.spec-row .meta{font:600 11px/1.5 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);display:flex;flex-direction:column;gap:6px}
+.spec-row .meta b{color:var(--orange);font-weight:700}
+.spec-display{font:400 clamp(56px,10vw,148px)/.95 var(--f-disp);letter-spacing:.005em;color:var(--ink)}
+.spec-display em{font-style:normal;color:var(--orange)}
+.spec-h1{font:400 clamp(40px,7vw,104px)/.95 var(--f-disp);letter-spacing:.005em;color:var(--orange)}
+.spec-h2{font:600 clamp(28px,4vw,56px)/1.05 var(--f-body);letter-spacing:-.012em;color:var(--ink)}
+.spec-hand{font-family:var(--f-hand);font-weight:700;font-size:clamp(36px,5vw,72px);line-height:1;color:var(--ink);transform:rotate(-2deg);display:inline-block;letter-spacing:.02em}
+.spec-lead{font:600 clamp(18px,2vw,28px)/1.45 var(--f-body);color:var(--ink);max-width:38ch}
+.spec-body{font:500 16px/1.7 var(--f-body);color:var(--ink);max-width:60ch}
+.spec-label{font:600 12px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);background:var(--yellow);padding:6px 12px;border:1px solid var(--ink);display:inline-block;transform:rotate(-1deg)}
+
+/* Surface */
+.surface-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:32px}
+@media(max-width:880px){.surface-grid{grid-template-columns:1fr}}
+.demo-card{background:var(--pink);color:var(--ink);padding:32px;display:flex;flex-direction:column;gap:16px;border:1px solid var(--ink);box-shadow:var(--note-shadow);transform:rotate(-1deg);position:relative}
+.demo-card .tag{align-self:flex-start;font-family:var(--f-hand);font-weight:700;font-size:24px;color:var(--ink);letter-spacing:.02em;transform:rotate(-2deg)}
+.demo-card h3{margin:0;font:400 40px/1 var(--f-disp);letter-spacing:.005em}
+.demo-card p{margin:0;font:500 15px/1.7 var(--f-body)}
+.demo-card .num-stat{font:400 80px/1 var(--f-disp);color:var(--orange);letter-spacing:.005em}
+.demo-card .hand-note{font-family:var(--f-hand);font-weight:700;font-size:30px;color:var(--ink);transform:rotate(-3deg);align-self:flex-end;letter-spacing:.02em}
+.tokens{list-style:none;padding:14px;margin:0;background:var(--blue);border:1px solid var(--ink);box-shadow:var(--note-shadow);display:flex;flex-direction:column;gap:4px;transform:rotate(.5deg)}
+.tokens li{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:10px 14px;border-bottom:1px dashed var(--ink-fade)}
+.tokens li:last-child{border:0}
+.tokens .name{font:600 12px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+.tokens .val{font:400 22px/1 var(--f-disp);letter-spacing:.005em;color:var(--ink)}
+.tokens .bar{height:8px;background:var(--orange);border:1px solid var(--ink)}
+
+/* Motion */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:880px){.two-col{grid-template-columns:1fr}}
+.panel{padding:32px;display:flex;flex-direction:column;gap:18px;border:1px solid var(--ink);box-shadow:var(--note-shadow)}
+.panel:first-child{background:var(--green);transform:rotate(-.6deg)}
+.panel:last-child{background:var(--yellow);transform:rotate(.6deg)}
+.panel .label-row{font-family:var(--f-hand);font-weight:700;font-size:22px;color:var(--ink);letter-spacing:.02em;align-self:flex-start;transform:rotate(-2deg)}
+.panel h4{margin:0;font:400 36px/1 var(--f-disp);color:var(--ink);letter-spacing:.005em}
+.panel h4 em{font-style:normal;color:var(--orange)}
+.panel p{margin:0;font:500 14px/1.7 var(--f-body);color:var(--ink);max-width:38ch}
+.panel pre{margin:0;padding:14px;border:1px solid var(--ink);background:var(--paper);font:600 12px/1.6 var(--f-mono);color:var(--ink);overflow-x:auto}
+
+.bg-preview{border:1px solid var(--ink);box-shadow:var(--note-shadow);aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--paper);transform:rotate(-.5deg)}
+.bg-preview canvas{width:100%;height:100%;display:block}
+.bg-preview .badge{position:absolute;bottom:12px;left:12px;font-family:var(--f-hand);font-weight:700;font-size:20px;color:var(--ink);letter-spacing:.02em;transform:rotate(-2deg)}
+
+details.code-block{border:1px solid var(--ink);box-shadow:var(--note-shadow);background:var(--paper);margin-top:12px}
+details.code-block summary{cursor:pointer;padding:14px 18px;list-style:none;font-family:var(--f-hand);font-weight:700;font-size:20px;color:var(--orange);display:flex;justify-content:space-between;letter-spacing:.02em}
+details.code-block summary::-webkit-details-marker{display:none}
+details.code-block summary::after{content:"+";font:400 18px/1 var(--f-disp);color:var(--orange)}
+details.code-block[open] summary::after{content:"\2212"}
+details.code-block pre{margin:0;padding:16px 18px;border-top:1px dashed var(--ink);font:11px/1.6 var(--f-mono);color:var(--ink-dim);background:transparent;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto}
+
+/* Guidelines */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:880px){.rules-grid{grid-template-columns:1fr}}
+.rules-col{padding:32px;border:1px solid var(--ink);box-shadow:var(--note-shadow)}
+.rules-col.do{background:var(--green);transform:rotate(-.6deg)}
+.rules-col.dont{background:var(--pink);transform:rotate(.6deg)}
+.rules-col h3{font:400 56px/1 var(--f-disp);margin:0 0 20px;letter-spacing:.005em;color:var(--ink)}
+.rules-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rules-col li{display:grid;grid-template-columns:2.4em 1fr;gap:12px;padding:12px 16px;background:var(--paper);border:1px solid var(--ink);font:500 15px/1.55 var(--f-body);color:var(--ink)}
+.rules-col li::before{font-family:var(--f-hand);font-weight:700;font-size:24px;line-height:1;align-self:center;text-align:center;letter-spacing:.02em}
+.rules-col.do li::before{content:"yes!";color:var(--orange)}
+.rules-col.dont li::before{content:"no.";color:var(--ink);opacity:.5;font-size:20px}
+
+/* Templates */
+.templates-wrap{border-top:2px dashed var(--ink);background:color-mix(in srgb,var(--yellow) 25%,var(--paper))}
+.templates-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+@media(max-width:1100px){.templates-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.templates-grid{grid-template-columns:1fr}}
+.tmpl{background:var(--paper);border:1px solid var(--ink);box-shadow:var(--note-shadow);overflow:hidden;transition:transform .2s cubic-bezier(.16,1,.3,1)}
+.tmpl:hover{transform:translateY(-3px) rotate(-.5deg)}
+.tmpl-thumb{width:100%;aspect-ratio:16/9;overflow:hidden;position:relative;background:var(--paper);border-bottom:1px dashed var(--ink-fade)}
+.tmpl-thumb .scale-wrap{width:1920px;height:1080px;transform-origin:top left}
+.tmpl-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 18px}
+.tmpl-foot .name{color:var(--ink);font:400 22px/1 var(--f-disp);letter-spacing:.005em}
+.tmpl-foot .idx{font-family:var(--f-hand);font-size:22px;font-weight:700;color:var(--orange);letter-spacing:.02em;transform:rotate(-2deg)}
+
+/* Endcap */
+footer.endcap{padding:96px var(--pad-x) 56px;background:var(--blue);color:var(--ink);border-top:2px dashed var(--ink);display:grid;grid-template-columns:1fr auto;gap:48px;align-items:end}
+footer.endcap .endmark{font:400 clamp(60px,13vw,220px)/.88 var(--f-disp);letter-spacing:.005em;margin:0;color:var(--ink)}
+footer.endcap .endmark em{font-style:normal;color:var(--orange);font-family:var(--f-hand);font-weight:700;display:inline-block;transform:rotate(-3deg);letter-spacing:.02em}
+footer.endcap .meta{font-family:var(--f-hand);font-size:24px;font-weight:700;text-align:right;color:var(--ink);line-height:1.6;letter-spacing:.02em}
+footer.endcap .meta b{color:var(--ink);font:400 20px/1 var(--f-disp);letter-spacing:.005em}
+</style>
+
+<!-- TEMPLATE STYLES -->
+<style id="template-css">
+__TEMPLATE_CSS__
+</style>
+</head>
+<body>
+
+<canvas id="design-bg"></canvas>
+<div id="bg-veil"></div>
+
+<div class="rail">
+  <div class="brand"><span class="notes"><span></span><span></span><span></span></span><b>__NAME__</b></div>
+  <nav><a href="#palette">palette</a><a href="#type">type</a><a href="#surface">surface</a><a href="#motion">motion</a><a href="#background">background</a><a href="#guidelines">rules</a><a href="#templates">notes</a></nav>
+  <div class="meta">— workshop, 2026</div>
+</div>
+
+<header class="cover" data-screen-label="00 Cover">
+  <div class="cover-deco d1">ok!</div>
+  <div class="cover-deco d2">yes!</div>
+  <div class="cover-chrome">
+    <div>Design System · &#8470; 024</div>
+    <div class="accent">— a brainstorm</div>
+  </div>
+  <h1 class="cover-headline">scatter<em>brain</em>.</h1>
+  <div class="cover-hand">— a deck for thinking out loud —</div>
+  <div class="cover-foot">
+    <div class="cell"><span class="k">Discipline</span><span class="v plain">Workshop · Brainstorm · Ideation</span></div>
+    <div class="cell"><span class="k">Display</span><span class="v hand">Shrikhand</span></div>
+    <div class="cell"><span class="k">Hand</span><span class="v hand">__ACCENT_LABEL__</span></div>
+    <div class="cell"><span class="k">Volume</span><span class="v plain">07 sections · __SLIDE_COUNT__ frames</span></div>
+  </div>
+</header>
+
+<section class="manifesto" data-screen-label="00 Manifesto">
+  <div class="manifesto-grid">
+    <div class="num">— manifesto</div>
+    <p>thinking is <em>messy</em>. notes are <strong>tilted</strong>. nothing is finished — that's the <em>point</em>.</p>
+  </div>
+</section>
+
+<section id="palette" data-screen-label="01 Palette">
+  <div class="section-head">
+    <div class="num">i — palette</div>
+    <h2>Four <em>sticky</em><br/>colours.</h2>
+    <p class="lede">__PALETTE_LEDE__</p>
+  </div>
+  <div class="palette">
+    <div class="swatch swatch--yellow"><div class="role">yellow note</div><div><div class="name">__PRIMARY_NAME__</div><div class="hex">__PRIMARY__</div><div class="usage">Headlines and starting points.</div></div></div>
+    <div class="swatch swatch--pink"><div class="role">pink note</div><div><div class="name">__SECONDARY_NAME__</div><div class="hex">__SECONDARY__</div><div class="usage">Warm thoughts, problems.</div></div></div>
+    <div class="swatch swatch--blue"><div class="role">blue note</div><div><div class="name">__TERTIARY_NAME__</div><div class="hex">__TERTIARY__</div><div class="usage">Cool thoughts, decisions.</div></div></div>
+    <div class="swatch swatch--green"><div class="role">green note</div><div><div class="name">__ACCENT_NAME__</div><div class="hex">__ACCENT__</div><div class="usage">Outcomes, agreements.</div></div></div>
+  </div>
+</section>
+
+<section id="type" data-screen-label="02 Type">
+  <div class="section-head">
+    <div class="num">ii — type</div>
+    <h2>Shrikhand, <em>Zilla,</em><br/>a hand.</h2>
+    <p class="lede">Shrikhand carries every display headline — its chunky display serif holds attention. Zilla Slab handles body in 500. Caveat is the hand — every note gets a handwritten label.</p>
+  </div>
+  <div class="specimen">
+    <div class="spec-row"><div class="meta"><span>Display</span><b>Shrikhand 400</b><span>10vw · upright</span></div><div class="spec-display">scatter <em>idea!</em></div></div>
+    <div class="spec-row"><div class="meta"><span>H1</span><b>Shrikhand 400</b><span>7vw · orange</span></div><div class="spec-h1">chapter one</div></div>
+    <div class="spec-row"><div class="meta"><span>H2</span><b>Zilla Slab 600</b><span>4vw · slab body</span></div><div class="spec-h2">a subheading sets the section.</div></div>
+    <div class="spec-row"><div class="meta"><span>Hand</span><b>Caveat 700</b><span>5vw · tilted · ink</span></div><div class="spec-hand">— a margin note —</div></div>
+    <div class="spec-row"><div class="meta"><span>Lead</span><b>Zilla Slab 600</b><span>2vw</span></div><div class="spec-lead">The lead carries the brief like a marker on a wall.</div></div>
+    <div class="spec-row"><div class="meta"><span>Body</span><b>Zilla Slab 500</b><span>16px · 60ch</span></div><p class="spec-body">Pack my box with five dozen liquor jugs. Body type stays at 500 weight slab. The slab anchors the playful display — think strategy notebook, not magazine.</p></div>
+    <div class="spec-row"><div class="meta"><span>Label</span><b>JetBrains Mono 500</b><span>12px · sticky</span></div><div><span class="spec-label">// LABEL · STICKY</span></div></div>
+  </div>
+</section>
+
+<section id="surface" data-screen-label="03 Surface">
+  <div class="section-head">
+    <div class="num">iii — surface</div>
+    <h2>Tilted,<br/>but <em>readable.</em></h2>
+    <p class="lede">Every card tilts ±1.5°. 1px ink border, 6px offset shadow (no blur). The handwritten label sits at a different angle to the card.</p>
+  </div>
+  <div class="surface-grid">
+    <div class="demo-card">
+      <span class="tag">— a sticky note —</span>
+      <h3>example.</h3>
+      <p>1px ink border. 6px offset shadow. ±1.5° tilt. The handwritten note tilts the other way. Suns, arrows, and exclamations are allowed in the margin.</p>
+      <div class="num-stat">+42%</div>
+      <div class="hand-note">— ooh nice!</div>
+    </div>
+    <ul class="tokens">
+      <li><span class="name">Corners</span><span class="val">__CORNER_RADIUS__</span><span class="bar" style="width:18px"></span></li>
+      <li><span class="name">Padding</span><span class="val">__PADDING__</span><span class="bar" style="width:36px"></span></li>
+      <li><span class="name">Gap</span><span class="val">__GAP__</span><span class="bar" style="width:24px"></span></li>
+      <li><span class="name">Elevation</span><span class="val">__ELEVATION__</span><span class="bar" style="width:36px"></span></li>
+      <li><span class="name">Density</span><span class="val">__DENSITY__</span><span class="bar" style="width:24px"></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="motion" data-screen-label="04 Motion">
+  <div class="section-head">
+    <div class="num">iv — motion</div>
+    <h2>__EASING_HEADLINE__</h2>
+    <p class="lede">__EASING_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="panel">
+      <span class="label-row">— easing —</span>
+      <h4>__EASING_NAME__</h4>
+      <p>__EASING_DESC__</p>
+      <pre>__EASING_VALUE__</pre>
+    </div>
+    <div class="panel">
+      <span class="label-row">— duration —</span>
+      <h4>__DURATION_DEFAULT__</h4>
+      <p>__DURATION_DESC__</p>
+      <pre>__DURATION_VALUES__</pre>
+    </div>
+  </div>
+</section>
+
+<section id="background" data-screen-label="05 Background">
+  <div class="section-head">
+    <div class="num">v — background</div>
+    <h2>__BG_HEADLINE__</h2>
+    <p class="lede">__BG_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="bg-preview"><canvas id="bg-preview-canvas"></canvas><span class="badge">— __BG_BADGE__ —</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <ul class="tokens" style="border-top:none">
+        <li><span class="name">Geometry</span><span class="val">__BG_TYPE__</span><span class="bar" style="width:36px"></span></li>
+        <li><span class="name">Density</span><span class="val">__BG_DENSITY__</span><span class="bar" style="width:42px"></span></li>
+        <li><span class="name">Speed</span><span class="val">__BG_SPEED__</span><span class="bar" style="width:18px;opacity:.7"></span></li>
+        <li><span class="name">Strength</span><span class="val">__BG_STRENGTH__</span><span class="bar" style="width:52px"></span></li>
+        <li><span class="name">Grain</span><span class="val">__BG_GRAIN__</span><span class="bar" style="width:24px"></span></li>
+      </ul>
+      <details class="code-block"><summary>— shader config (json) —</summary>
+<pre>__SHADER_CONFIG__</pre>
+      </details>
+      <details class="code-block"><summary>— vertex shader (glsl) —</summary>
+<pre id="vtx-src">__SHADER_VERTEX__</pre>
+      </details>
+      <details class="code-block"><summary>— fragment shader (glsl) —</summary>
+<pre id="frg-src">__SHADER_FRAGMENT__</pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="guidelines" data-screen-label="06 Guidelines">
+  <div class="section-head">
+    <div class="num">vi — guidelines</div>
+    <h2>yes!<br/><em>no.</em></h2>
+    <p class="lede">A short list. The board tidies the moment any of these slip.</p>
+  </div>
+  <div class="rules-grid">
+    <div class="rules-col do"><h3>yes!</h3><ul>__DOS__</ul></div>
+    <div class="rules-col dont"><h3>no.</h3><ul>__DONTS__</ul></div>
+  </div>
+</section>
+
+<section id="templates" class="templates-wrap" data-screen-label="07 Templates">
+  <div class="section-head">
+    <div class="num">vii — templates</div>
+    <h2>__SLIDE_COUNT_WORD__<br/><em>workshops.</em></h2>
+    <p class="lede">The full library at 1920&#215;1080. Each thumbnail is the live slide, scaled.</p>
+  </div>
+  <div class="templates-grid" id="templates-grid"></div>
+</section>
+
+<template id="tmpl-source">
+__SLIDE_CARDS__
+</template>
+
+<footer class="endcap" data-screen-label="08 End">
+  <h2 class="endmark">thanks <em>everyone!</em></h2>
+  <div class="meta">
+    <div><b>__NAME__</b></div>
+    <div>Shrikhand · Zilla Slab · Caveat</div>
+    <div>__DATE__</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.getElementById('templates-grid').appendChild(document.getElementById('tmpl-source').content.cloneNode(true));
+  function rescale(){document.querySelectorAll('.tmpl-thumb').forEach(t=>{const w=t.querySelector('.scale-wrap');if(w)w.style.transform='scale('+(t.clientWidth/1920)+')'})}
+  addEventListener('load',rescale);addEventListener('resize',rescale);requestAnimationFrame(rescale);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(rescale);
+})();
+</script>
+
+__SHADER_SCRIPT__
+
+</body>
+</html>

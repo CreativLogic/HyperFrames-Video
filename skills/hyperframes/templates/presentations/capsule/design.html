@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__NAME__ — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500__FONT_LINK_EXTRA__&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"}}
+</script>
+
+<style id="ds-tokens">
+:root{
+  --primary:__PRIMARY__; --secondary:__SECONDARY__; --tertiary:__TERTIARY__; --accent:__ACCENT__;
+  --bone:var(--primary); --ink:var(--secondary);
+  --mint:var(--tertiary); --blush:var(--accent); --lemon:#F2E388; --lilac:#D6C8F2;
+  --ink-dim:color-mix(in srgb,var(--ink) 65%,var(--bone));
+  --ink-fade:color-mix(in srgb,var(--ink) 32%,var(--bone));
+  --hairline:color-mix(in srgb,var(--ink) 14%,transparent);
+  --f-disp:"Outfit",sans-serif;
+  --f-body:"DM Sans",sans-serif;
+  --f-mono:"JetBrains Mono",monospace;
+  --pad-x:clamp(28px,5vw,80px); --pad-y:clamp(48px,7vh,120px);
+}
+</style>
+
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bone)}
+body{color:var(--ink);font:500 14px/1.65 var(--f-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+::selection{background:var(--blush);color:var(--ink)}
+
+#design-bg{position:fixed;inset:0;width:100%;height:100%;z-index:-2;opacity:.55;pointer-events:none}
+#bg-veil{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 30% 20%,transparent 0%,var(--bone) 75%)}
+
+.rail{position:fixed;top:16px;left:16px;right:16px;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:var(--bone);border-radius:999px;border:1px solid var(--hairline);z-index:100;font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim)}
+.rail .brand{display:inline-flex;align-items:center;gap:12px;color:var(--ink)}
+.rail .brand b{font-family:var(--f-disp);font-weight:800;letter-spacing:-.005em;text-transform:none;font-size:22px;color:var(--ink)}
+.rail .brand .pills{display:inline-flex;gap:3px}
+.rail .brand .pills span{width:18px;height:8px;border-radius:999px}
+.rail .brand .pills span:nth-child(1){background:var(--blush)}
+.rail .brand .pills span:nth-child(2){background:var(--mint)}
+.rail .brand .pills span:nth-child(3){background:var(--lemon)}
+.rail nav{display:flex;gap:18px}
+.rail nav a{color:var(--ink-dim);text-decoration:none;padding:6px 12px;border-radius:999px;transition:all .15s}
+.rail nav a:hover{background:var(--blush);color:var(--ink)}
+.rail .meta{font:600 11px/1 var(--f-mono);letter-spacing:.14em;padding:6px 14px;background:var(--mint);border-radius:999px;color:var(--ink)}
+@media(max-width:760px){.rail nav{display:none}}
+
+section{position:relative;padding:var(--pad-y) var(--pad-x)}
+.section-head{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:end;border-top:1px solid var(--hairline);padding-top:32px;margin-bottom:clamp(40px,6vh,72px)}
+.section-head .num{display:inline-block;font:600 11px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink);padding:8px 16px;background:var(--lemon);border-radius:999px;justify-self:start}
+.section-head h2{margin:0;font:800 clamp(56px,9vw,128px)/.92 var(--f-disp);letter-spacing:-.02em;color:var(--ink)}
+.section-head h2 em{font-style:normal;background:var(--blush);padding:0 .15em;border-radius:.25em;display:inline-block;line-height:.92}
+.section-head .lede{grid-column:2;max-width:54ch;margin-top:18px;font:500 15px/1.7 var(--f-body);color:var(--ink-dim)}
+
+/* Cover */
+.cover{min-height:100vh;padding:96px var(--pad-x) 56px;display:grid;grid-template-rows:auto 1fr auto;position:relative;overflow:hidden}
+.cover-chrome{display:flex;justify-content:space-between;font:600 11px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-top:48px}
+.cover-chrome .accent{padding:6px 14px;background:var(--blush);border-radius:999px;color:var(--ink)}
+.cover-headline{align-self:center;margin:0;font:900 clamp(96px,21vw,360px)/.85 var(--f-disp);letter-spacing:-.04em;color:var(--ink);text-align:center}
+.cover-headline em{font-style:normal;background:var(--blush);padding:0 .12em;border-radius:.5em;display:inline-block;line-height:.85;color:var(--ink)}
+.cover-pill{align-self:center;font:600 14px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink);background:var(--mint);padding:14px 28px;border-radius:999px;align-self:center;justify-self:center;margin-top:24px;text-align:center;display:inline-block;width:fit-content;margin-left:auto;margin-right:auto}
+.cover-foot{margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.cover-foot .cell{padding:18px 22px;border-radius:24px;display:flex;flex-direction:column;gap:6px}
+.cover-foot .cell:nth-child(1){background:var(--blush)}
+.cover-foot .cell:nth-child(2){background:var(--mint)}
+.cover-foot .cell:nth-child(3){background:var(--lemon)}
+.cover-foot .cell:nth-child(4){background:var(--lilac)}
+.cover-foot .k{font:600 10px/1.4 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink);opacity:.7}
+.cover-foot .v{font:800 22px/1.15 var(--f-disp);letter-spacing:-.005em;color:var(--ink)}
+.cover-foot .v.plain{font-family:var(--f-body);font-weight:600;font-size:14px;letter-spacing:0}
+@media(max-width:760px){.cover-foot{grid-template-columns:1fr 1fr}}
+
+/* Manifesto */
+.manifesto{padding:clamp(60px,9vh,120px) var(--pad-x);background:var(--blush);color:var(--ink);position:relative}
+.manifesto-grid{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:start}
+.manifesto-grid .num{font:600 11px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink);padding:8px 16px;background:var(--bone);border-radius:999px;align-self:flex-start;justify-self:start}
+.manifesto p{font:900 clamp(36px,5.5vw,84px)/1 var(--f-disp);max-width:22ch;margin:0;color:var(--ink);letter-spacing:-.02em}
+.manifesto p em{font-style:normal;background:var(--ink);color:var(--blush);padding:0 .12em;border-radius:.25em;display:inline-block;line-height:1}
+
+/* Palette */
+.palette{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:880px){.palette{grid-template-columns:repeat(2,1fr)}}
+.swatch{aspect-ratio:3/4;padding:24px;display:flex;flex-direction:column;justify-content:space-between;border-radius:32px;position:relative;overflow:hidden;transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.swatch:hover{transform:translateY(-6px)}
+.swatch .role{font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;padding:4px 12px;background:var(--bone);color:var(--ink);border-radius:999px;align-self:flex-start}
+.swatch .name{font:800 clamp(20px,2.2vw,32px)/.95 var(--f-disp);letter-spacing:-.015em;margin-top:auto;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swatch .hex{font:600 13px/1 var(--f-mono);margin-top:8px;color:var(--ink)}
+.swatch .usage{font:500 13px/1.5 var(--f-body);margin-top:6px;color:var(--ink);opacity:.75}
+.swatch--primary{background:var(--bone);border:1px solid var(--hairline)}
+.swatch--secondary{background:var(--ink)}
+.swatch--secondary .role{background:var(--bone);color:var(--ink)}
+.swatch--secondary .name,.swatch--secondary .hex,.swatch--secondary .usage{color:var(--bone)}
+.swatch--tertiary{background:var(--mint)}
+.swatch--accent{background:var(--blush)}
+
+/* Type specimen */
+.specimen{display:flex;flex-direction:column;gap:16px}
+.spec-row{display:grid;grid-template-columns:13em 1fr;gap:32px;padding:28px 32px;background:var(--bone);border:1px solid var(--hairline);border-radius:32px;align-items:baseline}
+.spec-row .meta{font:600 11px/1.5 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);display:flex;flex-direction:column;gap:6px}
+.spec-row .meta b{color:var(--ink);font-weight:700}
+.spec-display{font:900 clamp(56px,10vw,148px)/.92 var(--f-disp);letter-spacing:-.025em;color:var(--ink)}
+.spec-display em{font-style:normal;background:var(--blush);padding:0 .12em;border-radius:.25em;display:inline-block;line-height:.92}
+.spec-h1{font:800 clamp(40px,7vw,108px)/.95 var(--f-disp);letter-spacing:-.02em;color:var(--ink)}
+.spec-h2{font:700 clamp(28px,4.2vw,64px)/1 var(--f-disp);letter-spacing:-.015em;color:var(--ink)}
+.spec-lead{font:600 clamp(18px,2vw,28px)/1.45 var(--f-body);color:var(--ink);max-width:38ch}
+.spec-body{font:500 16px/1.7 var(--f-body);color:var(--ink);max-width:60ch}
+.spec-label{font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);background:var(--mint);padding:6px 14px;border-radius:999px;display:inline-block}
+
+/* Surface */
+.surface-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:24px}
+@media(max-width:880px){.surface-grid{grid-template-columns:1fr}}
+.demo-card{background:var(--bone);color:var(--ink);padding:32px;display:flex;flex-direction:column;gap:18px;border-radius:32px;border:1px solid var(--hairline);position:relative}
+.demo-card .tag{align-self:flex-start;font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);background:var(--lemon);padding:8px 14px;border-radius:999px}
+.demo-card h3{margin:0;font:800 44px/.95 var(--f-disp);letter-spacing:-.02em}
+.demo-card p{margin:0;font:500 15px/1.7 var(--f-body);color:var(--ink-dim)}
+.demo-card .num-stat{font:900 96px/.95 var(--f-disp);color:var(--ink);letter-spacing:-.025em}
+.demo-card .num-stat em{font-style:normal;background:var(--blush);padding:0 .12em;border-radius:.2em;display:inline-block;line-height:.95}
+.demo-card .pill-row{display:flex;flex-wrap:wrap;gap:8px}
+.demo-card .pill{padding:6px 14px;border-radius:999px;background:var(--mint);font:600 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase}
+.demo-card .pill:nth-child(2){background:var(--lilac)}
+.demo-card .pill:nth-child(3){background:var(--lemon)}
+.tokens{list-style:none;padding:14px;margin:0;background:var(--bone);border:1px solid var(--hairline);border-radius:32px;display:flex;flex-direction:column;gap:6px}
+.tokens li{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:12px 14px;background:var(--bone);border-radius:18px}
+.tokens li:nth-child(odd){background:color-mix(in srgb,var(--mint) 30%,var(--bone))}
+.tokens .name{font:600 12px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+.tokens .val{font:800 22px/1 var(--f-disp);letter-spacing:-.005em;color:var(--ink)}
+.tokens .bar{height:8px;background:var(--blush);border-radius:999px}
+
+/* Motion */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:880px){.two-col{grid-template-columns:1fr}}
+.panel{background:var(--bone);border:1px solid var(--hairline);border-radius:32px;padding:32px;display:flex;flex-direction:column;gap:18px}
+.panel:first-child{background:color-mix(in srgb,var(--lilac) 40%,var(--bone))}
+.panel:last-child{background:color-mix(in srgb,var(--mint) 35%,var(--bone))}
+.panel .label-row{font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);padding:6px 14px;background:var(--bone);border-radius:999px;align-self:flex-start}
+.panel h4{margin:0;font:800 36px/1 var(--f-disp);letter-spacing:-.015em;color:var(--ink)}
+.panel h4 em{font-style:normal;background:var(--blush);padding:0 .15em;border-radius:.2em;display:inline-block;line-height:1}
+.panel p{margin:0;font:500 14px/1.7 var(--f-body);color:var(--ink);max-width:38ch}
+.panel pre{margin:0;padding:14px 18px;border-radius:18px;background:var(--bone);font:500 12px/1.6 var(--f-mono);color:var(--ink);overflow-x:auto}
+
+/* Background */
+.bg-preview{border:1px solid var(--hairline);border-radius:32px;aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--bone)}
+.bg-preview canvas{width:100%;height:100%;display:block}
+.bg-preview .badge{position:absolute;bottom:12px;left:12px;font:600 10px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;background:color-mix(in srgb,var(--bone) 75%,transparent);padding:6px 14px;border-radius:999px;backdrop-filter:blur(8px);color:var(--ink)}
+
+details.code-block{border:1px solid var(--hairline);border-radius:24px;background:color-mix(in srgb,var(--bone) 60%,transparent);margin-top:12px;overflow:hidden}
+details.code-block summary{cursor:pointer;padding:14px 18px;list-style:none;font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);display:flex;justify-content:space-between}
+details.code-block summary::-webkit-details-marker{display:none}
+details.code-block summary::after{content:"+";font:800 18px/1 var(--f-disp);color:var(--ink)}
+details.code-block[open] summary::after{content:"\2212"}
+details.code-block pre{margin:0;padding:16px 18px;border-top:1px solid var(--hairline);font:500 11px/1.6 var(--f-mono);color:var(--ink-dim);background:transparent;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto}
+
+/* Guidelines */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:880px){.rules-grid{grid-template-columns:1fr}}
+.rules-col{padding:32px;border-radius:32px}
+.rules-col.do{background:var(--mint)}
+.rules-col.dont{background:var(--blush)}
+.rules-col h3{font:900 64px/1 var(--f-disp);margin:0 0 20px;letter-spacing:-.025em;color:var(--ink)}
+.rules-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rules-col li{display:grid;grid-template-columns:2em 1fr;gap:12px;padding:12px 16px;background:var(--bone);border-radius:18px;font:500 15px/1.5 var(--f-body);color:var(--ink)}
+.rules-col li::before{font:800 18px/1 var(--f-disp);align-self:center;text-align:center;letter-spacing:0}
+.rules-col.do li::before{content:"+";color:var(--ink)}
+.rules-col.dont li::before{content:"\00d7";color:var(--ink);opacity:.5}
+
+/* Templates */
+.templates-wrap{border-top:1px solid var(--hairline);background:color-mix(in srgb,var(--lilac) 16%,var(--bone))}
+.templates-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media(max-width:1100px){.templates-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.templates-grid{grid-template-columns:1fr}}
+.tmpl{background:var(--bone);border:1px solid var(--hairline);border-radius:24px;overflow:hidden;transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.tmpl:hover{transform:translateY(-3px)}
+.tmpl-thumb{width:100%;aspect-ratio:16/9;overflow:hidden;position:relative;background:var(--bone)}
+.tmpl-thumb .scale-wrap{width:1920px;height:1080px;transform-origin:top left}
+.tmpl-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid var(--hairline)}
+.tmpl-foot .name{color:var(--ink);font:800 18px/1 var(--f-disp);letter-spacing:-.005em}
+.tmpl-foot .idx{color:var(--ink);background:var(--blush);padding:4px 10px;border-radius:999px;font:600 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase}
+
+/* Endcap */
+footer.endcap{padding:96px var(--pad-x) 56px;background:var(--ink);color:var(--bone);display:grid;grid-template-columns:1fr auto;gap:48px;align-items:end}
+footer.endcap .endmark{font:900 clamp(60px,14vw,240px)/.85 var(--f-disp);letter-spacing:-.04em;margin:0;color:var(--bone)}
+footer.endcap .endmark em{font-style:normal;background:var(--blush);color:var(--ink);padding:0 .12em;border-radius:.2em;display:inline-block;line-height:.85}
+footer.endcap .meta{font:600 11px/2 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb,var(--bone) 65%,transparent);text-align:right}
+footer.endcap .meta b{color:var(--mint);font-family:var(--f-disp);font-weight:800;letter-spacing:-.005em;text-transform:none;font-size:14px}
+</style>
+
+<!-- TEMPLATE STYLES -->
+<style id="template-css">
+__TEMPLATE_CSS__
+</style>
+</head>
+<body>
+
+<canvas id="design-bg"></canvas>
+<div id="bg-veil"></div>
+
+<div class="rail">
+  <div class="brand"><span class="pills"><span></span><span></span><span></span></span><b>__NAME__</b></div>
+  <nav><a href="#palette">01</a><a href="#type">02</a><a href="#surface">03</a><a href="#motion">04</a><a href="#background">05</a><a href="#guidelines">06</a><a href="#templates">07</a></nav>
+  <div class="meta">v 1.0 · 2026</div>
+</div>
+
+<header class="cover" data-screen-label="00 Cover">
+  <div class="cover-chrome">
+    <div>Design System · &#8470; 018</div>
+    <div class="accent">__ACCENT_LABEL__</div>
+  </div>
+  <h1 class="cover-headline">Cap<em>sule</em>.</h1>
+  <div class="cover-pill">&#8594; __ACCENT_LABEL__</div>
+  <div class="cover-foot">
+    <div class="cell"><span class="k">Discipline</span><span class="v plain">Lifestyle · DTC · Creator</span></div>
+    <div class="cell"><span class="k">Display</span><span class="v">Outfit 900</span></div>
+    <div class="cell"><span class="k">Vibe</span><span class="v">__ACCENT_LABEL__</span></div>
+    <div class="cell"><span class="k">Volume</span><span class="v plain">07 sections · __SLIDE_COUNT__ frames</span></div>
+  </div>
+</header>
+
+<section class="manifesto" data-screen-label="00 Manifesto">
+  <div class="manifesto-grid">
+    <div class="num">manifesto</div>
+    <p>the page is <em>modular</em>. every element is a <em>capsule</em>. corners are <em>round</em>; nothing is sharp.</p>
+  </div>
+</section>
+
+<section id="palette" data-screen-label="01 Palette">
+  <div class="section-head">
+    <span class="num">01 / palette</span>
+    <h2>Bone, ink,<br/>and a <em>pastel pop.</em></h2>
+    <p class="lede">__PALETTE_LEDE__</p>
+  </div>
+  <div class="palette">
+    <div class="swatch swatch--primary"><div class="role">01 · Primary</div><div><div class="name">__PRIMARY_NAME__</div><div class="hex">__PRIMARY__</div><div class="usage">Warm canvas. Default surface.</div></div></div>
+    <div class="swatch swatch--secondary"><div class="role">02 · Secondary</div><div><div class="name">__SECONDARY_NAME__</div><div class="hex">__SECONDARY__</div><div class="usage">Type and the closing frame.</div></div></div>
+    <div class="swatch swatch--tertiary"><div class="role">03 · Tertiary</div><div><div class="name">__TERTIARY_NAME__</div><div class="hex">__TERTIARY__</div><div class="usage">Calm capsule. Stat fills.</div></div></div>
+    <div class="swatch swatch--accent"><div class="role">04 · Accent</div><div><div class="name">__ACCENT_NAME__</div><div class="hex">__ACCENT__</div><div class="usage">Warm capsule. Manifesto fill.</div></div></div>
+  </div>
+</section>
+
+<section id="type" data-screen-label="02 Type">
+  <div class="section-head">
+    <span class="num">02 / type</span>
+    <h2>Outfit, <em>chunky.</em></h2>
+    <p class="lede">Outfit at 800–900 carries every headline. DM Sans handles body in 500. JetBrains Mono runs the pill labels. No third face.</p>
+  </div>
+  <div class="specimen">
+    <div class="spec-row"><div class="meta"><span>Display</span><b>Outfit 900</b><span>11vw · −0.035em</span></div><div class="spec-display">Hello <em>world</em>.</div></div>
+    <div class="spec-row"><div class="meta"><span>H1</span><b>Outfit 800</b><span>7.5vw</span></div><div class="spec-h1">Chapter One</div></div>
+    <div class="spec-row"><div class="meta"><span>H2</span><b>Outfit 700</b><span>4.2vw</span></div><div class="spec-h2">Slide headlines.</div></div>
+    <div class="spec-row"><div class="meta"><span>Lead</span><b>DM Sans 600</b><span>2vw</span></div><div class="spec-lead">The lead carries the brief like a soft, modular intro.</div></div>
+    <div class="spec-row"><div class="meta"><span>Body</span><b>DM Sans 500</b><span>16px · 60ch</span></div><p class="spec-body">Pack my box with five dozen liquor jugs. Body type stays at 500 weight. Below 24px is forbidden in 1080p compositions. Never bold; the colour does the lifting.</p></div>
+    <div class="spec-row"><div class="meta"><span>Label</span><b>JetBrains Mono 600</b><span>12px · pill</span></div><div><span class="spec-label">// label · capsule · pill</span></div></div>
+  </div>
+</section>
+
+<section id="surface" data-screen-label="03 Surface">
+  <div class="section-head">
+    <span class="num">03 / surface</span>
+    <h2>Round corners,<br/><em>every time.</em></h2>
+    <p class="lede">Cards take 32px corners. Pills take 999px corners. Tags and labels are always pills. No hard edges anywhere.</p>
+  </div>
+  <div class="surface-grid">
+    <div class="demo-card">
+      <span class="tag">&#8594; capsule · card</span>
+      <h3>Example.</h3>
+      <p>32px rounded corners. Pill labels. Pastel fills used at module scale, never at letter scale. One pastel per card.</p>
+      <div class="num-stat">+<em>42</em>%</div>
+      <div class="pill-row"><span class="pill">&#8594; mint</span><span class="pill">&#8594; lilac</span><span class="pill">&#8594; lemon</span></div>
+    </div>
+    <ul class="tokens">
+      <li><span class="name">Corners</span><span class="val">__CORNER_RADIUS__</span><span class="bar" style="width:44px"></span></li>
+      <li><span class="name">Padding</span><span class="val">__PADDING__</span><span class="bar" style="width:36px"></span></li>
+      <li><span class="name">Gap</span><span class="val">__GAP__</span><span class="bar" style="width:28px"></span></li>
+      <li><span class="name">Elevation</span><span class="val">__ELEVATION__</span><span class="bar" style="width:0;opacity:.2"></span></li>
+      <li><span class="name">Density</span><span class="val">__DENSITY__</span><span class="bar" style="width:48px"></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="motion" data-screen-label="04 Motion">
+  <div class="section-head">
+    <span class="num">04 / motion</span>
+    <h2>__EASING_HEADLINE__</h2>
+    <p class="lede">__EASING_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="panel">
+      <span class="label-row">&#8594; easing</span>
+      <h4>__EASING_NAME__</h4>
+      <p>__EASING_DESC__</p>
+      <pre>__EASING_VALUE__</pre>
+    </div>
+    <div class="panel">
+      <span class="label-row">&#8594; duration</span>
+      <h4>__DURATION_DEFAULT__</h4>
+      <p>__DURATION_DESC__</p>
+      <pre>__DURATION_VALUES__</pre>
+    </div>
+  </div>
+</section>
+
+<section id="background" data-screen-label="05 Background">
+  <div class="section-head">
+    <span class="num">05 / background</span>
+    <h2>__BG_HEADLINE__</h2>
+    <p class="lede">__BG_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="bg-preview"><canvas id="bg-preview-canvas"></canvas><span class="badge">// __BG_BADGE__</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <ul class="tokens" style="border-top:none">
+        <li><span class="name">Geometry</span><span class="val">__BG_TYPE__</span><span class="bar" style="width:36px"></span></li>
+        <li><span class="name">Density</span><span class="val">__BG_DENSITY__</span><span class="bar" style="width:42px"></span></li>
+        <li><span class="name">Speed</span><span class="val">__BG_SPEED__</span><span class="bar" style="width:18px;opacity:.7"></span></li>
+        <li><span class="name">Strength</span><span class="val">__BG_STRENGTH__</span><span class="bar" style="width:52px"></span></li>
+        <li><span class="name">Grain</span><span class="val">__BG_GRAIN__</span><span class="bar" style="width:24px"></span></li>
+      </ul>
+      <details class="code-block"><summary>// shader config (json)</summary>
+<pre>__SHADER_CONFIG__</pre>
+      </details>
+      <details class="code-block"><summary>// vertex shader (glsl)</summary>
+<pre id="vtx-src">__SHADER_VERTEX__</pre>
+      </details>
+      <details class="code-block"><summary>// fragment shader (glsl)</summary>
+<pre id="frg-src">__SHADER_FRAGMENT__</pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="guidelines" data-screen-label="06 Guidelines">
+  <div class="section-head">
+    <span class="num">06 / rules</span>
+    <h2>Yes.<br/><em>No.</em></h2>
+    <p class="lede">The capsule cracks the moment any of these slip.</p>
+  </div>
+  <div class="rules-grid">
+    <div class="rules-col do"><h3>Yes.</h3><ul>__DOS__</ul></div>
+    <div class="rules-col dont"><h3>No.</h3><ul>__DONTS__</ul></div>
+  </div>
+</section>
+
+<section id="templates" class="templates-wrap" data-screen-label="07 Templates">
+  <div class="section-head">
+    <span class="num">07 / templates</span>
+    <h2>__SLIDE_COUNT_WORD__<br/><em>capsules.</em></h2>
+    <p class="lede">The full library at 1920&#215;1080. Each thumbnail is the live slide, scaled.</p>
+  </div>
+  <div class="templates-grid" id="templates-grid"></div>
+</section>
+
+<template id="tmpl-source">
+__SLIDE_CARDS__
+</template>
+
+<footer class="endcap" data-screen-label="08 End">
+  <h2 class="endmark">&#8594; <em>that's a wrap.</em></h2>
+  <div class="meta">
+    <div><b>__NAME__</b> · v 1.0</div>
+    <div>Outfit / DM Sans</div>
+    <div>__DATE__</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.getElementById('templates-grid').appendChild(document.getElementById('tmpl-source').content.cloneNode(true));
+  function rescale(){document.querySelectorAll('.tmpl-thumb').forEach(t=>{const w=t.querySelector('.scale-wrap');if(w)w.style.transform='scale('+(t.clientWidth/1920)+')'})}
+  addEventListener('load',rescale);addEventListener('resize',rescale);requestAnimationFrame(rescale);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(rescale);
+})();
+</script>
+
+__SHADER_SCRIPT__
+
+</body>
+</html>

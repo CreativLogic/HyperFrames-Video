@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__NAME__ — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600__FONT_LINK_EXTRA__&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"}}
+</script>
+
+<style id="ds-tokens">
+:root{
+  --primary:__PRIMARY__; --secondary:__SECONDARY__; --tertiary:__TERTIARY__; --accent:__ACCENT__;
+  --cream:var(--primary); --ink:var(--secondary);
+  --red:#E25C58; --blue:#2880A3; --yellow:#E8B842; --pink:#E89BC3;
+  --ink-dim:color-mix(in srgb,var(--ink) 65%,var(--cream));
+  --hairline:color-mix(in srgb,var(--ink) 20%,transparent);
+  --f-disp:"Oswald",sans-serif;
+  --f-body:"Noto Sans",sans-serif;
+  --f-jp:"Noto Sans JP",sans-serif;
+  --f-mono:"JetBrains Mono",monospace;
+  --pad-x:clamp(28px,5vw,80px); --pad-y:clamp(48px,7vh,120px);
+}
+</style>
+
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--cream)}
+body{color:var(--ink);font:400 14px/1.6 var(--f-body);overflow-x:hidden}
+::selection{background:var(--red);color:var(--cream)}
+
+#design-bg{position:fixed;inset:0;width:100%;height:100%;z-index:-2;opacity:.45;pointer-events:none}
+#bg-veil{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 40% 30%,transparent 0%,var(--cream) 75%)}
+
+/* Halftone overlay */
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle,rgba(28,22,18,0.05) 1px,transparent 1px);background-size:4px 4px}
+
+/* Diagonal rainbow ribbons across cover/manifesto */
+.ribbons{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.ribbons .ribbon{position:absolute;left:-20%;width:140%;height:48px;transform:rotate(-12deg)}
+.ribbons .ribbon.r1{top:14%;background:var(--red)}
+.ribbons .ribbon.r2{top:calc(14% + 48px);background:var(--yellow)}
+.ribbons .ribbon.r3{top:calc(14% + 96px);background:var(--blue)}
+.ribbons .ribbon.r4{top:calc(14% + 144px);background:var(--pink)}
+
+.rail{position:fixed;top:0;left:0;right:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 var(--pad-x);background:var(--ink);color:var(--cream);z-index:100;font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase}
+.rail .brand{display:inline-flex;align-items:center;gap:12px;color:var(--red)}
+.rail .brand b{font-family:var(--f-disp);font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:22px;color:var(--cream)}
+.rail .brand .ribbon-mark{display:inline-flex;gap:2px}
+.rail .brand .ribbon-mark span{width:4px;height:18px;transform:skewX(-12deg)}
+.rail .brand .ribbon-mark span:nth-child(1){background:var(--red)}
+.rail .brand .ribbon-mark span:nth-child(2){background:var(--yellow)}
+.rail .brand .ribbon-mark span:nth-child(3){background:var(--blue)}
+.rail .brand .ribbon-mark span:nth-child(4){background:var(--pink)}
+.rail nav{display:flex;gap:18px;font-family:var(--f-mono)}
+.rail nav a{color:color-mix(in srgb,var(--cream) 70%,transparent);text-decoration:none;transition:color .15s}
+.rail nav a:hover{color:var(--cream)}
+.rail .meta{font-family:var(--f-jp);font-weight:500;font-size:13px;letter-spacing:.08em;color:var(--yellow)}
+@media(max-width:760px){.rail nav{display:none}}
+
+section{position:relative;padding:var(--pad-y) var(--pad-x)}
+.section-head{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:end;border-top:2px solid var(--ink);padding-top:32px;margin-bottom:clamp(40px,6vh,72px)}
+.section-head .num{display:inline-flex;gap:6px;align-items:center;font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);align-self:flex-start}
+.section-head .num::before{content:"□";color:var(--red);font-size:18px;line-height:1}
+.section-head h2{margin:0;font:700 clamp(56px,9vw,128px)/.92 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--ink)}
+.section-head h2 em{font-style:normal;color:var(--cream);background:var(--red);padding:0 .04em;display:inline-block;line-height:.92}
+.section-head .lede{grid-column:2;max-width:54ch;margin-top:18px;font:500 15px/1.65 var(--f-body);color:var(--ink)}
+
+/* Cover */
+.cover{min-height:100vh;padding:96px var(--pad-x) 56px;display:grid;grid-template-rows:auto 1fr auto;position:relative;overflow:hidden;background:var(--cream)}
+.cover .ribbons{z-index:0}
+.cover>*{position:relative;z-index:1}
+.cover-chrome{display:flex;justify-content:space-between;font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);background:var(--cream);padding:8px 12px;border:2px solid var(--ink);align-self:flex-start;width:fit-content}
+.cover-chrome .right{margin-left:auto;color:var(--red)}
+.cover-chrome-wrap{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+.cover-headline{align-self:end;margin:0;font:700 clamp(72px,15vw,260px)/.88 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--ink);background:var(--cream);padding:24px 36px 24px;border:3px solid var(--ink);max-width:min(100%,1300px)}
+.cover-headline em{font-style:normal;color:var(--red)}
+.cover-jp{font-family:var(--f-jp);font-weight:500;font-size:24px;color:var(--ink);background:var(--cream);padding:8px 16px;border:2px solid var(--ink);align-self:flex-start;letter-spacing:.04em;width:fit-content;margin-top:-12px}
+.cover-foot{margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:3px solid var(--ink);background:var(--cream)}
+.cover-foot .cell{padding:18px 22px;border-right:2px solid var(--ink);display:flex;flex-direction:column;gap:6px;background:var(--cream)}
+.cover-foot .cell:last-child{border-right:0}
+.cover-foot .k{font:600 11px/1.4 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--blue)}
+.cover-foot .k::before{content:"☑ ";color:var(--red)}
+.cover-foot .v{font:700 18px/1.2 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--ink)}
+.cover-foot .v.jp{font-family:var(--f-jp);font-size:14px;letter-spacing:.04em;text-transform:none;font-weight:500}
+@media(max-width:760px){.cover-foot{grid-template-columns:1fr 1fr}}
+
+/* Manifesto */
+.manifesto{padding:clamp(60px,9vh,120px) var(--pad-x);background:var(--ink);color:var(--cream);position:relative;overflow:hidden;border-top:6px solid var(--red);border-bottom:6px solid var(--blue)}
+.manifesto-grid{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:start;position:relative;z-index:1}
+.manifesto-grid .num{font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--yellow)}
+.manifesto p{font:700 clamp(28px,4.5vw,64px)/1.05 var(--f-disp);max-width:22ch;margin:0;color:var(--cream);text-transform:uppercase;letter-spacing:.005em}
+.manifesto p em{font-style:normal;background:var(--red);color:var(--cream);padding:0 .06em;display:inline-block;line-height:1.05}
+.manifesto p strong{font-style:normal;font-weight:700;color:var(--yellow)}
+
+/* Palette */
+.palette{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:880px){.palette{grid-template-columns:repeat(2,1fr)}}
+.swatch{aspect-ratio:3/4;padding:0;display:flex;flex-direction:column;border:3px solid var(--ink);position:relative;overflow:hidden}
+.swatch .role{padding:6px 12px;background:var(--ink);color:var(--cream);font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.swatch .role::after{content:"☑";color:var(--yellow);font-size:14px;line-height:1}
+.swatch .fill{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
+.swatch .name{font:700 clamp(20px,2.2vw,32px)/.92 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;margin-top:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swatch .hex{font:600 13px/1 var(--f-mono);margin-top:8px}
+.swatch .usage{font:500 12px/1.5 var(--f-body);margin-top:6px;opacity:.85}
+.swatch--cream .fill{background:var(--cream);color:var(--ink)}
+.swatch--ink .fill{background:var(--ink);color:var(--cream)}
+.swatch--red .fill{background:var(--red);color:var(--cream)}
+.swatch--blue .fill{background:var(--blue);color:var(--cream)}
+
+/* Type specimen */
+.specimen{display:flex;flex-direction:column;border:3px solid var(--ink);background:var(--cream)}
+.spec-row{display:grid;grid-template-columns:13em 1fr;gap:32px;padding:28px 32px;border-bottom:2px solid var(--ink);align-items:baseline}
+.spec-row:last-child{border:0}
+.spec-row .meta{font:600 11px/1.5 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);display:flex;flex-direction:column;gap:6px}
+.spec-row .meta b{color:var(--red);font-weight:700}
+.spec-display{font:700 clamp(56px,10vw,148px)/.92 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--ink)}
+.spec-display em{font-style:normal;background:var(--red);color:var(--cream);padding:0 .04em;display:inline-block;line-height:.92}
+.spec-h1{font:700 clamp(40px,7vw,108px)/.92 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--blue)}
+.spec-h2{font:700 clamp(28px,4.2vw,64px)/1 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--ink)}
+.spec-jp{font-family:var(--f-jp);font-weight:700;font-size:clamp(32px,5vw,72px);line-height:1.1;color:var(--ink);letter-spacing:.04em}
+.spec-lead{font:600 clamp(18px,2vw,28px)/1.45 var(--f-body);color:var(--ink);max-width:38ch}
+.spec-body{font:500 16px/1.65 var(--f-body);color:var(--ink);max-width:60ch}
+.spec-label{font:600 13px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cream);background:var(--ink);padding:6px 12px;display:inline-block}
+
+/* Surface */
+.surface-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:32px}
+@media(max-width:880px){.surface-grid{grid-template-columns:1fr}}
+.demo-card{background:var(--cream);color:var(--ink);padding:0;display:flex;flex-direction:column;border:3px solid var(--ink);position:relative;overflow:hidden}
+.demo-card .strip{height:24px;background:repeating-linear-gradient(-12deg,var(--red) 0 12px,var(--yellow) 12px 24px,var(--blue) 24px 36px,var(--pink) 36px 48px)}
+.demo-card-body{padding:24px 28px;display:flex;flex-direction:column;gap:14px}
+.demo-card .tag{align-self:flex-start;font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cream);background:var(--ink);padding:6px 12px}
+.demo-card h3{margin:0;font:700 36px/1 var(--f-disp);letter-spacing:.005em;text-transform:uppercase}
+.demo-card p{margin:0;font:500 14px/1.65 var(--f-body)}
+.demo-card .specs{display:flex;flex-direction:column;gap:6px;padding-top:14px;border-top:2px solid var(--ink);font:500 13px/1.5 var(--f-mono);letter-spacing:.04em}
+.demo-card .specs span::before{content:"☑ ";color:var(--red)}
+.demo-card .num-stat{font:700 80px/.95 var(--f-disp);color:var(--red);letter-spacing:.005em}
+.tokens{list-style:none;padding:0;margin:0;border:3px solid var(--ink);background:var(--cream)}
+.tokens li{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:14px 22px;border-bottom:2px solid var(--ink)}
+.tokens li:last-child{border:0}
+.tokens .name{font:600 12px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+.tokens .name::before{content:"☑ ";color:var(--red)}
+.tokens .val{font:700 20px/1 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--blue)}
+.tokens .bar{height:8px;background:repeating-linear-gradient(90deg,var(--red) 0 8px,var(--yellow) 8px 16px,var(--blue) 16px 24px);border:1px solid var(--ink)}
+
+/* Motion */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+@media(max-width:880px){.two-col{grid-template-columns:1fr}}
+.panel{background:var(--cream);border:3px solid var(--ink);padding:0;display:flex;flex-direction:column;overflow:hidden}
+.panel .header{padding:8px 16px;background:var(--ink);color:var(--cream);font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.panel .header::after{content:"REC ●";color:var(--red)}
+.panel-body{padding:24px 28px;display:flex;flex-direction:column;gap:16px}
+.panel h4{margin:0;font:700 32px/1 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;color:var(--ink)}
+.panel h4 em{font-style:normal;background:var(--red);color:var(--cream);padding:0 .06em;display:inline-block;line-height:1}
+.panel p{margin:0;font:500 14px/1.65 var(--f-body);color:var(--ink);max-width:38ch}
+.panel pre{margin:0;padding:14px;border:2px solid var(--ink);background:var(--cream);font:500 12px/1.6 var(--f-mono);color:var(--ink);overflow-x:auto}
+
+/* Background preview */
+.bg-preview{border:3px solid var(--ink);aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--cream)}
+.bg-preview canvas{width:100%;height:100%;display:block}
+.bg-preview .badge{position:absolute;bottom:0;left:0;right:0;font:600 10px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;background:var(--ink);padding:8px 14px;color:var(--yellow)}
+
+details.code-block{border:3px solid var(--ink);background:var(--cream);margin-top:12px;overflow:hidden}
+details.code-block summary{cursor:pointer;padding:10px 16px;list-style:none;font:600 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cream);background:var(--ink);display:flex;justify-content:space-between;align-items:center}
+details.code-block summary::-webkit-details-marker{display:none}
+details.code-block summary::after{content:"+";font:700 18px/1 var(--f-disp);color:var(--red)}
+details.code-block[open] summary::after{content:"\2212"}
+details.code-block pre{margin:0;padding:14px;border-top:2px solid var(--ink);font:500 12px/1.6 var(--f-mono);color:var(--ink);background:var(--cream);overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto}
+
+/* Guidelines */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+@media(max-width:880px){.rules-grid{grid-template-columns:1fr}}
+.rules-col{border:3px solid var(--ink);background:var(--cream);overflow:hidden}
+.rules-col .header{padding:8px 16px;font:600 12px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cream)}
+.rules-col.do .header{background:var(--blue)}
+.rules-col.dont .header{background:var(--red)}
+.rules-col-body{padding:24px 28px}
+.rules-col h3{font:700 48px/1 var(--f-disp);margin:0 0 18px;letter-spacing:.005em;text-transform:uppercase;color:var(--ink)}
+.rules-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rules-col li{display:grid;grid-template-columns:1.8em 1fr;gap:10px;padding:12px 14px;background:var(--cream);border:2px solid var(--ink);font:500 14px/1.5 var(--f-body);color:var(--ink)}
+.rules-col li::before{font:700 18px/1 var(--f-disp);align-self:center;text-align:center}
+.rules-col.do li::before{content:"☑";color:var(--blue)}
+.rules-col.dont li::before{content:"☒";color:var(--red)}
+
+/* Templates */
+.templates-wrap{border-top:6px solid var(--ink);background:var(--ink)}
+.templates-wrap .section-head{border-top-color:var(--cream);color:var(--cream)}
+.templates-wrap .section-head .num{color:var(--yellow)}
+.templates-wrap .section-head h2{color:var(--cream)}
+.templates-wrap .section-head .lede{color:color-mix(in srgb,var(--cream) 75%,transparent)}
+.templates-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+@media(max-width:1100px){.templates-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.templates-grid{grid-template-columns:1fr}}
+.tmpl{background:var(--cream);border:3px solid var(--cream);overflow:hidden;transition:transform .15s}
+.tmpl:hover{transform:translateY(-2px)}
+.tmpl-thumb{width:100%;aspect-ratio:16/9;overflow:hidden;position:relative;background:var(--cream);border-bottom:3px solid var(--ink)}
+.tmpl-thumb .scale-wrap{width:1920px;height:1080px;transform-origin:top left}
+.tmpl-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;background:var(--cream)}
+.tmpl-foot .name{color:var(--ink);font-family:var(--f-disp);font-weight:700;font-size:18px;letter-spacing:.005em;text-transform:uppercase}
+.tmpl-foot .idx{color:var(--cream);background:var(--red);padding:4px 10px}
+
+/* Endcap */
+footer.endcap{padding:96px var(--pad-x) 56px;background:var(--cream);position:relative;overflow:hidden;border-top:6px solid var(--red)}
+footer.endcap .ribbons .ribbon.r1{background:var(--blue);top:30%}
+footer.endcap .ribbons .ribbon.r2{background:var(--yellow);top:calc(30% + 48px)}
+footer.endcap .ribbons .ribbon.r3{background:var(--red);top:calc(30% + 96px)}
+footer.endcap .ribbons .ribbon.r4{background:var(--pink);top:calc(30% + 144px)}
+footer.endcap .grid{display:grid;grid-template-columns:1fr auto;gap:48px;align-items:end;position:relative;z-index:1}
+footer.endcap .endmark{font:700 clamp(60px,14vw,240px)/.88 var(--f-disp);letter-spacing:.005em;text-transform:uppercase;margin:0;color:var(--ink);background:var(--cream);padding:20px 28px;border:3px solid var(--ink);display:inline-block;width:fit-content}
+footer.endcap .endmark em{font-style:normal;color:var(--red)}
+footer.endcap .meta{font:600 12px/2 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);text-align:right;background:var(--cream);padding:14px 18px;border:2px solid var(--ink)}
+footer.endcap .meta b{color:var(--red)}
+</style>
+
+<style id="template-css">
+__TEMPLATE_CSS__
+</style>
+</head>
+<body>
+
+<canvas id="design-bg"></canvas>
+<div id="bg-veil"></div>
+
+<div class="rail">
+  <div class="brand"><span class="ribbon-mark"><span></span><span></span><span></span><span></span></span><b>__NAME__</b></div>
+  <nav><a href="#palette">01</a><a href="#type">02</a><a href="#surface">03</a><a href="#motion">04</a><a href="#background">05</a><a href="#guidelines">06</a><a href="#templates">07</a></nav>
+  <div class="meta">サクラ・クロマ</div>
+</div>
+
+<header class="cover" data-screen-label="00 Cover">
+  <div class="ribbons"><div class="ribbon r1"></div><div class="ribbon r2"></div><div class="ribbon r3"></div><div class="ribbon r4"></div></div>
+  <div class="cover-chrome-wrap">
+    <div class="cover-chrome">☑ Design System / № 013</div>
+    <div class="cover-chrome"><span class="right">★ MMXXVI</span></div>
+  </div>
+  <h1 class="cover-headline">__NAME__<em>.</em></h1>
+  <div class="cover-jp">桜・色彩 — a system in four ribbons</div>
+  <div class="cover-foot">
+    <div class="cell"><span class="k">CATEGORY</span><span class="v">Catalogue · Hardware · Music</span></div>
+    <div class="cell"><span class="k">DISPLAY</span><span class="v">Oswald 700</span></div>
+    <div class="cell"><span class="k">SIGNAL</span><span class="v">__ACCENT_LABEL__</span></div>
+    <div class="cell"><span class="k">VOLUME</span><span class="v jp">07 sections · __SLIDE_COUNT__ frames</span></div>
+  </div>
+</header>
+
+<section class="manifesto" data-screen-label="00 Manifesto">
+  <div class="manifesto-grid">
+    <div class="num">☑ MANIFESTO</div>
+    <p>the deck is a <em>product page</em>. each slide is a <strong>catalogue entry</strong>. ribbons are not decoration — they are <em>category</em>.</p>
+  </div>
+</section>
+
+<section id="palette" data-screen-label="01 Palette">
+  <div class="section-head">
+    <span class="num">01 — Palette</span>
+    <h2>Cream, ink,<br/>and <em>four ribbons.</em></h2>
+    <p class="lede">__PALETTE_LEDE__</p>
+  </div>
+  <div class="palette">
+    <div class="swatch swatch--cream"><div class="role"><span>01 // PAPER</span></div><div class="fill"><div class="name">__PRIMARY_NAME__</div><div class="hex">__PRIMARY__</div><div class="usage">Catalogue paper.</div></div></div>
+    <div class="swatch swatch--ink"><div class="role"><span>02 // INK</span></div><div class="fill"><div class="name">__SECONDARY_NAME__</div><div class="hex">__SECONDARY__</div><div class="usage">Headlines, borders, lines.</div></div></div>
+    <div class="swatch swatch--red"><div class="role"><span>03 // RED</span></div><div class="fill"><div class="name">__ACCENT_NAME__</div><div class="hex">__ACCENT__</div><div class="usage">Primary ribbon. Headlines, alerts.</div></div></div>
+    <div class="swatch swatch--blue"><div class="role"><span>04 // BLUE</span></div><div class="fill"><div class="name">__TERTIARY_NAME__</div><div class="hex">__TERTIARY__</div><div class="usage">Secondary ribbon. Subheads.</div></div></div>
+  </div>
+</section>
+
+<section id="type" data-screen-label="02 Type">
+  <div class="section-head">
+    <span class="num">02 — Type</span>
+    <h2>Oswald,<br/>condensed and <em>bold.</em></h2>
+    <p class="lede">Oswald 700 stamps every headline. Noto Sans handles the body in 500 weight. Noto Sans JP carries the bilingual moments. JetBrains Mono for technical labels.</p>
+  </div>
+  <div class="specimen">
+    <div class="spec-row"><div class="meta"><span>Display</span><b>Oswald 700</b><span>10vw · UPPERCASE</span></div><div class="spec-display">CHROMA <em>04</em>.</div></div>
+    <div class="spec-row"><div class="meta"><span>H1</span><b>Oswald 700</b><span>7vw · blue</span></div><div class="spec-h1">CHAPTER ONE</div></div>
+    <div class="spec-row"><div class="meta"><span>H2</span><b>Oswald 700</b><span>4.2vw</span></div><div class="spec-h2">SLIDE HEADLINES.</div></div>
+    <div class="spec-row"><div class="meta"><span>JP</span><b>Noto Sans JP 700</b><span>5vw</span></div><div class="spec-jp">桜・色彩。</div></div>
+    <div class="spec-row"><div class="meta"><span>Lead</span><b>Noto Sans 600</b><span>2vw</span></div><div class="spec-lead">The lead carries the brief like a back-cover blurb on a cassette.</div></div>
+    <div class="spec-row"><div class="meta"><span>Body</span><b>Noto Sans 500</b><span>16px · 60ch</span></div><p class="spec-body">Pack my box with five dozen liquor jugs. Body type stays at 500 weight. Below 24px is forbidden in 1080p compositions. The page reads as a JIS-spec sheet — every fact has a checkbox.</p></div>
+    <div class="spec-row"><div class="meta"><span>Label</span><b>JetBrains Mono 600</b><span>13px · cream on ink</span></div><div class="spec-label">☑ CATALOG · LABEL · TYPE-IV</div></div>
+  </div>
+</section>
+
+<section id="surface" data-screen-label="03 Surface">
+  <div class="section-head">
+    <span class="num">03 — Surface</span>
+    <h2>Cards as<br/><em>cassette cases.</em></h2>
+    <p class="lede">Every card opens with a diagonal-ribbon strip on top. Then a 3px ink border, 0 radius, JIS-spec checkboxes beneath the headline.</p>
+  </div>
+  <div class="surface-grid">
+    <div class="demo-card">
+      <div class="strip"></div>
+      <div class="demo-card-body">
+        <span class="tag">☑ TYPE-IV · METAL</span>
+        <h3>EXAMPLE CARD.</h3>
+        <p>Each card opens with a diagonal-ribbon header strip. Bevels are forbidden; the page is print. The accent always lives in the strip — never below it.</p>
+        <div class="num-stat">+42%</div>
+        <div class="specs">
+          <span>STOCK : <b>120 GSM CREAM</b></span>
+          <span>INK : <b>2-PLATE OFFSET</b></span>
+          <span>BORDER : <b>3 PX SOLID</b></span>
+        </div>
+      </div>
+    </div>
+    <ul class="tokens">
+      <li><span class="name">Corners</span><span class="val">__CORNER_RADIUS__</span><span class="bar" style="width:6px"></span></li>
+      <li><span class="name">Padding</span><span class="val">__PADDING__</span><span class="bar" style="width:36px"></span></li>
+      <li><span class="name">Gap</span><span class="val">__GAP__</span><span class="bar" style="width:30px"></span></li>
+      <li><span class="name">Elevation</span><span class="val">__ELEVATION__</span><span class="bar" style="width:0;opacity:.2"></span></li>
+      <li><span class="name">Density</span><span class="val">__DENSITY__</span><span class="bar" style="width:48px"></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="motion" data-screen-label="04 Motion">
+  <div class="section-head">
+    <span class="num">04 — Motion</span>
+    <h2>__EASING_HEADLINE__</h2>
+    <p class="lede">__EASING_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="panel">
+      <div class="header">EASING.dll</div>
+      <div class="panel-body">
+        <h4>__EASING_NAME__</h4>
+        <p>__EASING_DESC__</p>
+        <pre>__EASING_VALUE__</pre>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="header">DURATION.dll</div>
+      <div class="panel-body">
+        <h4>__DURATION_DEFAULT__</h4>
+        <p>__DURATION_DESC__</p>
+        <pre>__DURATION_VALUES__</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- V. BACKGROUND -->
+<section id="background" data-screen-label="05 Background">
+  <div class="section-head">
+    <span class="num">05 — Background</span>
+    <h2>__BG_HEADLINE__</h2>
+    <p class="lede">__BG_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="bg-preview"><canvas id="bg-preview-canvas"></canvas><span class="badge">☑ __BG_BADGE__</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <ul class="tokens" style="border-top:none">
+        <li><span class="name">Geometry</span><span class="val">__BG_TYPE__</span><span class="bar" style="width:36px"></span></li>
+        <li><span class="name">Density</span><span class="val">__BG_DENSITY__</span><span class="bar" style="width:42px"></span></li>
+        <li><span class="name">Speed</span><span class="val">__BG_SPEED__</span><span class="bar" style="width:18px;opacity:.7"></span></li>
+        <li><span class="name">Strength</span><span class="val">__BG_STRENGTH__</span><span class="bar" style="width:52px"></span></li>
+        <li><span class="name">Grain</span><span class="val">__BG_GRAIN__</span><span class="bar" style="width:24px"></span></li>
+      </ul>
+      <details class="code-block"><summary>☑ SHADER CONFIG (JSON)</summary>
+<pre>__SHADER_CONFIG__</pre>
+      </details>
+      <details class="code-block"><summary>☑ VERTEX SHADER (GLSL)</summary>
+<pre id="vtx-src">__SHADER_VERTEX__</pre>
+      </details>
+      <details class="code-block"><summary>☑ FRAGMENT SHADER (GLSL)</summary>
+<pre id="frg-src">__SHADER_FRAGMENT__</pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="guidelines" data-screen-label="06 Guidelines">
+  <div class="section-head">
+    <span class="num">06 — Rules</span>
+    <h2>Allowed.<br/><em>Forbidden.</em></h2>
+    <p class="lede">The catalogue stays in print the moment any of these slip.</p>
+  </div>
+  <div class="rules-grid">
+    <div class="rules-col do">
+      <div class="header">☑ ALLOWED</div>
+      <div class="rules-col-body">
+        <h3>YES.</h3>
+        <ul>__DOS__</ul>
+      </div>
+    </div>
+    <div class="rules-col dont">
+      <div class="header">☒ FORBIDDEN</div>
+      <div class="rules-col-body">
+        <h3>NO.</h3>
+        <ul>__DONTS__</ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="templates" class="templates-wrap" data-screen-label="07 Templates">
+  <div class="section-head">
+    <span class="num">07 — Templates</span>
+    <h2>__SLIDE_COUNT_WORD__<br/><em>cassette frames.</em></h2>
+    <p class="lede">The full library at 1920×1080. Each thumbnail is the live slide, scaled.</p>
+  </div>
+  <div class="templates-grid" id="templates-grid"></div>
+</section>
+
+<template id="tmpl-source">
+__SLIDE_CARDS__
+</template>
+
+<footer class="endcap" data-screen-label="08 End">
+  <div class="ribbons"><div class="ribbon r1"></div><div class="ribbon r2"></div><div class="ribbon r3"></div><div class="ribbon r4"></div></div>
+  <div class="grid">
+    <h2 class="endmark">END <em>SIDE B.</em></h2>
+    <div class="meta">
+      <div><b>__NAME__</b> · 桜・色彩 v 1.0</div>
+      <div>Oswald / Noto Sans / Noto Sans JP</div>
+      <div>Pressed __DATE__</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.getElementById('templates-grid').appendChild(document.getElementById('tmpl-source').content.cloneNode(true));
+  function rescale(){document.querySelectorAll('.tmpl-thumb').forEach(t=>{const w=t.querySelector('.scale-wrap');if(w)w.style.transform='scale('+(t.clientWidth/1920)+')'})}
+  addEventListener('load',rescale);addEventListener('resize',rescale);requestAnimationFrame(rescale);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(rescale);
+})();
+</script>
+
+__SHADER_SCRIPT__
+
+</body>
+</html>

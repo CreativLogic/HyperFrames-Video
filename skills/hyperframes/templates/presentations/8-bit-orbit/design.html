@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__NAME__ — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Silkscreen:wght@400;700__FONT_LINK_EXTRA__&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"}}
+</script>
+
+<style id="ds-tokens">
+/* 8-BIT ORBIT TOKENS — CRT arcade palette. */
+:root{
+  --primary:__PRIMARY__; --secondary:__SECONDARY__; --tertiary:__TERTIARY__; --accent:__ACCENT__;
+  --void:#06091A; --hud:var(--secondary);
+  --cyan:#4ADDE5; --magenta:#FF52A2; --lemon:#FFE74A; --lime:#7CFF6B;
+  --ink:var(--primary);
+  --ink-dim:color-mix(in srgb,var(--primary) 55%,var(--secondary));
+  --ink-fade:color-mix(in srgb,var(--primary) 28%,var(--secondary));
+  --grid:color-mix(in srgb,var(--secondary) 93%,var(--tertiary));
+  --hairline:color-mix(in srgb,var(--primary) 12%,transparent);
+
+  --f-disp:"Press Start 2P",monospace;
+  --f-body:"VT323",monospace;
+  --f-label:"Silkscreen",monospace;
+
+  --glow-pink:0 0 4px #FF52A2,0 0 12px rgba(255,82,162,.7),0 0 24px rgba(255,82,162,.4);
+  --glow-cyan:0 0 4px #4ADDE5,0 0 12px rgba(74,221,229,.7),0 0 24px rgba(74,221,229,.4);
+  --glow-lemon:0 0 4px #FFE74A,0 0 12px rgba(255,231,74,.6);
+
+  --pad-x:clamp(24px,5vw,80px);
+  --pad-y:clamp(48px,7vh,120px);
+}
+</style>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;image-rendering:pixelated}
+html,body{margin:0;padding:0;background:var(--void)}
+body{color:var(--ink);font:400 18px/1.45 var(--f-body);overflow-x:hidden}
+::selection{background:var(--magenta);color:var(--ink)}
+
+/* CRT scanlines overlay */
+body::before{
+  content:"";position:fixed;inset:0;z-index:200;pointer-events:none;
+  background:repeating-linear-gradient(180deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0,0,0,0.25) 3px,
+    rgba(0,0,0,0.25) 4px);
+  mix-blend-mode:multiply;
+}
+/* Faint CRT glow vignette */
+body::after{
+  content:"";position:fixed;inset:0;z-index:201;pointer-events:none;
+  background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
+}
+
+/* Pixel grid background, fixed */
+.bg-grid{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(74,221,229,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(74,221,229,0.04) 1px,transparent 1px);
+  background-size:32px 32px;
+  background-position:0 0;
+}
+
+#design-bg{position:fixed;inset:0;width:100%;height:100%;z-index:-2;opacity:.35;pointer-events:none}
+
+/* Top HUD rail */
+.hud{
+  position:fixed;top:0;left:0;right:0;height:48px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 var(--pad-x);
+  background:var(--secondary);
+  border-bottom:2px solid var(--cyan);
+  box-shadow:0 0 0 1px var(--secondary),0 2px 0 var(--magenta),0 0 24px rgba(74,221,229,0.2);
+  z-index:100;
+  font:400 12px/1 var(--f-disp);
+  letter-spacing:.04em;
+  color:var(--cyan);
+  text-shadow:0 0 6px rgba(74,221,229,0.7);
+}
+.hud .brand{display:inline-flex;align-items:center;gap:14px}
+.hud .brand .pix{width:14px;height:14px;background:var(--magenta);box-shadow:0 -4px 0 var(--magenta),4px 0 0 var(--magenta),-4px 0 0 var(--magenta),0 4px 0 var(--magenta),0 0 12px rgba(255,82,162,0.6)}
+.hud nav{display:flex;gap:18px;font:400 10px/1 var(--f-disp)}
+.hud nav a{color:var(--ink-dim);text-decoration:none;transition:color .1s}
+.hud nav a:hover{color:var(--magenta);text-shadow:0 0 6px rgba(255,82,162,0.7)}
+.hud .right{display:flex;align-items:center;gap:14px;font:400 10px/1 var(--f-disp)}
+.hud .right .live{color:var(--lime);text-shadow:0 0 6px rgba(124,255,107,0.6)}
+.hud .right .live::before{content:"●";margin-right:6px;animation:blink 1.4s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media(max-width:760px){.hud nav{display:none}}
+
+/* Sections */
+section{position:relative;padding:var(--pad-y) var(--pad-x)}
+.section-head{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:end;border-top:2px solid var(--grid);padding-top:32px;margin-bottom:clamp(40px,6vh,72px)}
+.section-head .num{
+  font:400 11px/1 var(--f-disp);
+  color:var(--magenta);
+  text-shadow:var(--glow-pink);
+  letter-spacing:.04em;
+}
+.section-head h2{
+  font:400 clamp(40px,6.5vw,92px)/1 var(--f-disp);
+  letter-spacing:.01em;
+  margin:0;
+  color:var(--ink);
+  text-shadow:4px 4px 0 var(--magenta),8px 8px 0 var(--secondary);
+}
+.section-head h2 .cyan{color:var(--cyan);text-shadow:4px 4px 0 var(--secondary)}
+.section-head .lede{grid-column:2;max-width:54ch;margin-top:18px;font:400 22px/1.5 var(--f-body);color:var(--ink-dim)}
+
+/* Cover */
+.cover{min-height:100vh;padding:80px var(--pad-x) 48px;display:grid;grid-template-rows:auto 1fr auto;position:relative;overflow:hidden}
+.cover-chrome{display:flex;justify-content:space-between;align-items:flex-start;font:400 10px/1 var(--f-disp);color:var(--cyan)}
+.cover-chrome .blink{color:var(--magenta);animation:blink 1.2s steps(2) infinite}
+
+.cover-headline{
+  align-self:center;
+  margin:0;
+  font:400 clamp(72px,15vw,240px)/.9 var(--f-disp);
+  letter-spacing:.01em;
+  color:var(--ink);
+  text-shadow:
+    6px 6px 0 var(--magenta),
+    12px 12px 0 var(--cyan),
+    0 0 32px rgba(74,221,229,0.3);
+}
+.cover-headline .cyan{color:var(--cyan);text-shadow:6px 6px 0 var(--magenta),0 0 32px rgba(255,82,162,0.4)}
+.cover-headline .magenta{color:var(--magenta);text-shadow:6px 6px 0 var(--cyan),0 0 32px rgba(255,82,162,0.4)}
+
+.press-start{
+  margin-top:32px;
+  text-align:center;
+  font:400 14px/1.6 var(--f-disp);
+  color:var(--lemon);
+  text-shadow:var(--glow-lemon);
+  letter-spacing:.04em;
+  animation:blink 1.4s steps(2) infinite
+}
+
+.cover-foot{margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:2px solid var(--cyan);box-shadow:0 0 0 1px var(--secondary),4px 4px 0 var(--magenta)}
+.cover-foot .cell{padding:18px 22px;border-right:1px solid var(--hairline);display:flex;flex-direction:column;gap:6px;background:var(--hud)}
+.cover-foot .cell:last-child{border-right:0}
+.cover-foot .k{font:400 9px/1 var(--f-disp);letter-spacing:.04em;color:var(--magenta);text-shadow:0 0 4px rgba(255,82,162,0.6)}
+.cover-foot .v{font:400 22px/1.2 var(--f-body);color:var(--cyan);text-shadow:var(--glow-cyan)}
+.cover-foot .v.big{font:400 14px/1 var(--f-disp);letter-spacing:.04em;color:var(--lemon)}
+@media(max-width:760px){.cover-foot{grid-template-columns:1fr 1fr}.cover-foot .cell:nth-child(2){border-right:0}.cover-foot .cell:nth-child(-n+2){border-bottom:1px solid var(--hairline)}}
+
+/* Manifesto */
+.manifesto{padding:clamp(60px,9vh,120px) var(--pad-x);border-top:2px solid var(--grid);border-bottom:2px solid var(--grid);background:var(--hud)}
+.manifesto-grid{display:grid;grid-template-columns:11em 1fr;gap:clamp(24px,4vw,56px);align-items:start}
+.manifesto-grid .num{font:400 11px/1 var(--f-disp);color:var(--magenta);text-shadow:var(--glow-pink);letter-spacing:.04em}
+.manifesto p{font:400 clamp(28px,4vw,48px)/1.2 var(--f-disp);max-width:22ch;margin:0;color:var(--ink);letter-spacing:.01em;line-height:1.3}
+.manifesto p em{font-style:normal;color:var(--cyan);text-shadow:var(--glow-cyan)}
+.manifesto p strong{font-weight:400;color:var(--magenta);text-shadow:var(--glow-pink)}
+
+/* Palette */
+.palette{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:880px){.palette{grid-template-columns:repeat(2,1fr)}}
+.swatch{aspect-ratio:3/4;padding:0;display:flex;flex-direction:column;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--secondary),12px 12px 0 var(--magenta);position:relative;transition:transform .1s steps(2)}
+.swatch:hover{transform:translate(-3px,-3px)}
+.swatch .role-bar{padding:8px 14px;font:400 9px/1 var(--f-disp);letter-spacing:.04em;border-bottom:3px solid var(--ink);display:flex;justify-content:space-between;align-items:center}
+.swatch .role-bar .x{width:10px;height:10px;background:currentColor;box-shadow:0 -3px 0 currentColor,3px 0 0 currentColor,-3px 0 0 currentColor,0 3px 0 currentColor}
+.swatch .fill{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
+.swatch .name{font:400 28px/1 var(--f-disp);letter-spacing:.01em;margin-top:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swatch .hex{font:400 22px/1 var(--f-body);margin-top:14px}
+.swatch .usage{font:400 18px/1.4 var(--f-body);margin-top:6px;opacity:.85}
+.swatch--paper{background:var(--ink);color:var(--secondary)}
+.swatch--paper .role-bar{background:var(--secondary);color:var(--cyan)}
+.swatch--void{background:var(--secondary);color:var(--ink)}
+.swatch--void .role-bar{background:var(--ink);color:var(--secondary)}
+.swatch--cyan{background:var(--cyan);color:var(--secondary)}
+.swatch--cyan .role-bar{background:var(--secondary);color:var(--cyan);text-shadow:var(--glow-cyan)}
+.swatch--magenta{background:var(--magenta);color:var(--secondary)}
+.swatch--magenta .role-bar{background:var(--secondary);color:var(--magenta);text-shadow:var(--glow-pink)}
+
+/* Type specimen */
+.specimen{display:flex;flex-direction:column;border:2px solid var(--cyan);background:var(--hud)}
+.spec-row{display:grid;grid-template-columns:14em 1fr;gap:32px;padding:32px 36px;border-bottom:1px solid var(--grid);align-items:baseline}
+.spec-row:last-child{border:0}
+.spec-row .meta{font:400 10px/1.5 var(--f-disp);color:var(--cyan);letter-spacing:.04em;display:flex;flex-direction:column;gap:8px}
+.spec-row .meta b{color:var(--magenta);font-weight:400;text-shadow:var(--glow-pink)}
+.spec-display{font:400 clamp(48px,9vw,128px)/.95 var(--f-disp);letter-spacing:.01em;color:var(--ink);text-shadow:4px 4px 0 var(--magenta)}
+.spec-h1{font:400 clamp(32px,6vw,72px)/1 var(--f-disp);letter-spacing:.01em;color:var(--cyan);text-shadow:var(--glow-cyan)}
+.spec-h2{font:400 clamp(24px,4vw,48px)/1.1 var(--f-disp);color:var(--ink)}
+.spec-lead{font:400 clamp(22px,2.2vw,32px)/1.4 var(--f-body);color:var(--ink)}
+.spec-body{font:400 22px/1.5 var(--f-body);color:var(--ink);max-width:60ch}
+.spec-label{font:400 12px/1 var(--f-disp);letter-spacing:.04em;color:var(--lemon);text-shadow:var(--glow-lemon)}
+
+/* Surface */
+.surface-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:32px}
+@media(max-width:880px){.surface-grid{grid-template-columns:1fr}}
+.demo-card{background:var(--secondary);color:var(--ink);border:3px solid var(--cyan);box-shadow:6px 6px 0 var(--magenta);padding:28px 32px;display:flex;flex-direction:column;gap:18px;position:relative}
+.demo-card::before{content:"";position:absolute;top:8px;left:8px;right:8px;bottom:8px;border:1px solid var(--cyan);opacity:.3;pointer-events:none}
+.demo-card .card-label{align-self:flex-start;font:400 10px/1 var(--f-disp);color:var(--magenta);background:var(--secondary);padding:6px 10px;border:2px solid var(--magenta);box-shadow:3px 3px 0 var(--cyan);text-shadow:var(--glow-pink);letter-spacing:.04em}
+.demo-card h3{margin:0;font:400 28px/1.1 var(--f-disp);letter-spacing:.01em;color:var(--cyan);text-shadow:var(--glow-cyan)}
+.demo-card p{margin:0;font:400 20px/1.55 var(--f-body);color:var(--ink-dim)}
+.demo-card .stat-row{display:flex;align-items:flex-end;gap:18px;padding-top:14px;border-top:1px solid var(--grid)}
+.demo-card .stat-row .num{font:400 56px/1 var(--f-disp);color:var(--lemon);text-shadow:var(--glow-lemon);letter-spacing:.01em}
+.demo-card .stat-row .pct{font:400 18px/1 var(--f-disp);color:var(--ink-dim);margin-bottom:6px}
+.tokens{list-style:none;padding:0;margin:0;border:2px solid var(--cyan);background:var(--hud)}
+.tokens li{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:14px 22px;border-bottom:1px solid var(--grid)}
+.tokens li:last-child{border:0}
+.tokens .name{font:400 11px/1 var(--f-disp);color:var(--cyan);letter-spacing:.04em}
+.tokens .val{font:400 22px/1 var(--f-body);color:var(--lemon)}
+.tokens .bar{height:8px;background:var(--magenta);box-shadow:0 0 8px rgba(255,82,162,.6)}
+
+/* Motion */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+@media(max-width:880px){.two-col{grid-template-columns:1fr}}
+.panel{background:var(--hud);border:2px solid var(--magenta);box-shadow:6px 6px 0 var(--cyan);padding:32px;display:flex;flex-direction:column;gap:18px}
+.panel .label-row{font:400 10px/1 var(--f-disp);color:var(--cyan);letter-spacing:.04em;text-shadow:var(--glow-cyan)}
+.panel h4{margin:0;font:400 28px/1.1 var(--f-disp);color:var(--magenta);text-shadow:var(--glow-pink)}
+.panel p{margin:0;font:400 20px/1.55 var(--f-body);color:var(--ink-dim);max-width:40ch}
+.panel pre{margin:0;padding:14px 18px;background:var(--void);border:1px solid var(--grid);font:400 18px/1.5 var(--f-body);color:var(--cyan);overflow-x:auto}
+
+/* Background */
+.bg-preview{border:3px solid var(--cyan);box-shadow:6px 6px 0 var(--magenta);aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--void)}
+.bg-preview canvas{width:100%;height:100%;display:block}
+.bg-preview .badge{position:absolute;bottom:12px;left:12px;font:400 10px/1 var(--f-disp);letter-spacing:.04em;background:var(--hud);padding:6px 10px;border:2px solid var(--cyan);color:var(--cyan);text-shadow:var(--glow-cyan)}
+
+details.code-block{border:2px solid var(--grid);background:var(--hud);margin-top:12px}
+details.code-block summary{cursor:pointer;padding:14px 18px;list-style:none;font:400 10px/1 var(--f-disp);letter-spacing:.04em;color:var(--cyan);text-shadow:var(--glow-cyan);display:flex;justify-content:space-between}
+details.code-block summary::-webkit-details-marker{display:none}
+details.code-block summary::after{content:"+";font:400 18px/1 var(--f-disp);color:var(--magenta);text-shadow:var(--glow-pink)}
+details.code-block[open] summary::after{content:"\2212"}
+details.code-block pre{margin:0;padding:16px 18px;border-top:1px solid var(--grid);font:400 16px/1.5 var(--f-body);color:var(--cyan);background:var(--void);overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto}
+
+/* Guidelines */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+@media(max-width:880px){.rules-grid{grid-template-columns:1fr}}
+.rules-col{border:3px solid;padding:32px;background:var(--hud)}
+.rules-col.do{border-color:var(--cyan);box-shadow:6px 6px 0 var(--magenta)}
+.rules-col.dont{border-color:var(--magenta);box-shadow:6px 6px 0 var(--grid)}
+.rules-col h3{font:400 36px/1 var(--f-disp);margin:0 0 24px;letter-spacing:.01em}
+.rules-col.do h3{color:var(--cyan);text-shadow:var(--glow-cyan)}
+.rules-col.dont h3{color:var(--magenta);text-shadow:var(--glow-pink)}
+.rules-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.rules-col li{display:grid;grid-template-columns:2em 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--grid);font:400 19px/1.45 var(--f-body);color:var(--ink)}
+.rules-col li::before{font:400 10px/1.3 var(--f-disp);align-self:center;text-align:center;letter-spacing:.04em;padding:6px 0;border:2px solid currentColor}
+.rules-col.do li::before{content:"OK";color:var(--cyan);background:transparent}
+.rules-col.dont li::before{content:"NO";color:var(--magenta)}
+
+/* Templates */
+.templates-wrap{border-top:2px solid var(--grid)}
+.templates-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+@media(max-width:1100px){.templates-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.templates-grid{grid-template-columns:1fr}}
+.tmpl{background:var(--secondary);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--magenta);overflow:hidden;transition:transform .12s steps(2),box-shadow .12s steps(2)}
+.tmpl:hover{transform:translate(-3px,-3px);box-shadow:9px 9px 0 var(--magenta)}
+.tmpl-thumb{width:100%;aspect-ratio:16/9;overflow:hidden;position:relative;background:var(--void);border-bottom:2px solid var(--cyan)}
+.tmpl-thumb .scale-wrap{width:1920px;height:1080px;transform-origin:top left}
+.tmpl-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;font:400 10px/1 var(--f-disp);letter-spacing:.04em;background:var(--hud)}
+.tmpl-foot .name{color:var(--cyan)}
+.tmpl-foot .idx{color:var(--magenta);background:var(--secondary);padding:4px 8px;border:1px solid var(--magenta)}
+
+/* Endcap */
+footer.endcap{padding:80px var(--pad-x) 56px;border-top:2px solid var(--magenta);background:var(--secondary);position:relative}
+footer.endcap::before{content:"";position:absolute;top:-2px;left:0;right:0;height:2px;background:repeating-linear-gradient(90deg,var(--cyan) 0 12px,var(--magenta) 12px 24px,var(--lemon) 24px 36px,var(--lime) 36px 48px)}
+footer.endcap .grid{display:grid;grid-template-columns:1fr auto;gap:48px;align-items:end}
+footer.endcap .endmark{margin:0;font:400 clamp(48px,11vw,160px)/.95 var(--f-disp);letter-spacing:.02em;color:var(--magenta);text-shadow:6px 6px 0 var(--cyan),0 0 24px rgba(255,82,162,0.4)}
+footer.endcap .endmark .blink{color:var(--lemon);text-shadow:6px 6px 0 var(--magenta);animation:blink 1.4s steps(2) infinite}
+footer.endcap .meta{font:400 12px/1.8 var(--f-disp);letter-spacing:.04em;color:var(--ink-dim);text-align:right}
+footer.endcap .meta b{color:var(--cyan);font-weight:400}
+</style>
+
+<!-- ════════════════════════════════════════════════════════════
+     8-BIT ORBIT TEMPLATE STYLES — 1920×1080 arcade slides.
+     ════════════════════════════════════════════════════════════ -->
+<style id="template-css">
+__TEMPLATE_CSS__
+</style>
+</head>
+
+<body>
+<div class="bg-grid"></div>
+<canvas id="design-bg"></canvas>
+
+<!-- HUD rail -->
+<div class="hud">
+  <div class="brand"><span class="pix"></span><span>__NAME__</span></div>
+  <nav>
+    <a href="#palette">01.Palette</a>
+    <a href="#type">02.Type</a>
+    <a href="#surface">03.Surface</a>
+    <a href="#motion">04.Motion</a>
+    <a href="#background">05.Background</a>
+    <a href="#guidelines">06.Rules</a>
+    <a href="#templates">07.Frames</a>
+  </nav>
+  <div class="right"><span class="live">Online</span><span>v1.0</span></div>
+</div>
+
+<!-- COVER -->
+<header class="cover" data-screen-label="00 Cover">
+  <div class="cover-chrome">
+    <div>SYS_LOAD &nbsp;&middot;&nbsp; № 004</div>
+    <div><span class="blink">●</span> READY</div>
+  </div>
+  <h1 class="cover-headline">__NAME__</h1>
+  <div class="press-start">▸ PRESS START</div>
+  <div class="cover-foot">
+    <div class="cell"><span class="k">DISCIPLINE</span><span class="v">Gaming · Web3 · Indie</span></div>
+    <div class="cell"><span class="k">DISPLAY TYPE</span><span class="v big">PRESS START 2P</span></div>
+    <div class="cell"><span class="k">ACCENT</span><span class="v">__ACCENT_LABEL__</span></div>
+    <div class="cell"><span class="k">BUILD</span><span class="v big">07 · __SLIDE_COUNT__ FRAMES</span></div>
+  </div>
+</header>
+
+<!-- MANIFESTO -->
+<section class="manifesto" data-screen-label="00 Manifesto">
+  <div class="manifesto-grid">
+    <div class="num">// MANIFESTO</div>
+    <p>type is <em>display</em>. color is <strong>signal</strong>. the page is a <em>CRT</em>. nothing is anti-aliased.</p>
+  </div>
+</section>
+
+<!-- 01 PALETTE -->
+<section id="palette" data-screen-label="01 Palette">
+  <div class="section-head">
+    <div class="num">01 // PALETTE</div>
+    <h2>FOUR<br/><span class="cyan">PIXELS.</span></h2>
+    <p class="lede">__PALETTE_LEDE__</p>
+  </div>
+  <div class="palette">
+    <div class="swatch swatch--paper"><div class="role-bar"><span>01 // PAPER</span><span class="x"></span></div><div class="fill"><div class="name">__PRIMARY_NAME__</div><div class="hex">__PRIMARY__</div><div class="usage">Legible body type on dark.</div></div></div>
+    <div class="swatch swatch--void"><div class="role-bar"><span>02 // VOID</span><span class="x"></span></div><div class="fill"><div class="name">__SECONDARY_NAME__</div><div class="hex">__SECONDARY__</div><div class="usage">The canvas. The CRT off-state.</div></div></div>
+    <div class="swatch swatch--cyan"><div class="role-bar"><span>03 // PLAYER</span><span class="x"></span></div><div class="fill"><div class="name">__TERTIARY_NAME__</div><div class="hex">__TERTIARY__</div><div class="usage">Friendly signal. UI primary.</div></div></div>
+    <div class="swatch swatch--magenta"><div class="role-bar"><span>04 // ENEMY</span><span class="x"></span></div><div class="fill"><div class="name">__ACCENT_NAME__</div><div class="hex">__ACCENT__</div><div class="usage">Hostile signal. Alert states.</div></div></div>
+  </div>
+</section>
+
+<!-- 02 TYPE -->
+<section id="type" data-screen-label="02 Type">
+  <div class="section-head">
+    <div class="num">02 // TYPOGRAPHY</div>
+    <h2>PIXELS,<br/><span class="cyan">ALL THE WAY DOWN.</span></h2>
+    <p class="lede">Press Start 2P carries display + headlines. VT323 runs body — a real terminal face, never anti-aliased. Silkscreen for the smallest chrome.</p>
+  </div>
+  <div class="specimen">
+    <div class="spec-row"><div class="meta"><span>DISPLAY</span><b>Press Start 2P</b><span>11vw · letter-spacing 0.01em</span></div><div class="spec-display">HELLO WORLD.</div></div>
+    <div class="spec-row"><div class="meta"><span>HEADING 01</span><b>Press Start 2P</b><span>6vw · cyan + glow</span></div><div class="spec-h1">CHAPTER 1</div></div>
+    <div class="spec-row"><div class="meta"><span>HEADING 02</span><b>Press Start 2P</b><span>4vw · drop shadow</span></div><div class="spec-h2">SLIDE TITLE</div></div>
+    <div class="spec-row"><div class="meta"><span>LEAD</span><b>VT323 400</b><span>2.2vw · terminal face</span></div><div class="spec-lead">The lead carries the brief in a single screen of CRT text.</div></div>
+    <div class="spec-row"><div class="meta"><span>BODY</span><b>VT323 400</b><span>22px · 1.5 · 60ch</span></div><p class="spec-body">PACK MY BOX WITH FIVE DOZEN LIQUOR JUGS. The body face is VT323 — a faithful terminal font. Use it for everything readable. Body copy below 24px is forbidden in 1080p compositions.</p></div>
+    <div class="spec-row"><div class="meta"><span>LABEL</span><b>Press Start 2P</b><span>12px · 0.04em · lemon</span></div><div class="spec-label">// HUD · STATS · COIN: 0042</div></div>
+  </div>
+</section>
+
+<!-- 03 SURFACE -->
+<section id="surface" data-screen-label="03 Surface">
+  <div class="section-head">
+    <div class="num">03 // SURFACE</div>
+    <h2>PIXEL<br/><span class="cyan">BORDERS.</span></h2>
+    <p class="lede">3-pixel solid borders. Offset shadows in stepped colours — never blurred. Glow is reserved for accent text only.</p>
+  </div>
+  <div class="surface-grid">
+    <div class="demo-card">
+      <span class="card-label">// CARD · DEMO</span>
+      <h3>EXAMPLE CARD.</h3>
+      <p>Configured border, padding, and stepped shadow. Glow is rare — only on text that wants to be remembered. Surfaces stay flat; the CRT does the lifting.</p>
+      <div class="stat-row"><div class="num">042</div><div class="pct">% READ-RATE</div></div>
+    </div>
+    <ul class="tokens">
+      <li><span class="name">// CORNERS</span><span class="val">__CORNER_RADIUS__</span><span class="bar" style="width:6px"></span></li>
+      <li><span class="name">// PADDING</span><span class="val">__PADDING__</span><span class="bar" style="width:36px"></span></li>
+      <li><span class="name">// GAP</span><span class="val">__GAP__</span><span class="bar" style="width:32px"></span></li>
+      <li><span class="name">// ELEVATION</span><span class="val">__ELEVATION__</span><span class="bar" style="width:44px"></span></li>
+      <li><span class="name">// DENSITY</span><span class="val">__DENSITY__</span><span class="bar" style="width:52px"></span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 04 MOTION -->
+<section id="motion" data-screen-label="04 Motion">
+  <div class="section-head">
+    <div class="num">04 // MOTION</div>
+    <h2>__EASING_HEADLINE__</h2>
+    <p class="lede">__EASING_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="panel">
+      <span class="label-row">// EASING</span>
+      <h4>__EASING_NAME__</h4>
+      <p>__EASING_DESC__</p>
+      <pre>__EASING_VALUE__</pre>
+    </div>
+    <div class="panel">
+      <span class="label-row">// TIMING</span>
+      <h4>__DURATION_DEFAULT__</h4>
+      <p>__DURATION_DESC__</p>
+      <pre>__DURATION_VALUES__</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 05 BACKGROUND -->
+<section id="background" data-screen-label="05 Background">
+  <div class="section-head">
+    <div class="num">05 // BACKGROUND</div>
+    <h2>__BG_HEADLINE__</h2>
+    <p class="lede">__BG_LEDE__</p>
+  </div>
+  <div class="two-col">
+    <div class="bg-preview"><canvas id="bg-preview-canvas"></canvas><span class="badge">// __BG_BADGE__</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <ul class="tokens" style="border-top:none">
+        <li><span class="name">// GEOMETRY</span><span class="val">__BG_TYPE__</span><span class="bar" style="width:36px"></span></li>
+        <li><span class="name">// DENSITY</span><span class="val">__BG_DENSITY__</span><span class="bar" style="width:42px"></span></li>
+        <li><span class="name">// SPEED</span><span class="val">__BG_SPEED__</span><span class="bar" style="width:18px"></span></li>
+        <li><span class="name">// STRENGTH</span><span class="val">__BG_STRENGTH__</span><span class="bar" style="width:52px"></span></li>
+        <li><span class="name">// GRAIN</span><span class="val">__BG_GRAIN__</span><span class="bar" style="width:24px"></span></li>
+      </ul>
+      <details class="code-block"><summary>// SHADER CONFIG (JSON)</summary>
+<pre>__SHADER_CONFIG__</pre>
+      </details>
+      <details class="code-block"><summary>// VERTEX SHADER (GLSL)</summary>
+<pre id="vtx-src">__SHADER_VERTEX__</pre>
+      </details>
+      <details class="code-block"><summary>// FRAGMENT SHADER (GLSL)</summary>
+<pre id="frg-src">__SHADER_FRAGMENT__</pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- 06 GUIDELINES -->
+<section id="guidelines" data-screen-label="06 Guidelines">
+  <div class="section-head">
+    <div class="num">06 // RULES</div>
+    <h2>OK.<br/><span class="cyan">NO.</span></h2>
+    <p class="lede">The CRT enforces these. Break any and the illusion collapses.</p>
+  </div>
+  <div class="rules-grid">
+    <div class="rules-col do"><h3>OK.</h3><ul>__DOS__</ul></div>
+    <div class="rules-col dont"><h3>NO.</h3><ul>__DONTS__</ul></div>
+  </div>
+</section>
+
+<!-- 07 TEMPLATES -->
+<section id="templates" class="templates-wrap" data-screen-label="07 Templates">
+  <div class="section-head">
+    <div class="num">07 // FRAMES</div>
+    <h2>__SLIDE_COUNT_WORD__<br/><span class="cyan">SCREENS.</span></h2>
+    <p class="lede">The full template library at 1920×1080. Each thumbnail is the live slide, scaled.</p>
+  </div>
+  <div class="templates-grid" id="templates-grid"></div>
+</section>
+
+<template id="tmpl-source">
+__SLIDE_CARDS__
+</template>
+
+<footer class="endcap" data-screen-label="08 End">
+  <div class="grid">
+    <h2 class="endmark">GAME<br><span class="blink">OVER.</span></h2>
+    <div class="meta">
+      <div><b>__NAME__</b> // V1.0</div>
+      <div>PRESS START 2P / VT323</div>
+      <div>__DATE__</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.getElementById('templates-grid').appendChild(document.getElementById('tmpl-source').content.cloneNode(true));
+  function rescale(){document.querySelectorAll('.tmpl-thumb').forEach(t=>{const w=t.querySelector('.scale-wrap');if(w)w.style.transform='scale('+(t.clientWidth/1920)+')'})}
+  addEventListener('load',rescale);addEventListener('resize',rescale);requestAnimationFrame(rescale);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(rescale);
+})();
+</script>
+
+__SHADER_SCRIPT__
+
+</body>
+</html>
