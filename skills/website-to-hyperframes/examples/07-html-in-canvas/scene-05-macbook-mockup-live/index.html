@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-05-macbook-mockup-live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #050510; }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] {
+      --ink: #f6f8fb;
+      --muted: #8a8f99;
+      --brand: #6d7bff;
+      --brand-2: #ff89c0;
+      --font-display: "Inter", -apple-system, "SF Pro Display", sans-serif;
+      --font-data: "Geist Mono", "SF Mono", monospace;
+      position: relative;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: var(--font-display);
+      background:
+        radial-gradient(circle at 22% 28%, rgba(109, 123, 255, 0.30), transparent 55%),
+        radial-gradient(circle at 78% 78%, rgba(255, 137, 192, 0.22), transparent 55%),
+        radial-gradient(circle at 50% 100%, rgba(120, 220, 200, 0.16), transparent 60%),
+        linear-gradient(160deg, #0a0a18 0%, #110a22 40%, #08070f 100%);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] .grain {
+      position: absolute; inset: 0; pointer-events: none; z-index: 50; opacity: 0.05;
+      background-image:
+        radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1.2px),
+        radial-gradient(rgba(0,0,0,0.4) 1px, transparent 1.2px);
+      background-size: 3px 3px, 5px 5px;
+      background-position: 0 0, 1px 2px;
+      mix-blend-mode: overlay;
+    }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] .scene-label {
+      position: absolute;
+      left: 48px;
+      bottom: 36px;
+      font-size: 14px;
+      color: #b3b6c0;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 100;
+      font-family: "Inter", sans-serif;
+      background: rgba(20,20,30,0.55);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 8px 14px;
+      border-radius: 100px;
+      backdrop-filter: blur(12px);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .scene-label .accent {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Floor glow under the laptop */
+    [data-composition-id="scene-05-macbook-mockup-live"] .floor-glow {
+      position: absolute;
+      left: 50%;
+      bottom: 80px;
+      width: 1400px;
+      height: 220px;
+      transform: translateX(-50%);
+      background: radial-gradient(ellipse at center, rgba(109,123,255,0.35), transparent 65%);
+      filter: blur(40px);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Stage with perspective */
+    [data-composition-id="scene-05-macbook-mockup-live"] .stage {
+      position: absolute;
+      inset: 0;
+      perspective: 2400px;
+      perspective-origin: 50% 55%;
+      z-index: 2;
+    }
+
+    /* ───────────── MacBook frame (CSS-only) ───────────── */
+    [data-composition-id="scene-05-macbook-mockup-live"] .laptop {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 1280px;
+      height: 800px;
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      transform-origin: 50% 100%;
+    }
+
+    /* Shadow puddle under closed area */
+    [data-composition-id="scene-05-macbook-mockup-live"] .laptop-shadow {
+      position: absolute;
+      left: 50%;
+      bottom: -90px;
+      transform: translateX(-50%) translateZ(-1px);
+      width: 1180px;
+      height: 80px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.6), transparent 65%);
+      filter: blur(28px);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* Lid: the upper "screen" half */
+    [data-composition-id="scene-05-macbook-mockup-live"] .lid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 720px;
+      background: linear-gradient(180deg, #2b2b30 0%, #1a1a1f 100%);
+      border-radius: 18px 18px 6px 6px;
+      padding: 18px 18px 22px;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.07),
+        inset 0 0 0 2px rgba(0,0,0,0.4),
+        0 18px 80px rgba(0,0,0,0.55),
+        0 6px 20px rgba(0,0,0,0.35);
+    }
+
+    /* Camera notch */
+    [data-composition-id="scene-05-macbook-mockup-live"] .notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 180px;
+      height: 22px;
+      background: #0a0a0d;
+      border-radius: 0 0 12px 12px;
+      z-index: 4;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .notch::after {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 6px;
+      background: #1a1a1c;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    /* The actual screen surface */
+    [data-composition-id="scene-05-macbook-mockup-live"] .screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #f7f8fa;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    /* Screen glow / glass sheen */
+    [data-composition-id="scene-05-macbook-mockup-live"] .screen-sheen {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(115deg,
+        rgba(255,255,255,0.12) 0%,
+        rgba(255,255,255,0.02) 18%,
+        transparent 36%,
+        transparent 60%,
+        rgba(255,255,255,0.04) 78%,
+        rgba(255,255,255,0.10) 100%);
+      mix-blend-mode: screen;
+      z-index: 40;
+      border-radius: 6px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .screen-glow {
+      position: absolute;
+      inset: -30px;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(109,123,255,0.35), transparent 60%);
+      filter: blur(34px);
+      z-index: -1;
+      opacity: 0;
+    }
+
+    /* Hinge band between lid and base */
+    [data-composition-id="scene-05-macbook-mockup-live"] .hinge {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 720px;
+      width: 100%;
+      height: 14px;
+      background: linear-gradient(180deg, #1a1a1f 0%, #0c0c10 50%, #1a1a1f 100%);
+      border-radius: 2px;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        inset 0 -1px 0 rgba(0,0,0,0.6);
+    }
+
+    /* Base / keyboard deck */
+    [data-composition-id="scene-05-macbook-mockup-live"] .base {
+      position: absolute;
+      left: -36px;
+      top: 734px;
+      width: 1352px;
+      height: 66px;
+      background: linear-gradient(180deg, #2a2a30 0%, #1b1b21 50%, #14141a 100%);
+      border-radius: 6px 6px 22px 22px;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        inset 0 -2px 0 rgba(0,0,0,0.55),
+        0 30px 60px rgba(0,0,0,0.5);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .base::before {
+      /* indented groove where the lid closes */
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 360px;
+      height: 8px;
+      background: linear-gradient(180deg, #0a0a10, #16161c);
+      border-radius: 0 0 12px 12px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .base::after {
+      /* trackpad outline hint */
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 8px;
+      width: 480px;
+      height: 4px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 2px;
+    }
+
+    /* ───────────── Simulated Browser inside screen ───────────── */
+    [data-composition-id="scene-05-macbook-mockup-live"] .browser {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] .b-chrome {
+      flex-shrink: 0;
+      height: 44px;
+      background: linear-gradient(180deg, #f3f3f6 0%, #e7e7ec 100%);
+      border-bottom: 1px solid #d8d8de;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 14px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .traffic {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .traffic .dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .traffic .dot.red { background: #ff5f57; }
+    [data-composition-id="scene-05-macbook-mockup-live"] .traffic .dot.yellow { background: #febc2e; }
+    [data-composition-id="scene-05-macbook-mockup-live"] .traffic .dot.green { background: #28c840; }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] .tabs {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex: 1;
+      padding-left: 8px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .tab {
+      height: 30px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #4a4a52;
+      background: #e2e2e8;
+      border-radius: 6px 6px 0 0;
+      font-weight: 500;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .tab.active {
+      background: #ffffff;
+      color: #1a1a1f;
+      box-shadow: 0 -1px 0 rgba(0,0,0,0.04);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .tab .fav {
+      width: 12px; height: 12px; border-radius: 3px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] .urlbar {
+      flex: 0 1 460px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      background: #ffffff;
+      border: 1px solid #d6d6dc;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #2a2a32;
+      font-family: var(--font-data);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .urlbar .lock {
+      color: #4a8a4a;
+      font-size: 11px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .urlbar .url {
+      flex: 1;
+      letter-spacing: 0.01em;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .urlbar .url .gray { color: #8a8f99; }
+    [data-composition-id="scene-05-macbook-mockup-live"] .b-chrome .right-icons {
+      display: flex; gap: 10px; align-items: center;
+      color: #6a6a72; font-size: 13px;
+    }
+
+    /* Page viewport: clips the scrolling content */
+    [data-composition-id="scene-05-macbook-mockup-live"] .viewport {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    /* The scrolling page itself — taller than viewport so we can move it up */
+    [data-composition-id="scene-05-macbook-mockup-live"] .page {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      will-change: transform;
+    }
+
+    /* Page sections */
+    [data-composition-id="scene-05-macbook-mockup-live"] .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 60px;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #eef0f4;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .nav-bar .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+      color: #1a1a1f;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .nav-bar .logo .mark {
+      width: 26px; height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .nav-bar .nav-links {
+      display: flex; gap: 28px;
+      font-size: 13px; color: #4a4a52; font-weight: 500;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .nav-bar .nav-cta {
+      font-size: 12px;
+      padding: 8px 16px;
+      background: #1a1a1f;
+      color: #ffffff;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero {
+      padding: 80px 60px 70px;
+      text-align: center;
+      background: linear-gradient(180deg, #ffffff 0%, #f6f6fb 100%);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .eyebrow {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(109,123,255,0.10);
+      color: var(--brand);
+      font-family: var(--font-data);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      border-radius: 100px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .headline {
+      font-size: 56px;
+      font-weight: 800;
+      color: #0d0d14;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      max-width: 880px;
+      margin: 0 auto;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .headline .grad {
+      background: linear-gradient(120deg, var(--brand), var(--brand-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .subhead {
+      font-size: 18px;
+      color: #4a4a52;
+      margin-top: 18px;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.55;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .cta-row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .cta {
+      position: relative;
+      padding: 14px 26px;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      color: #ffffff;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      box-shadow: 0 10px 24px rgba(109,123,255,0.30);
+      overflow: hidden;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .cta .ripple {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.55);
+      transform: translate(-50%, -50%) scale(0);
+      pointer-events: none;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .hero .cta-ghost {
+      padding: 14px 22px;
+      background: #ffffff;
+      color: #1a1a1f;
+      border: 1px solid #d6d6dc;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Feature cards section */
+    [data-composition-id="scene-05-macbook-mockup-live"] .features {
+      padding: 70px 60px;
+      background: #ffffff;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .features .section-eyebrow {
+      text-align: center;
+      font-family: var(--font-data);
+      font-size: 11px;
+      color: var(--brand);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .features .section-title {
+      text-align: center;
+      font-size: 34px;
+      font-weight: 800;
+      color: #0d0d14;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      max-width: 600px;
+      margin: 0 auto 40px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .f-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f8f8fb 100%);
+      border: 1px solid #ececf2;
+      border-radius: 16px;
+      padding: 26px 22px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .f-card .f-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .f-card .f-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0d0d14;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .f-card .f-desc {
+      font-size: 13px;
+      color: #5a5a62;
+      line-height: 1.55;
+    }
+
+    /* Pricing section */
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing {
+      padding: 70px 60px 90px;
+      background: linear-gradient(180deg, #f6f6fb 0%, #ececf4 100%);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing .section-eyebrow {
+      text-align: center;
+      font-family: var(--font-data);
+      font-size: 11px;
+      color: var(--brand);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing .section-title {
+      text-align: center;
+      font-size: 30px;
+      font-weight: 800;
+      color: #0d0d14;
+      letter-spacing: -0.02em;
+      margin-bottom: 36px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card {
+      background: #ffffff;
+      border: 1px solid #e2e2ea;
+      border-radius: 20px;
+      padding: 32px 30px;
+      max-width: 380px;
+      margin: 0 auto;
+      box-shadow: 0 20px 40px rgba(20,20,40,0.06);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card .plan {
+      font-size: 13px;
+      color: var(--brand);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card .price {
+      font-family: var(--font-data);
+      font-size: 46px;
+      font-weight: 600;
+      color: #0d0d14;
+      letter-spacing: -0.02em;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card .price .per {
+      font-size: 14px;
+      color: #8a8f99;
+      font-weight: 500;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card ul {
+      list-style: none;
+      margin-top: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #2a2a32;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card li .check {
+      width: 18px; height: 18px;
+      background: rgba(109,123,255,0.12);
+      color: var(--brand);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .pricing-card .pc-cta {
+      display: block;
+      margin-top: 24px;
+      padding: 13px 0;
+      text-align: center;
+      background: #1a1a1f;
+      color: #ffffff;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* ───────────── Cursor ───────────── */
+    [data-composition-id="scene-05-macbook-mockup-live"] .cursor {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      z-index: 30;
+      pointer-events: none;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+      opacity: 0;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .cursor svg {
+      width: 100%; height: 100%;
+    }
+
+    /* ───────────── Modal sheet ───────────── */
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(10,10,18,0.42);
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+      width: 460px;
+      background: #ffffff;
+      box-shadow: -18px 0 40px rgba(0,0,0,0.18);
+      z-index: 21;
+      padding: 40px 36px;
+      display: flex;
+      flex-direction: column;
+      /* GSAP sets initial xPercent: 100 via tl.set at t=0 to keep it off-screen until 4.6s */
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .m-eyebrow {
+      font-family: var(--font-data);
+      font-size: 11px;
+      color: var(--brand);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .m-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #0d0d14;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .m-sub {
+      font-size: 13px;
+      color: #5a5a62;
+      line-height: 1.55;
+      margin-bottom: 24px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .field label {
+      font-size: 11px;
+      color: #6a6a72;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .field input {
+      padding: 12px 14px;
+      border: 1px solid #d8d8e0;
+      border-radius: 9px;
+      background: #f9f9fc;
+      font-size: 14px;
+      color: #1a1a1f;
+      font-family: inherit;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .m-submit {
+      margin-top: 8px;
+      padding: 14px 0;
+      text-align: center;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      color: #ffffff;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 10px 24px rgba(109,123,255,0.30);
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .modal .m-fineprint {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #8a8f99;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ───────────── Caption ───────────── */
+    [data-composition-id="scene-05-macbook-mockup-live"] .caption {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 70px;
+      text-align: center;
+      z-index: 6;
+    }
+    [data-composition-id="scene-05-macbook-mockup-live"] .caption .kicker {
+      display: inline-block;
+      font-family: var(--font-data);
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.24em;
+      color: #b3b6c8;
+      text-transform: uppercase;
+      padding: 7px 16px;
+      background: rgba(40,40,60,0.55);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 100px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.30);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="scene-05-macbook-mockup-live"
+       data-composition-id="scene-05-macbook-mockup-live"
+       data-start="0"
+       data-duration="7"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="grain"></div>
+    <div class="floor-glow"></div>
+
+    <div class="caption">
+      <span class="kicker" id="cap-kicker">// product · live preview</span>
+    </div>
+
+    <div class="stage">
+      <div class="laptop" id="laptop"
+           style="margin-left: -640px; margin-top: -400px; transform: translateY(1100px) rotateX(-3deg) rotateY(5deg);">
+
+        <div class="laptop-shadow"></div>
+
+        <div class="lid">
+          <div class="notch"></div>
+
+          <div class="screen" id="screen">
+            <div class="screen-glow" id="screen-glow"></div>
+
+            <div class="browser">
+              <!-- Browser chrome -->
+              <div class="b-chrome">
+                <div class="traffic">
+                  <div class="dot red"></div>
+                  <div class="dot yellow"></div>
+                  <div class="dot green"></div>
+                </div>
+                <div class="tabs">
+                  <div class="tab active"><div class="fav"></div>Acme · The everything platform</div>
+                  <div class="tab"><div class="fav" style="background:#5cc16a;"></div>Docs</div>
+                </div>
+                <div class="urlbar">
+                  <span class="lock">&#x1F512;</span>
+                  <span class="url"><span class="gray">https://</span>acme.app<span class="gray">/?utm=preview</span></span>
+                </div>
+                <div class="right-icons">
+                  <span>&#x2B;</span><span>&#x22EE;</span>
+                </div>
+              </div>
+
+              <!-- Page viewport -->
+              <div class="viewport" id="viewport">
+                <div class="page" id="page">
+
+                  <!-- Top nav -->
+                  <div class="nav-bar">
+                    <div class="logo"><div class="mark"></div>Acme</div>
+                    <div class="nav-links">
+                      <span>Product</span><span>Solutions</span><span>Pricing</span><span>Docs</span>
+                    </div>
+                    <div class="nav-cta">Sign in</div>
+                  </div>
+
+                  <!-- Hero -->
+                  <div class="hero">
+                    <div class="eyebrow">v2.4 just shipped</div>
+                    <h1 class="headline">Ship beautiful apps <span class="grad">faster than ever</span></h1>
+                    <p class="subhead">A unified workspace for design, code, and motion. Built for teams who care about the details that make products feel alive.</p>
+                    <div class="cta-row">
+                      <div class="cta" id="cta-btn">
+                        Get started free
+                        <span class="ripple" id="cta-ripple"></span>
+                      </div>
+                      <div class="cta-ghost">Watch demo &rarr;</div>
+                    </div>
+                  </div>
+
+                  <!-- Feature cards -->
+                  <div class="features">
+                    <div class="section-eyebrow">Built for craft</div>
+                    <h2 class="section-title">Everything you need to make it real</h2>
+                    <div class="feature-grid">
+                      <div class="f-card">
+                        <div class="f-icon">&#x2728;</div>
+                        <div class="f-title">Real-time canvas</div>
+                        <div class="f-desc">Design and prototype in one fluid surface. Zero context switching, full fidelity.</div>
+                      </div>
+                      <div class="f-card">
+                        <div class="f-icon">&#x26A1;</div>
+                        <div class="f-title">Motion-native</div>
+                        <div class="f-desc">First-class timeline, easing, and physics. Animations feel intentional, not generic.</div>
+                      </div>
+                      <div class="f-card">
+                        <div class="f-icon">&#x1F517;</div>
+                        <div class="f-title">Ships as code</div>
+                        <div class="f-desc">Export to React, Vue, or vanilla. Pixel-perfect output, no manual cleanup.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Pricing -->
+                  <div class="pricing">
+                    <div class="section-eyebrow">Simple pricing</div>
+                    <h2 class="section-title">One plan. Everything included.</h2>
+                    <div class="pricing-card">
+                      <div class="plan">Studio</div>
+                      <div class="price">$24<span class="per"> / month</span></div>
+                      <ul>
+                        <li><span class="check">&#x2713;</span>Unlimited projects &amp; collaborators</li>
+                        <li><span class="check">&#x2713;</span>Motion engine + timeline editor</li>
+                        <li><span class="check">&#x2713;</span>Export to React, Vue, Svelte</li>
+                        <li><span class="check">&#x2713;</span>Priority support &amp; onboarding</li>
+                      </ul>
+                      <div class="pc-cta">Start 14-day trial</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Cursor + modal live INSIDE the viewport so they look like part of the page -->
+                <div class="cursor" id="cursor" style="left: 80px; top: 80px;">
+                  <svg viewBox="0 0 24 24">
+                    <path fill="#1a1a1f" stroke="#ffffff" stroke-width="1.4" stroke-linejoin="round"
+                          d="M5 3 L5 19 L9 15 L11.5 21 L14 20 L11.5 14 L17.5 14 Z"/>
+                  </svg>
+                </div>
+
+                <div class="modal-backdrop" id="modal-backdrop"></div>
+                <div class="modal" id="modal">
+                  <div class="m-eyebrow">// get started</div>
+                  <div class="m-title">Create your workspace</div>
+                  <div class="m-sub">No credit card required. Cancel anytime. Built for teams of any size.</div>
+                  <div class="field">
+                    <label>Work email</label>
+                    <input type="text" value="you@acme.com" readonly />
+                  </div>
+                  <div class="field">
+                    <label>Team name</label>
+                    <input type="text" value="Acme Studio" readonly />
+                  </div>
+                  <div class="m-submit">Create workspace &rarr;</div>
+                  <div class="m-fineprint">By continuing you agree to our terms. We email setup tips for 7 days.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="screen-sheen"></div>
+          </div>
+        </div>
+
+        <div class="hinge"></div>
+        <div class="base"></div>
+      </div>
+    </div>
+
+    <div class="scene-label">
+      Scene 05 · <span class="accent">MacBook Mockup with Live Screen</span> · CSS-only laptop frame + animated browser UI
+    </div>
+  </div>
+
+  <script>
+    (function initMacbookMockupLive() {
+      var root = document.querySelector('[data-composition-id="scene-05-macbook-mockup-live"]');
+      if (!root || typeof gsap === "undefined") {
+        setTimeout(initMacbookMockupLive, 50);
+        return;
+      }
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // Lock initial states (so they apply at t=0 and to every seek before the entrance)
+      tl.set("#modal", { xPercent: 100 }, 0);
+      tl.set("#modal-backdrop", { opacity: 0 }, 0);
+      tl.set("#cursor", { opacity: 0 }, 0);
+
+      // ===================================================================
+      // 0 - 1.0s : laptop enters from below with elastic settle
+      //           screen content fades in (the screen-glow grows)
+      // ===================================================================
+      tl.fromTo("#laptop",
+        { y: 1100, rotationX: -3, rotationY: 5, opacity: 0 },
+        { y: 0, rotationX: -3, rotationY: 5, opacity: 1, duration: 1.0, ease: "back.out(1.3)" },
+        0.0);
+
+      // Page initially invisible (CSS keeps it visible — we manipulate via overlay)
+      tl.fromTo("#screen-glow",
+        { opacity: 0 },
+        { opacity: 0.7, duration: 0.9, ease: "power2.out" },
+        0.2);
+
+      // Caption fades in
+      tl.fromTo("#cap-kicker",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" },
+        0.6);
+
+      // ===================================================================
+      // 1.0 - 3.0s : simulated scroll — page moves up to reveal features + pricing
+      //              continuous laptop breath
+      // ===================================================================
+      // Page is 720px tall hero+nav, ~620px features, ~520px pricing. Viewport ~676px.
+      // Total page height: ~1860. We move up by ~720 over 2s (just past hero into features).
+      tl.fromTo("#page",
+        { y: 0 },
+        { y: -540, duration: 1.7, ease: "power2.inOut" },
+        1.05);
+
+      // Continuous breath: small rotateY oscillation (lid catches light)
+      tl.to("#laptop",
+        { rotationY: 6.5, duration: 1.2, ease: "sine.inOut" },
+        1.0);
+      tl.to("#laptop",
+        { rotationY: 4.5, duration: 1.4, ease: "sine.inOut" },
+        2.2);
+
+      // Screen glow gently breathes too
+      tl.to("#screen-glow",
+        { opacity: 0.55, duration: 1.0, ease: "sine.inOut" },
+        1.6);
+      tl.to("#screen-glow",
+        { opacity: 0.75, duration: 1.2, ease: "sine.inOut" },
+        2.6);
+
+      // ===================================================================
+      // 3.0 - 4.5s : scroll back to hero, cursor moves to CTA + clicks (ripple)
+      // ===================================================================
+      // Scroll back up to hero so CTA is in view
+      tl.to("#page",
+        { y: -40, duration: 0.7, ease: "power2.inOut" },
+        3.0);
+
+      // Cursor appears top-right area, then sweeps to the CTA button position.
+      // CTA is centered horizontally in the hero (~screen midpoint). The viewport's
+      // hero CTA sits roughly at x≈600, y≈420 within the visible viewport.
+      tl.fromTo("#cursor",
+        { opacity: 0, left: 980, top: 110 },
+        { opacity: 1, left: 980, top: 110, duration: 0.2, ease: "none" },
+        3.05);
+
+      tl.to("#cursor",
+        { left: 560, top: 410, duration: 0.85, ease: "power3.inOut" },
+        3.25);
+
+      // Tiny "settle" wiggle before the click
+      tl.to("#cursor",
+        { left: 570, top: 415, duration: 0.15, ease: "sine.inOut" },
+        4.10);
+
+      // Click ripple expands from CTA
+      tl.fromTo("#cta-ripple",
+        { scale: 0, opacity: 0.7 },
+        { scale: 16, opacity: 0, duration: 0.7, ease: "power2.out" },
+        4.20);
+
+      // CTA button does a satisfying scale press
+      tl.fromTo("#cta-btn",
+        { scale: 1 },
+        { scale: 0.96, duration: 0.10, ease: "power2.out" },
+        4.20);
+      tl.to("#cta-btn",
+        { scale: 1, duration: 0.30, ease: "back.out(2.4)" },
+        4.30);
+
+      // ===================================================================
+      // 4.5 - 6.0s : modal/sheet slides in from right with "Get started" form
+      // ===================================================================
+      tl.to("#modal-backdrop",
+        { opacity: 1, duration: 0.35, ease: "power2.out" },
+        4.55);
+
+      tl.fromTo("#modal",
+        { xPercent: 100 },
+        { xPercent: 0, duration: 0.75, ease: "power3.out" },
+        4.60);
+
+      // Cursor follows over to the modal submit area
+      tl.to("#cursor",
+        { left: 1140, top: 380, duration: 0.9, ease: "power2.inOut" },
+        4.95);
+
+      // Tiny hover float on the modal (continuous). Use keyframes so two tweens
+      // don't collide on the same property at the boundary.
+      tl.to("#modal",
+        { keyframes: [{ y: -4 }, { y: 0 }], duration: 1.8, ease: "sine.inOut" },
+        5.40);
+
+      // ===================================================================
+      // 6.0 - 7.0s : hold — laptop continues to breathe, glow pulses, cursor settles
+      // ===================================================================
+      tl.to("#laptop",
+        { rotationY: 6, rotationX: -2.5, duration: 0.8, ease: "sine.inOut" },
+        6.0);
+
+      tl.to("#screen-glow",
+        { opacity: 0.95, duration: 0.7, ease: "sine.inOut" },
+        6.0);
+      tl.to("#screen-glow",
+        { opacity: 0.6, duration: 0.3, ease: "sine.inOut" },
+        6.7);
+
+      // Cursor tiny idle drift
+      tl.to("#cursor",
+        { left: 1148, top: 376, duration: 0.5, ease: "sine.inOut" },
+        6.3);
+      tl.to("#cursor",
+        { left: 1142, top: 382, duration: 0.5, ease: "sine.inOut" },
+        6.8);
+
+      // Caption gentle continuous drift
+      tl.to("#cap-kicker",
+        { y: -3, duration: 1.6, ease: "sine.inOut" },
+        2.0);
+      tl.to("#cap-kicker",
+        { y: 0, duration: 1.6, ease: "sine.inOut" },
+        3.6);
+      tl.to("#cap-kicker",
+        { y: -2, duration: 1.5, ease: "sine.inOut" },
+        5.2);
+
+      window.__timelines["scene-05-macbook-mockup-live"] = tl;
+    })();
+  </script>
+
+</body>
+</html>

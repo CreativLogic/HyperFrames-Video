@@ -1,30 +1,35 @@
 # HANDOFF — Examples Library (Sessions May 19, 2026)
 
-> **READ THIS BEFORE PICKING UP THE EXAMPLES LIBRARY WORK.** This is the followup to `HANDOFF.md` (which covers the v2-v9 pipeline-quality work through May 18). This doc covers what was built May 19: the HyperFrames Capability Showcase example library, 49 scenes across 13 sections, all rendered and uploaded, gallery app live.
+> **READ THIS BEFORE PICKING UP THE EXAMPLES LIBRARY WORK.** This is the followup to `HANDOFF.md` (which covers the v2-v9 pipeline-quality work through May 18). This doc covers what was built May 19: the HyperFrames Capability Showcase example library, **57 scenes across 13 sections**, all rendered and uploaded, gallery app live, **skill wiring updated to 3-mode framework** (copy+mutate / recombine / fresh).
 
 ---
 
 ## TL;DR
 
-**What got built:** 53 production-grade example scenes at `skills/website-to-hyperframes/examples/`, covering every HyperFrames technique. Each scene is standalone-renderable, lint-clean, snapshot-verified, composed 100% from HTML/CSS/SVG/GSAP/Canvas — zero captured screenshots. Plus a single concatenated "Grand Tour" reel (5:58 MP4) that plays all 53 back-to-back.
+**What got built:** **57 production-grade example scenes** at `skills/website-to-hyperframes/examples/`, covering every HyperFrames technique. Each scene is standalone-renderable, lint-clean, snapshot-verified, composed 100% from HTML/CSS/SVG/GSAP/Canvas — zero captured screenshots. Plus a single concatenated "Grand Tour" reel (**6:26 MP4**) that plays all 57 back-to-back.
 
-**Why:** `HANDOFF.md` Recommendation 1 said skill prose was exhausted as a lever (11 eval branches all produced slideshow videos regardless of prose changes). Recommendation 2 said: **show, don't tell** — build production-grade reference examples agents can copy from. This library is that.
+**Why:** `HANDOFF.md` Recommendation 1 said skill prose was exhausted as a lever (11 eval branches all produced slideshow videos regardless of prose changes). Recommendation 2 said: **show, don't tell** — build production-grade reference examples agents can use. This library is that.
 
 **Gallery is live:** https://www.heygenverse.com/a/1636f2fe-3ddc-4543-9a56-0d0b99538807
-**Grand Tour reel (all 53 scenes, 5:58):** https://www.heygenverse.com/s/bd3a5ac8-8b80-4dc8-af1b-20606a50456e/raw
+**Grand Tour reel (all 57 scenes, 6:26):** https://www.heygenverse.com/s/b9cdfa1b-6fbd-45a1-b71f-7183edc9bd61/raw
 
-**Skill wiring is active:** SKILL.md Step -1 forces agents to read `examples/README.md` + 3 scenes before planning. step-3 requires beats to cite ≥2 example scenes. step-5 has a beat-type → scene map. beat-builder-guide makes the matching scene the #1 read.
+**Skill wiring is active AND updated** (May 19 evening): the skill now explicitly names **three legitimate modes** for using examples — `copy+mutate` (1:1 fit), `recombine` (2-3 scenes layered), `fresh` (author from scratch with examples as taste reference). Examples are NEVER finished beats — non-negotiable customization rule applies in every mode. See **[Skill Wiring](#skill-wiring)** below for the patch summary.
 
-**Branch:** `feat/pipeline-quality-v2` (continued from prior session). 11 commits added this session.
+- **SKILL.md Step -1**: forces agents to read `examples/README.md` + open scenes; introduces 3 modes; sets non-negotiable customization rule.
+- **step-3-storyboard.md**: technique-pick checklist now requires `mode:`, `refs:`, and `customize:` lines per beat.
+- **step-5-build.md**: mode-aware build process; explicit "fresh ≠ paste, recombine ≠ frankenstein".
+- **beat-builder-guide.md**: 3-mode table is the FIRST mandatory read; "non-negotiable in every mode: customize."
 
-**What's deferred:** rendering a "Grand Tour" stitched reel (concat all 49 scenes into one MP4), agent self-test on a fresh worktree, mining the remaining archive projects for more lifts.
+**Branch:** `feat/pipeline-quality-v2` (continued from prior session). **13 commits** total this session.
+
+**What's deferred:** agent self-test on a fresh worktree (the proof point that the library + 3-mode wiring changes agent behavior), mining the remaining archive projects for more lifts, deeper sections (especially 03 easing, 05 shader, 06 css, 08 svg).
 
 ---
 
 ## TABLE OF CONTENTS
 
 1. [Library Architecture](#library-architecture)
-2. [The 49 Scenes — Full Inventory](#the-49-scenes--full-inventory)
+2. [The 57 Scenes — Full Inventory](#the-57-scenes--full-inventory)
 3. [Scene Origin Breakdown](#scene-origin-breakdown)
 4. [HeyGen Verse Asset IDs](#heygen-verse-asset-ids)
 5. [Gallery App](#gallery-app)
@@ -53,12 +58,12 @@ skills/website-to-hyperframes/examples/
 ├── 04-composed-ui/             README.md + 10 scene dirs
 ├── 05-transitions-shader/      README.md + 1 scene dir
 ├── 06-transitions-css/         README.md + 1 scene dir
-├── 07-html-in-canvas/          README.md + 3 scene dirs
+├── 07-html-in-canvas/          README.md + 5 scene dirs
 ├── 08-svg-and-path/            README.md + 1 scene dir
-├── 09-counters-and-data/       README.md + 2 scene dirs
+├── 09-counters-and-data/       README.md + 3 scene dirs
 ├── 10-particles-and-ambient/   README.md + 3 scene dirs
-├── 11-3d-and-parallax/         README.md + 4 scene dirs
-├── 12-combined-vignettes/      README.md + 2 scene dirs
+├── 11-3d-and-parallax/         README.md + 5 scene dirs
+├── 12-combined-vignettes/      README.md + 3 scene dirs
 └── 13-anti-patterns/           README.md + 4 scene dirs
 ```
 
@@ -77,7 +82,7 @@ skills/website-to-hyperframes/examples/
 
 ---
 
-## THE 49 SCENES — FULL INVENTORY
+## THE 57 SCENES — FULL INVENTORY
 
 ### Section 01 — Typography (11 scenes)
 
@@ -142,13 +147,15 @@ skills/website-to-hyperframes/examples/
 |-------|----------|-----------|
 | `scene-01-css-transitions-grid` | 5s | 2×3 grid: push, scale, blur-dissolve, 3D flip, light-leak, dissolve |
 
-### Section 07 — HTML in Canvas (3 scenes)
+### Section 07 — HTML in Canvas (5 scenes)
 
 | Scene | Duration | Technique |
 |-------|----------|-----------|
 | `scene-01-webgl-shader` | 1.2s | WebGL fragment shader (domain-warp FBM) + Canvas 2D fallback |
 | `scene-02-canvas-ascii` | 3.9s | Canvas 2D procedural ASCII + lightning + "THE END" bitmap font |
 | `scene-03-cursor-blur-sweeps` | 5.5s | Canvas 2D cursor-driven blur/glow + chromatic aberration text |
+| `scene-04-iphone-mockup-live` | 8s | CSS iPhone with live "Glow" meditation app — streak counter, breathing badge, bottom-sheet modal slide-in |
+| `scene-05-macbook-mockup-live` | 8s | CSS MacBook with simulated browser session — tab + URL bar type-on + page content reveal |
 
 ### Section 08 — SVG and Path (1 scene)
 
@@ -156,12 +163,13 @@ skills/website-to-hyperframes/examples/
 |-------|----------|-----------|
 | `scene-01-vinyl-record` | 3s | Concentric SVG grooves + tonearm descent + 360° spin |
 
-### Section 09 — Counters and Data (2 scenes)
+### Section 09 — Counters and Data (3 scenes)
 
 | Scene | Duration | Technique |
 |-------|----------|-----------|
 | `scene-01-timeline-diagram` | 8.5s | Editorial build: divs dock on timeline + SVG easing curve + MotionPath slider |
 | `scene-02-pipeline-diagram` | 10.7s | Vertical scroll-pan through Agent→Renderer→MP4 + SVG connectors |
+| `scene-03-counter-million-showcase` | 6s | Canonical 0 → 1,000,000 counter — 33 deterministic `tl.set()` calls with comma formatting |
 
 ### Section 10 — Particles and Ambient (3 scenes)
 
@@ -181,12 +189,13 @@ skills/website-to-hyperframes/examples/
 | `scene-04-anamorphic-text-crt` | 15s | Three.js 3D text morphing MOTION↔DESIGN + CRT HUD |
 | `scene-05-iphone-device-gesture` | 6.5s | CSS 3D iPhone with tap/swipe gesture overlays + composed app screen |
 
-### Section 12 — Combined Vignettes (2 scenes)
+### Section 12 — Combined Vignettes (3 scenes)
 
 | Scene | Duration | Technique |
 |-------|----------|-----------|
 | `scene-01-techniques-grid` | 4s | 24-cell grid with 15+ techniques (clock, blob, vortex, glitch, cube, etc.) |
 | `scene-02-binary-rain-boot` | 7.5s | Matrix-style binary rain + centered terminal boot sequence |
+| `scene-03-product-launch-beat` | 8s | 6 techniques in one beat: stroke-draw logo + kinetic headline + counter + marker + particle burst + breathing |
 
 ### Section 13 — Anti-Patterns (4 scenes)
 
@@ -307,6 +316,8 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 | scene-01-webgl-shader | a907dc9e-4de5-4651-9271-8973b03764a2 |
 | scene-02-canvas-ascii | f7215d72-2f32-42c7-8733-e804ed6e67b6 |
 | scene-03-cursor-blur-sweeps | d72808fa-f024-4abc-a37d-2330e71fabc4 |
+| scene-04-iphone-mockup-live | a04b8c89-642f-4751-b42b-c4fb7067319d |
+| scene-05-macbook-mockup-live | 3137d43f-1337-4c4b-8ef2-f8e723fecde4 |
 
 ### Section 08 — SVG and Path
 | Scene | Asset ID |
@@ -318,6 +329,7 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 |---|---|
 | scene-01-timeline-diagram | 400f0927-7310-469d-addd-ba69a8685c6f |
 | scene-02-pipeline-diagram | cdb200fb-fee7-4826-bfbf-96641430f1df |
+| scene-03-counter-million-showcase | f30928c0-2baf-41bd-9834-36689ede19f3 |
 
 ### Section 10 — Particles and Ambient
 | Scene | Asset ID |
@@ -340,6 +352,13 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 |---|---|
 | scene-01-techniques-grid | bef2cf66-bae2-4c9a-a88c-023707b3d068 |
 | scene-02-binary-rain-boot | c97c2141-5a91-4fa7-b721-f3f511679267 |
+| scene-03-product-launch-beat | c23f3036-d4ce-4cf9-bbc9-4131949c7b16 |
+
+### Grand Tour Reel
+| Reel | Asset ID | Duration |
+|---|---|---|
+| grand-tour-57-scenes (current) | b9cdfa1b-6fbd-45a1-b71f-7183edc9bd61 | 6:26 |
+| grand-tour (53-scene, superseded) | bd3a5ac8-8b80-4dc8-af1b-20606a50456e | 5:58 |
 
 ### Section 13 — Anti-Patterns
 | Scene | Asset ID |
@@ -350,7 +369,7 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 | scene-04-screenshot-ken-burns | 464471da-8066-4702-95de-2d451840bfac |
 
 ### Rendered MP4s on local disk
-Path: `/tmp/scene-renders/<section>-<scene-id>.mp4` — 49 files, total ~75MB. Re-renderable via `npx tsx packages/cli/src/cli.ts render <scene-dir> --output ... --quality draft --fps 24`.
+Path: `/tmp/scene-renders/<section>-<scene-id>.mp4` — 57 scene files + `_grand-tour-57.mp4` (80MB) + previous `_grand-tour.mp4` (53-scene). Re-renderable via `npx tsx packages/cli/src/cli.ts render <scene-dir> --output ... --quality high --fps 30`.
 
 ---
 
@@ -380,39 +399,54 @@ hv_execute({
 1. Insert a new `<div class="card">...</div>` block before the closing `</div>\n</section>` of the target section.
 2. Bump the section header count (e.g. `— 3 scenes` → `— 4 scenes`).
 3. Bump the nav badge count (e.g. `07 html-in-canvas (3)` → `07 html-in-canvas (4)`).
-4. Bump the top-of-page stats `<span><b>49</b> scenes</span>` total.
+4. Bump the top-of-page stats `<span><b>57</b> scenes</span>` total + the Grand Tour duration if a new reel was built.
 
 ---
 
 ## SKILL WIRING
 
-The library is mandatory reading for agents — wired into 4 places:
+The library is mandatory reading for agents — wired into 4 places. **Updated May 19 evening** to introduce the **3-mode framework** after user feedback that the original "copy the closest example" framing was too rigid and would produce derivative work.
+
+### The three modes (the user-facing correction)
+
+The original wiring told agents to "copy the closest scene and mutate." That produces beats that are identifiable as "scene-X with content swapped" — not tailored work. The updated wiring names three legitimate ways to use examples, and the storyboard MUST pick one per beat:
+
+| Mode             | When                                                                                                                          | What the sub-agent does                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **copy+mutate**  | The cited scene is a near-1:1 fit (same UI shape, similar length, just different brand/content).                              | Copy the scene's `index.html` as a seed. Swap content, change colors to DESIGN.md, adjust copy, tune duration. Keep timeline shape and easing variety.                             |
+| **recombine**    | No single scene fits, but 2–3 scenes each contribute a layer (e.g. UI shell + counter + transition each from different scenes). | Start from the closest scene, then layer in patterns from the others. Authoring an arrangement — examples are ingredients, not the dish.                                          |
+| **fresh**        | The beat is unique; the library doesn't directly cover it, but examples set the taste bar.                                    | Write from scratch. Use cited scenes as taste references for easing variety, continuous-motion practice, snapshot determinism. Do NOT regress to screenshot+Ken Burns+VO slideshow.|
+
+**Non-negotiable in every mode:** customize for the actual beat. If output is recognizable as "scene-X with content swapped," the sub-agent copied without thinking — even in copy+mutate mode.
 
 ### `skills/website-to-hyperframes/SKILL.md`
-New **Step -1** before Step 0:
-
-> **Study the technique library.** Read `examples/README.md`. Open AT LEAST 3 scene HTMLs before planning. Specifically: one scene from `04-composed-ui/` matching a UI element you'll show, one from `01-typography/` matching your headline style, and the "bar" scenes `04-composed-ui/scene-01-kanban-board/` and `04-composed-ui/scene-02-chat-with-typing/`. After reading: you should be able to answer "for each beat I'm planning, which example scene am I going to copy as the starting point?"
-
-> **The non-negotiable rule:** if the user's prompt would lead you to use a product screenshot of an interface (kanban, chat, dashboard, etc.) as the primary visual of any beat — STOP. Open the matching scene in `examples/04-composed-ui/` and BUILD that UI from divs instead.
+**Step -1** before Step 0 now includes the 3-mode table and the non-negotiable customization rule. The Gate requires naming (a) which scenes inform each beat (b) which mode.
 
 ### `skills/website-to-hyperframes/references/step-3-storyboard.md`
-Technique-pick checklist after the pacing table:
+Technique-pick checklist now requires THREE things per beat: `techniques`, `refs:` (cited scene paths), `mode:` (copy+mutate / recombine / fresh). Format example:
 
-> Before writing each beat's description, name the 2–4 techniques it will use, and cite the example scene for each. Format: `Beat 3: kanban-board (examples/04-composed-ui/scene-01-kanban-board/) + counter (examples/04-composed-ui/scene-05-dashboard-counters/) + back.out easing (examples/_shared/easing-glossary.md)`. If a beat lists fewer than 2 cited techniques, **redesign that beat.**
+```
+Beat 3: kanban-board ui + counter overlay
+  techniques: composed-ui · counter · back.out easing
+  refs: examples/04-composed-ui/scene-01-kanban-board/ + examples/09-counters-and-data/scene-03-counter-million-showcase/
+  mode: recombine
+  customize: brand colors from DESIGN.md, 5 columns not 3, counter starts at 47 (current PRs), narration sync at 1.8s and 4.2s
+```
 
 ### `skills/website-to-hyperframes/references/step-5-build.md`
-Concrete map from beat type to example scene to copy. Quick mapping:
-- "Show a kanban / project board" → `examples/04-composed-ui/scene-01-kanban-board/`
-- "Show chat / messaging" → `examples/04-composed-ui/scene-02-chat-with-typing/`
-- "Show terminal / CLI" → `examples/04-composed-ui/scene-03-terminal-typeon/`
-- "Show command palette / Cmd+K" → `examples/04-composed-ui/scene-04-command-palette/`
-- "Show stats / dashboard / numbers" → `examples/04-composed-ui/scene-05-dashboard-counters/`
-- "Show files / folder tree" → `examples/04-composed-ui/scene-06-file-tree-reveal/`
-- "Show code editor" → `examples/04-composed-ui/scene-07-code-editor-typing/`
-- "Show calendar / schedule" → `examples/04-composed-ui/scene-08-calendar-events/`
+Mode-aware build process:
+- **copy+mutate** → seed from the cited scene's `index.html`, then mutate content/colors/timing
+- **recombine** → seed from closest scene, then layer in patterns from the others
+- **fresh** → write from scratch, examples as taste reference only
+
+Expanded scene-mapping table now includes the new gap-filler scenes:
+- "Show iPhone with live UI" → `examples/07-html-in-canvas/scene-04-iphone-mockup-live/`
+- "Show MacBook with browser/app" → `examples/07-html-in-canvas/scene-05-macbook-mockup-live/`
+- "Show big counter (millions, dollars, users)" → `examples/09-counters-and-data/scene-03-counter-million-showcase/`
+- "Hero product launch / brand reveal beat" → `examples/12-combined-vignettes/scene-03-product-launch-beat/`
 
 ### `skills/website-to-hyperframes/references/beat-builder-guide.md`
-Step 1 "Read and understand" — the matching example scene is now the **#1 mandatory read** for every beat, before even the hyperframes skill itself. Sub-agents copy the cited scene's `index.html` to their `compositions/beat-N-name.html` and mutate. They do NOT write from scratch — "there is always a closer example."
+Step 1 "Read and understand" now leads with the 3-mode table. The cited example scenes are the FIRST mandatory read; the mode (specified in the beat spec from step-3) tells the sub-agent what to do next. "Non-negotiable in every mode: customize for THIS beat" is the explicit rule.
 
 Plus 3 new RULES added to beat-builder-guide.md:
 - **COUNTERS**: 20-30 `tl.set(textContent)` calls along the duration is the canonical seekable pattern. Cite `scene-05-dashboard-counters` for the canonical example.
@@ -521,11 +555,13 @@ batch_upload_assets supports up to 20 files at once. PUTs can run in parallel vi
 
 ---
 
-## THE 11 COMMITS
+## THE 13 COMMITS
 
 ```
-46629336  feat(skill): examples library batch 6 - 4 more archive lifts (53 scenes total)
+[pending]  feat(skill): examples library batch 7 — 4 gap-fillers + 3-mode skill wiring (57 scenes total)
+3d7564bb  docs: refresh HANDOFF-examples-library to ship state (Grand Tour live, batch 6, skill wiring active)
 b2f4ee26  docs: HANDOFF-examples-library.md — 49 scenes, gallery live
+46629336  feat(skill): examples library batch 6 - 4 more archive lifts (53 scenes total)
 01e0098e  feat(skill): examples library batch 5 - 6 lifts from team archive
 68235f50  feat(skill): examples library scene 04-10 - terminal + live preview
 01ef4368  feat(skill): examples library batch 4 - sections 05 + 06 complete, library reaches 13/13
@@ -537,7 +573,7 @@ a877da70  feat(skill): examples library section 04 — composed UI, 8 scenes
 04827b98  feat(skill): examples library scaffold + section 01 (typography) — 10 scenes
 ```
 
-All on branch `feat/pipeline-quality-v2`, ahead of `origin/feat/pipeline-quality-v2` by 11 commits.
+All on branch `feat/pipeline-quality-v2`, ahead of `origin/feat/pipeline-quality-v2` by 13 commits.
 
 ---
 

@@ -21,23 +21,32 @@ If the user said "dark cinematic feel" — that's SLOW, not fast. If they said "
 
 ## Technique-pick checklist (REQUIRED, do this BEFORE writing beat copy)
 
-For every beat you plan, name 2–4 techniques it will use AND cite the matching scene in [`examples/`](../examples/). Without this, you'll default to the same slideshow that every prior eval run produced.
+For every beat you plan, do three things:
+1. Name 2–4 techniques it will use.
+2. Cite the matching example scenes in [`examples/`](../examples/) (paths).
+3. Pick a **mode** — `copy+mutate` (one scene is a near-fit) / `recombine` (mix patterns from 2-3 scenes) / `fresh` (no scene close enough, examples as taste reference only).
 
 Format (one line per beat):
 
 ```
-Beat 3: kanban-board (examples/04-composed-ui/scene-01-kanban-board/) +
-        counter on the In-Progress chip (examples/04-composed-ui/scene-05-dashboard-counters/) +
-        back.out for the entrance staggered (examples/_shared/easing-glossary.md)
+Beat 3: composed kanban + counter chip + back.out entrance stagger
+  mode: recombine
+  refs:
+    - examples/04-composed-ui/scene-01-kanban-board/        (kanban scaffold + drag pattern)
+    - examples/04-composed-ui/scene-05-dashboard-counters/  (counter on the In-Progress chip)
+    - examples/_shared/easing-glossary.md                    (back.out(1.7) for entrance)
+  customize: real project name "Atlas Q3", brand purple #5b3fff, 4 cards per column with realistic backlog items
 ```
 
 If a beat lists fewer than 2 cited techniques, **redesign that beat.** A beat with one technique is a slideshow frame.
 
 If a technique you want isn't in [`examples/`](../examples/), either:
 1. Pick a library technique that's close enough (preferred), or
-2. Note explicitly in the beat spec why you're inventing one — and what you'll build it from (which existing scene you'll start from + what you'll change).
+2. Mark the beat `mode: fresh` and note what scenes you'll use as taste/technique references even though no scene matches the content.
 
-**Forbidden:** "show the kanban" as a beat description with no technique citation. The library exists so you don't have to think from scratch — open the closest scene, copy it into your `compositions/`, mutate the content.
+**The non-negotiable in every mode:** examples are NEVER the finished beat. The `customize:` line above is the actual deliverable — what makes this beat THIS brand's beat instead of a recolored example. If your beat is identifiable as "scene-X with content swapped," you copied without thinking.
+
+**Forbidden:** "show the kanban" as a beat description with no technique citation, no mode, and no customize line. The library exists so you have a reference frame — not so you can stop thinking.
 
 ---
 

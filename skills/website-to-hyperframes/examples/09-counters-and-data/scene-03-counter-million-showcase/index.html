@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-03-counter-million-showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #06070b; }
+
+    #scene-03-counter-million-showcase {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 50%, rgba(91, 141, 255, 0.18) 0%, rgba(91, 141, 255, 0.04) 30%, transparent 60%),
+        radial-gradient(ellipse at 20% 80%, rgba(167, 139, 250, 0.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 20%, rgba(96, 165, 250, 0.08) 0%, transparent 55%),
+        linear-gradient(180deg, #0a0d14 0%, #06070b 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Subtle background drifting orb behind the number */
+    .bg-orb {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 1400px;
+      height: 1400px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(96, 165, 250, 0.16) 0%, rgba(96, 165, 250, 0.04) 35%, transparent 65%);
+      filter: blur(40px);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    /* Soft grid texture behind everything (very subtle) */
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 50%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 50%, transparent 80%);
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    /* Stage that holds the stat content */
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    /* Eyebrow */
+    .eyebrow {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: 0.40em;
+      text-transform: uppercase;
+      color: #8a93a0;
+      margin-bottom: 36px;
+      will-change: transform, opacity, letter-spacing;
+    }
+    .eyebrow .dot {
+      display: inline-block;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #60a5fa;
+      box-shadow: 0 0 12px #60a5fa;
+      margin-right: 14px;
+      transform: translateY(-3px);
+      will-change: opacity, transform;
+    }
+
+    /* Hero counter — the big number */
+    .counter-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: baseline;
+      justify-content: center;
+      padding: 0 40px;
+      will-change: transform;
+    }
+    .counter {
+      font-size: 340px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.05em;
+      font-variant-numeric: tabular-nums;
+      color: #ffffff;
+      background:
+        linear-gradient(180deg, #ffffff 0%, #c4cad4 62%, #8a93a0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 80px rgba(96, 165, 250, 0.0);
+      will-change: transform, filter;
+    }
+
+    /* Glow halo behind the counter */
+    .counter-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 1100px;
+      height: 360px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(ellipse at center, rgba(96, 165, 250, 0.45) 0%, rgba(96, 165, 250, 0.10) 35%, transparent 65%);
+      filter: blur(30px);
+      pointer-events: none;
+      z-index: -1;
+      will-change: opacity, transform;
+    }
+
+    /* Subtext below */
+    .subtext {
+      margin-top: 40px;
+      font-size: 26px;
+      font-weight: 400;
+      color: #8a93a0;
+      letter-spacing: 0.04em;
+      will-change: transform, opacity;
+    }
+    .subtext .accent {
+      color: #e5e7eb;
+      font-weight: 600;
+    }
+
+    /* Growth pill */
+    .growth-row {
+      margin-top: 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      will-change: opacity, transform;
+    }
+    .growth {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      border-radius: 999px;
+      background: rgba(52, 211, 153, 0.10);
+      border: 1px solid rgba(52, 211, 153, 0.30);
+      color: #34d399;
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(8px);
+    }
+    .growth-arrow {
+      width: 0; height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-bottom: 10px solid #34d399;
+    }
+    .growth-caption {
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.04em;
+    }
+
+    /* Scene label at the bottom */
+    .label {
+      position: absolute;
+      left: 60px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-03-counter-million-showcase"
+       data-composition-id="scene-03-counter-million-showcase"
+       data-start="0"
+       data-duration="6"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="grid-bg" id="grid-bg"></div>
+    <div class="bg-orb" id="bg-orb"></div>
+
+    <div class="stage">
+      <div class="eyebrow" id="eyebrow">
+        <span class="dot" id="eyebrow-dot"></span>Monthly Active Users
+      </div>
+
+      <div class="counter-wrap" id="counter-wrap">
+        <div class="counter-glow" id="counter-glow"></div>
+        <span class="counter" id="counter">0</span>
+      </div>
+
+      <div class="subtext" id="subtext">
+        Since launch · <span class="accent">2026</span>
+      </div>
+
+      <div class="growth-row" id="growth-row">
+        <div class="growth">
+          <span class="growth-arrow"></span>
+          <span>+12.4%</span>
+        </div>
+        <span class="growth-caption">month over month</span>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 03 · <span class="accent">Counter 0&rarr;1M Showcase</span> · deterministic tl.set() counter pattern + label + flourish
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 6;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0 initial state — lock everything that animates in ============
+      tl.set("#eyebrow", { opacity: 0, y: -10, letterSpacing: "0.40em" }, 0);
+      tl.set("#counter-wrap", { opacity: 0, scale: 0.94, y: 20 }, 0);
+      tl.set("#counter", { scale: 1 }, 0);
+      tl.set("#counter-glow", { opacity: 0, scale: 0.8 }, 0);
+      tl.set("#subtext", { opacity: 0, y: 16 }, 0);
+      tl.set("#growth-row", { opacity: 0, y: 12, scale: 0.95 }, 0);
+      tl.set("#bg-orb", { opacity: 0.6, scale: 0.9 }, 0);
+
+      // === t=0.10s: counter wrap quietly settles into place ================
+      // We bring the counter container in early at low opacity so the "0"
+      // is visible as a ghost while the eyebrow lands.
+      tl.fromTo("#counter-wrap",
+        { opacity: 0, scale: 0.94, y: 20 },
+        { opacity: 0.9, scale: 1, y: 0, duration: 1.1, ease: "expo.out" },
+        0.10);
+
+      // Glow fades in early but stays soft until the counter lands
+      tl.fromTo("#counter-glow",
+        { opacity: 0, scale: 0.8 },
+        { opacity: 0.5, scale: 1, duration: 1.2, ease: "expo.out" },
+        0.10);
+
+      // === t=0.0s → 0.8s: eyebrow fades in =================================
+      tl.fromTo("#eyebrow",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "expo.out" },
+        0.00);
+
+      // === t=0.8s → 4.0s: HERO COUNTER 0 → 1,000,000 =======================
+      // 33 discrete tl.set() steps. Values were picked so the pacing eases out:
+      // it starts fast (big jumps early), then slows down as it approaches 1M
+      // (small jumps near the end). All steps formatted with toLocaleString()
+      // for comma separation. Fully seekable, no onUpdate.
+      var steps = [
+        0,
+        180, 720, 1840, 3500, 6200, 9800, 14500, 21000, 29400,
+        42000, 58000, 76500, 98000, 122000, 158000, 198000, 245000, 298000,
+        358000, 425000, 498000, 575000, 652000, 728000, 798000, 860000,
+        912000, 952000, 978000, 992000, 998000, 1000000
+      ];
+      var counterStart = 0.80;
+      var counterEnd   = 4.00;
+      var counterDur   = counterEnd - counterStart;
+      steps.forEach(function (v, i) {
+        var t = counterStart + (i / (steps.length - 1)) * counterDur;
+        tl.set("#counter", { textContent: v.toLocaleString() }, t);
+      });
+
+      // While the counter is rolling, the glow brightens proportionally
+      tl.to("#counter-glow", {
+        opacity: 1,
+        scale: 1.05,
+        duration: counterDur,
+        ease: "power2.in",
+      }, counterStart);
+
+      // Counter wrap rises to full opacity by the time it lands
+      tl.to("#counter-wrap", {
+        opacity: 1,
+        duration: counterDur * 0.6,
+        ease: "power2.out",
+      }, counterStart);
+
+      // === t=4.0s → 4.5s: counter "lands" with elastic scale pulse =========
+      // The hero number gets one satisfying impact bounce.
+      tl.fromTo("#counter-wrap",
+        { scale: 1 },
+        { scale: 1.08, duration: 0.32, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        4.00);
+      tl.to("#counter-wrap",
+        { scale: 1, duration: 0.55, ease: "elastic.out(1, 0.55)", transformOrigin: "50% 50%" },
+        4.32);
+
+      // Glow flashes brighter on the landing
+      tl.to("#counter-glow", {
+        opacity: 1,
+        scale: 1.15,
+        duration: 0.4,
+        ease: "back.out(2)",
+      }, 4.00);
+      tl.to("#counter-glow", {
+        scale: 1.05,
+        duration: 0.6,
+        ease: "expo.out",
+      }, 4.40);
+
+      // === t=4.5s → 5.0s: subtext fades in =================================
+      tl.fromTo("#subtext",
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" },
+        4.50);
+
+      // === t=4.8s: growth pill fades in with a small whip ==================
+      tl.fromTo("#growth-row",
+        { opacity: 0, y: 12, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.7)" },
+        4.80);
+
+      // === t=5.0s → 6.0s: HOLD with continuous motion ======================
+
+      // (A) Eyebrow letter-spacing "breath" — subtle, ambient
+      tl.to("#eyebrow", {
+        letterSpacing: "0.46em",
+        duration: 1.0,
+        ease: "sine.inOut",
+      }, 5.00);
+
+      // (B) Eyebrow dot heartbeat — pulses 3 times during the hold
+      tl.to("#eyebrow-dot", {
+        scale: 1.35,
+        opacity: 0.7,
+        duration: 0.35,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 3,
+        transformOrigin: "50% 50%",
+      }, 5.00);
+
+      // (C) Counter glow pulse during hold — breathing rhythm
+      tl.to("#counter-glow", {
+        opacity: 0.85,
+        scale: 1.10,
+        duration: 0.7,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 5.00);
+
+      // (D) Background orb drift — slow ambient zoom for "depth"
+      tl.to("#bg-orb", {
+        opacity: 0.9,
+        scale: 1.05,
+        duration: 1.0,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 5.00);
+
+      // (E) Background grid slow drift (parallax)
+      tl.fromTo("#grid-bg",
+        { x: 0, y: 0 },
+        { x: -14, y: -8, duration: 1.0, ease: "none" },
+        5.00);
+
+      // (F) Subtext gentle drift upward
+      tl.to("#subtext", {
+        y: -4,
+        duration: 1.0,
+        ease: "sine.inOut",
+        overwrite: "auto",
+      }, 5.05);
+
+      // (G) Counter micro "breath" — tiny scale flex over the hold
+      tl.to("#counter-wrap", {
+        scale: 1.012,
+        duration: 0.7,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 5.00);
+
+      // (H) Growth pill subtle bob
+      tl.to("#growth-row", {
+        y: -3,
+        duration: 1.0,
+        ease: "sine.inOut",
+        overwrite: "auto",
+      }, 5.35);
+
+      window.__timelines["scene-03-counter-million-showcase"] = tl;
+    })();
+  </script>
+</body>
+</html>

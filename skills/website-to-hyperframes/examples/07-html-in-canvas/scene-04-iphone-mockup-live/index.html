@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-04-iphone-mockup-live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #04030a; }
+
+    [data-composition-id="scene-04-iphone-mockup-live"] {
+      --ink: #f8fafc;
+      --muted: #8a8f99;
+      --accent: #6cf0d1;
+      --accent-warm: #ffb074;
+      --font-display: "Manrope", -apple-system, "SF Pro Display", sans-serif;
+      --font-data: "Geist Mono", "SF Mono", monospace;
+      position: relative;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: var(--font-display);
+      background:
+        radial-gradient(circle at 22% 30%, rgba(108, 240, 209, 0.18), transparent 50%),
+        radial-gradient(circle at 78% 70%, rgba(255, 176, 116, 0.18), transparent 55%),
+        linear-gradient(160deg, #07061a 0%, #0c0b22 45%, #100a26 100%);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Subtle background grid */
+    [data-composition-id="scene-04-iphone-mockup-live"] .grid {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, #000 0%, transparent 75%);
+    }
+
+    [data-composition-id="scene-04-iphone-mockup-live"] .ambient-blob {
+      position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0;
+    }
+
+    [data-composition-id="scene-04-iphone-mockup-live"] .particle {
+      position: absolute; width: 4px; height: 4px; border-radius: 50%;
+      background: rgba(255,255,255,0.7);
+      pointer-events: none; z-index: 1;
+      box-shadow: 0 0 6px rgba(255,255,255,0.6);
+    }
+
+    [data-composition-id="scene-04-iphone-mockup-live"] .grain {
+      position: absolute; inset: 0; pointer-events: none; z-index: 60; opacity: 0.05;
+      background-image:
+        radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1.2px),
+        radial-gradient(rgba(0,0,0,0.4) 1px, transparent 1.2px);
+      background-size: 3px 3px, 5px 5px;
+      background-position: 0 0, 1px 2px;
+      mix-blend-mode: overlay;
+    }
+
+    [data-composition-id="scene-04-iphone-mockup-live"] .scene-label {
+      position: absolute; left: 48px; bottom: 36px;
+      font-size: 13px; color: #f8fafc;
+      letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500;
+      z-index: 100; font-family: "Manrope", sans-serif;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 9px 16px; border-radius: 100px;
+      backdrop-filter: blur(12px);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .scene-label .accent {
+      color: var(--accent); font-weight: 700; letter-spacing: 0.16em;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .scene-label .dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); margin: 0 10px 2px; vertical-align: middle;
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    /* Headline copy block (right side) */
+    [data-composition-id="scene-04-iphone-mockup-live"] .copy {
+      position: absolute; right: 120px; top: 50%; transform: translateY(-50%);
+      width: 600px; z-index: 5;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .copy .kicker {
+      display: inline-block; font-family: var(--font-data); font-weight: 500;
+      font-size: 12px; letter-spacing: 0.28em; color: var(--accent);
+      text-transform: uppercase;
+      padding: 7px 14px; border: 1px solid rgba(108,240,209,0.3);
+      border-radius: 100px; background: rgba(108,240,209,0.05);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .copy .title {
+      display: block; margin-top: 26px;
+      font-family: var(--font-display); font-weight: 800;
+      font-size: 84px; line-height: 0.98; letter-spacing: -0.035em;
+      color: #f8fafc;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .copy .title em {
+      font-style: normal; color: var(--accent);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .copy .sub {
+      display: block; margin-top: 22px;
+      font-family: var(--font-display); font-weight: 400;
+      font-size: 20px; line-height: 1.5; color: rgba(248,250,252,0.65);
+      max-width: 480px;
+    }
+
+    /* ============ Phone ============ */
+    [data-composition-id="scene-04-iphone-mockup-live"] .stage {
+      position: absolute; inset: 0; perspective: 2400px; perspective-origin: 50% 45%;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .phone {
+      position: absolute;
+      left: 280px; top: 50%;
+      width: 420px; height: 860px;
+      margin-top: -430px;
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .phone-shadow {
+      position: absolute; width: 380px; height: 64px;
+      left: 20px; bottom: -76px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 70%);
+      filter: blur(22px); border-radius: 50%; transform: translateZ(-1px);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .phone-body {
+      position: relative; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #3a3a3d 0%, #1c1c1e 50%, #2c2c2e 100%);
+      border-radius: 62px; padding: 10px;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.10),
+        inset 0 0 0 5px #1a1a1c,
+        inset 0 0 0 6px rgba(255,255,255,0.06),
+        0 40px 100px rgba(0,0,0,0.55),
+        0 12px 30px rgba(0,0,0,0.30);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .btn-vol,
+    [data-composition-id="scene-04-iphone-mockup-live"] .btn-pwr {
+      position: absolute; width: 5px; border-radius: 3px;
+      background: linear-gradient(180deg, #4a4a4e, #2c2c2e);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .btn-vol.up { left: -8px; top: 180px; height: 66px; }
+    [data-composition-id="scene-04-iphone-mockup-live"] .btn-vol.down { left: -8px; top: 260px; height: 66px; }
+    [data-composition-id="scene-04-iphone-mockup-live"] .btn-pwr { right: -8px; top: 210px; height: 96px; }
+    [data-composition-id="scene-04-iphone-mockup-live"] .phone-screen {
+      position: relative; width: 100%; height: 100%;
+      background: #0c0c0d; border-radius: 52px; overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .phone-shine {
+      position: absolute; inset: 0; border-radius: 52px;
+      background: linear-gradient(115deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 18%, transparent 35%, transparent 62%, rgba(255,255,255,0.05) 80%, rgba(255,255,255,0.12) 100%);
+      pointer-events: none; z-index: 30; mix-blend-mode: screen;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .dynamic-island {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      width: 124px; height: 34px; background: #000; border-radius: 20px;
+      z-index: 12; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .status-bar {
+      position: absolute; top: 20px; left: 0; right: 0;
+      display: flex; justify-content: space-between; padding: 0 34px;
+      font-weight: 600; font-size: 15px; color: #fff; z-index: 13;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .status-bar .icons {
+      display: flex; gap: 5px; align-items: center; font-size: 12px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .home-ind {
+      position: absolute; bottom: 11px; left: 50%; transform: translateX(-50%);
+      width: 154px; height: 5px; background: rgba(255,255,255,0.95);
+      border-radius: 3px; z-index: 25;
+    }
+
+    /* ============ GLOW app (meditation) — inner UI ============ */
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, #0e0a26 0%, #1e0f3d 50%, #2a1056 100%);
+      padding: 60px 0 100px;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow::before {
+      content: ""; position: absolute; inset: 0;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(180,120,255,0.35), transparent 55%),
+        radial-gradient(circle at 70% 80%, rgba(255,111,156,0.25), transparent 55%);
+      pointer-events: none;
+    }
+
+    /* Pages stack — pre-built, toggled via opacity */
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-page {
+      position: absolute; left: 0; right: 0; top: 60px; bottom: 100px;
+      padding: 0 22px; display: flex; flex-direction: column;
+      z-index: 2;
+    }
+
+    /* Page A — TODAY */
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 6px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-greeting .greet-time {
+      font-size: 13px; color: rgba(255,255,255,0.55); font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-greeting .greet-name {
+      font-size: 26px; font-weight: 800; color: white;
+      margin-top: 2px; letter-spacing: -0.02em;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, #6cf0d1, #ffb074);
+      display: flex; align-items: center; justify-content: center;
+      color: #0e0a26; font-weight: 800; font-size: 16px;
+      box-shadow: 0 6px 18px rgba(108,240,209,0.4);
+    }
+
+    /* Breathing orb hero */
+    [data-composition-id="scene-04-iphone-mockup-live"] .orb-wrap {
+      position: relative; margin: 24px auto 16px;
+      width: 240px; height: 240px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .orb {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), rgba(180,120,255,0.6) 35%, rgba(108,240,209,0.4) 75%, transparent 100%);
+      filter: blur(2px);
+      box-shadow: 0 0 80px rgba(180,120,255,0.6), inset 0 0 60px rgba(255,255,255,0.15);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .orb-ring {
+      position: absolute; inset: -16px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .orb-ring.r2 { inset: -32px; border-color: rgba(255,255,255,0.10); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .orb-ring.r3 { inset: -52px; border-color: rgba(255,255,255,0.05); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .orb-label {
+      position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      text-align: center; font-family: var(--font-data); font-size: 11px;
+      letter-spacing: 0.3em; color: white; text-transform: uppercase;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 3;
+    }
+
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-stat-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+      margin-top: 6px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-stat {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 10px 8px; text-align: center;
+      backdrop-filter: blur(8px);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-stat .lbl {
+      font-size: 9px; color: rgba(255,255,255,0.55);
+      text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-stat .val {
+      font-family: var(--font-data); font-size: 18px;
+      font-weight: 700; color: white; margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-stat .val .unit {
+      font-size: 10px; color: rgba(255,255,255,0.5); margin-left: 2px;
+    }
+
+    /* Page B — SESSIONS list (feed) */
+    [data-composition-id="scene-04-iphone-mockup-live"] .glow-page-b {
+      opacity: 0;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-title-row {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      margin-top: 6px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-title {
+      font-size: 26px; font-weight: 800; color: white; letter-spacing: -0.02em;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-count {
+      font-family: var(--font-data); font-size: 12px;
+      color: rgba(255,255,255,0.55); padding-bottom: 4px;
+    }
+
+    /* Scroll viewport for feed cards */
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-viewport {
+      position: relative; margin-top: 16px;
+      flex: 1; overflow: hidden;
+      mask-image: linear-gradient(180deg, transparent 0%, #000 6%, #000 88%, transparent 100%);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-track {
+      position: absolute; left: 0; right: 0; top: 0;
+      display: flex; flex-direction: column; gap: 10px;
+      will-change: transform;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 12px;
+      backdrop-filter: blur(8px);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb {
+      width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb.t1 { background: linear-gradient(135deg, #ff89c0, #b478ff); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb.t2 { background: linear-gradient(135deg, #6cf0d1, #5bd9ff); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb.t3 { background: linear-gradient(135deg, #ffb074, #ff6f9c); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb.t4 { background: linear-gradient(135deg, #b478ff, #5bd9ff); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb.t5 { background: linear-gradient(135deg, #ffb074, #b478ff); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-thumb.t6 { background: linear-gradient(135deg, #6cf0d1, #ffb074); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-info { flex: 1; min-width: 0; }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-name {
+      font-size: 14px; font-weight: 700; color: white;
+      letter-spacing: -0.01em;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-meta {
+      font-size: 10px; color: rgba(255,255,255,0.5);
+      margin-top: 2px;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .feed-len {
+      font-family: var(--font-data); font-size: 12px;
+      color: rgba(255,255,255,0.6); font-variant-numeric: tabular-nums;
+    }
+
+    /* Tab bar */
+    [data-composition-id="scene-04-iphone-mockup-live"] .tabbar {
+      position: absolute; left: 16px; right: 16px; bottom: 24px;
+      height: 60px; background: rgba(10,8,28,0.78);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: space-around;
+      z-index: 5;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .tab {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px; flex: 1;
+      color: rgba(255,255,255,0.4); font-size: 10px; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      transition: color 0.3s;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .tab .ico {
+      font-size: 18px; opacity: 0.85;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .tab.active { color: var(--accent); }
+    [data-composition-id="scene-04-iphone-mockup-live"] .tab-pill {
+      position: absolute; top: 6px; height: 3px; width: 24px;
+      background: var(--accent); border-radius: 2px;
+      box-shadow: 0 0 12px var(--accent);
+      left: 16px;
+    }
+
+    /* Notification banner */
+    [data-composition-id="scene-04-iphone-mockup-live"] .notif {
+      position: absolute; left: 14px; right: 14px; top: 58px;
+      background: rgba(20,16,40,0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 12px 14px;
+      display: flex; align-items: center; gap: 12px;
+      z-index: 20;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .notif-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #6cf0d1, #b478ff);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #0e0a26; font-weight: 800;
+      flex-shrink: 0;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .notif-body { flex: 1; min-width: 0; }
+    [data-composition-id="scene-04-iphone-mockup-live"] .notif-app {
+      font-size: 9px; color: rgba(255,255,255,0.5);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .notif-text {
+      font-size: 13px; color: white; font-weight: 600;
+      letter-spacing: -0.01em; margin-top: 1px;
+      line-height: 1.25;
+    }
+    [data-composition-id="scene-04-iphone-mockup-live"] .notif-time {
+      font-family: var(--font-data); font-size: 10px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* Tap pulse — visual feedback for the tab tap */
+    [data-composition-id="scene-04-iphone-mockup-live"] .tap-pulse {
+      position: absolute; width: 60px; height: 60px;
+      border-radius: 50%; border: 2px solid var(--accent);
+      pointer-events: none; opacity: 0;
+      z-index: 6;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="scene-04-iphone-mockup-live"
+       data-composition-id="scene-04-iphone-mockup-live"
+       data-start="0"
+       data-duration="7"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="grid"></div>
+    <div class="ambient-blob" id="blob-a" style="width: 540px; height: 540px; top: -120px; left: -120px; background: #b478ff; opacity: 0.25;"></div>
+    <div class="ambient-blob" id="blob-b" style="width: 620px; height: 620px; bottom: -160px; right: -160px; background: #6cf0d1; opacity: 0.18;"></div>
+    <div class="ambient-blob" id="blob-c" style="width: 320px; height: 320px; top: 540px; left: 880px; background: #ffb074; opacity: 0.15;"></div>
+
+    <!-- Pre-built deterministic particles (no Math.random) -->
+    <div class="particle" id="p1" style="left: 980px; top: 220px;"></div>
+    <div class="particle" id="p2" style="left: 1180px; top: 340px;"></div>
+    <div class="particle" id="p3" style="left: 1380px; top: 180px;"></div>
+    <div class="particle" id="p4" style="left: 1560px; top: 460px;"></div>
+    <div class="particle" id="p5" style="left: 1280px; top: 720px;"></div>
+    <div class="particle" id="p6" style="left: 1080px; top: 820px;"></div>
+    <div class="particle" id="p7" style="left: 1480px; top: 660px;"></div>
+    <div class="particle" id="p8" style="left: 1620px; top: 880px;"></div>
+    <div class="particle" id="p9" style="left: 860px; top: 540px;"></div>
+    <div class="particle" id="p10" style="left: 1720px; top: 280px;"></div>
+
+    <!-- Right-side headline copy -->
+    <div class="copy" id="copy">
+      <span class="kicker" id="copy-kicker"><span class="dot" style="display:inline-block; width:6px; height:6px; border-radius:50%; background: currentColor; vertical-align:middle; margin-right:8px; margin-bottom:2px; box-shadow:0 0 8px currentColor;"></span>LIVE PROTOTYPE</span>
+      <span class="title" id="copy-title">Ship the <em>app</em>,<br/>not the spec.</span>
+      <span class="sub" id="copy-sub">Every screen, every transition — rendered in a real device frame, real CSS, real motion. No mockups.</span>
+    </div>
+
+    <!-- Phone -->
+    <div class="stage">
+      <div class="phone" id="phone" style="transform: rotateY(15deg) rotateX(2deg) translateZ(0);">
+        <div class="phone-shadow" id="phone-shadow"></div>
+        <div class="phone-body">
+          <div class="btn-vol up"></div>
+          <div class="btn-vol down"></div>
+          <div class="btn-pwr"></div>
+          <div class="phone-screen">
+            <div class="dynamic-island"></div>
+            <div class="status-bar">
+              <span id="clock">9:41</span>
+              <span class="icons">●●● ◐ ▮</span>
+            </div>
+
+            <!-- LIVE APP — Glow meditation -->
+            <div class="glow">
+
+              <!-- PAGE A: Today (visible 0–3.5s) -->
+              <div class="glow-page glow-page-a" id="page-a">
+                <div class="glow-head">
+                  <div class="glow-greeting">
+                    <div class="greet-time">TUESDAY · 9:41</div>
+                    <div class="greet-name">Good morning, Iris</div>
+                  </div>
+                  <div class="glow-avatar">I</div>
+                </div>
+
+                <div class="orb-wrap">
+                  <div class="orb-ring r3"></div>
+                  <div class="orb-ring r2"></div>
+                  <div class="orb-ring"></div>
+                  <div class="orb" id="orb"></div>
+                  <div class="orb-label" id="orb-label">INHALE</div>
+                </div>
+
+                <div class="glow-stat-row">
+                  <div class="glow-stat">
+                    <div class="lbl">Streak</div>
+                    <div class="val"><span id="stat-streak">0</span><span class="unit">d</span></div>
+                  </div>
+                  <div class="glow-stat">
+                    <div class="lbl">Today</div>
+                    <div class="val"><span id="stat-today">0</span><span class="unit">min</span></div>
+                  </div>
+                  <div class="glow-stat">
+                    <div class="lbl">Heart</div>
+                    <div class="val"><span id="stat-hr">0</span><span class="unit">bpm</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PAGE B: Sessions feed (visible 3.5–7s) -->
+              <div class="glow-page glow-page-b" id="page-b" style="opacity: 0;">
+                <div class="feed-title-row">
+                  <div class="feed-title">Sessions</div>
+                  <div class="feed-count">12 NEW</div>
+                </div>
+
+                <div class="feed-viewport">
+                  <div class="feed-track" id="feed-track">
+                    <div class="feed-card">
+                      <div class="feed-thumb t1">∞</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Stillness in motion</div>
+                        <div class="feed-meta">Marisol · Beginner</div>
+                      </div>
+                      <div class="feed-len">10:00</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t2">~</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Ocean breath</div>
+                        <div class="feed-meta">Theo · Intermediate</div>
+                      </div>
+                      <div class="feed-len">15:00</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t3">☉</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Morning light flow</div>
+                        <div class="feed-meta">Iris · Daily</div>
+                      </div>
+                      <div class="feed-len">7:30</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t4">◇</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Crystal focus</div>
+                        <div class="feed-meta">Marisol · Deep work</div>
+                      </div>
+                      <div class="feed-len">25:00</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t5">✦</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Evening unwind</div>
+                        <div class="feed-meta">Theo · Sleep prep</div>
+                      </div>
+                      <div class="feed-len">20:00</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t6">∇</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Grounded sit</div>
+                        <div class="feed-meta">Marisol · 8 series</div>
+                      </div>
+                      <div class="feed-len">12:00</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t1">∞</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Body scan reset</div>
+                        <div class="feed-meta">Iris · Recovery</div>
+                      </div>
+                      <div class="feed-len">18:00</div>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-thumb t3">☉</div>
+                      <div class="feed-info">
+                        <div class="feed-name">Solar gratitude</div>
+                        <div class="feed-meta">Theo · Morning</div>
+                      </div>
+                      <div class="feed-len">9:00</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab bar (always visible) -->
+              <div class="tabbar">
+                <div class="tab" id="tab-1">
+                  <span class="ico">◐</span>
+                  <span>Today</span>
+                </div>
+                <div class="tab" id="tab-2">
+                  <span class="ico">≋</span>
+                  <span>Sessions</span>
+                </div>
+                <div class="tab" id="tab-3">
+                  <span class="ico">♡</span>
+                  <span>Pulse</span>
+                </div>
+                <div class="tab" id="tab-4">
+                  <span class="ico">◌</span>
+                  <span>You</span>
+                </div>
+                <div class="tab-pill" id="tab-pill"></div>
+              </div>
+
+              <!-- Tap visual feedback -->
+              <div class="tap-pulse" id="tap-pulse"></div>
+
+              <!-- Notification banner (off-screen until 5.5s) -->
+              <div class="notif" id="notif" style="opacity:0;">
+                <div class="notif-icon">G</div>
+                <div class="notif-body">
+                  <div class="notif-app">GLOW · NOW</div>
+                  <div class="notif-text">Theo just joined your evening sit.</div>
+                </div>
+                <div class="notif-time">now</div>
+              </div>
+            </div>
+
+            <div class="home-ind"></div>
+            <div class="phone-shine"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grain"></div>
+
+    <div class="scene-label">
+      Scene&nbsp;04 <span class="dot"></span>
+      <span class="accent">iPhone Mockup</span> &nbsp;·&nbsp; Live Screen &nbsp;·&nbsp; CSS-only frame + animated UI
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      /* ============ Phone entrance — 0 → 1.5s ============ */
+      tl.fromTo("#phone",
+        { y: 80, scale: 0.78, autoAlpha: 0, rotationY: 30, rotationX: -4 },
+        { y: 0, scale: 1, autoAlpha: 1, rotationY: 15, rotationX: 2, duration: 1.2, ease: "elastic.out(1, 0.65)" },
+        0.0
+      );
+      tl.fromTo("#phone-shadow",
+        { opacity: 0, scaleX: 0.6 },
+        { opacity: 1, scaleX: 1, duration: 1.2, ease: "power2.out" },
+        0.0
+      );
+
+      /* ============ Headline copy entrance — 0.4 → 1.6s ============ */
+      tl.fromTo("#copy-kicker",
+        { y: 18, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.55, ease: "power3.out" },
+        0.45
+      );
+      tl.fromTo("#copy-title",
+        { y: 30, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.7, ease: "power4.out" },
+        0.65
+      );
+      tl.fromTo("#copy-sub",
+        { y: 20, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.6, ease: "power3.out" },
+        0.95
+      );
+
+      /* ============ Page A elements settle in — 0.6 → 1.5s ============ */
+      tl.fromTo(".glow-page-a .greet-time",
+        { y: 8, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.45, ease: "power2.out" },
+        0.7
+      );
+      tl.fromTo(".glow-page-a .greet-name",
+        { y: 10, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.5, ease: "power3.out" },
+        0.78
+      );
+      tl.fromTo(".glow-avatar",
+        { scale: 0, autoAlpha: 0 },
+        { scale: 1, autoAlpha: 1, duration: 0.5, ease: "back.out(1.8)" },
+        0.85
+      );
+
+      // Orb pulses in
+      tl.fromTo("#orb",
+        { scale: 0.3, autoAlpha: 0 },
+        { scale: 1, autoAlpha: 1, duration: 0.9, ease: "back.out(1.4)" },
+        0.7
+      );
+      tl.fromTo(".orb-ring",
+        { scale: 0.5, autoAlpha: 0 },
+        { scale: 1, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: "power3.out" },
+        0.85
+      );
+      tl.fromTo("#orb-label",
+        { autoAlpha: 0 },
+        { autoAlpha: 1, duration: 0.4, ease: "power2.out" },
+        1.1
+      );
+
+      // Stats appear
+      tl.fromTo(".glow-stat",
+        { y: 16, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.5, stagger: 0.07, ease: "power3.out" },
+        1.0
+      );
+
+      // Tab bar slides up
+      tl.fromTo(".tabbar",
+        { y: 70, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.6, ease: "power3.out" },
+        0.9
+      );
+      tl.set("#tab-1", { className: "tab active" }, 0.9);
+      // Position pill under tab 1 (visual: tab 1 is leftmost in 4-tab bar)
+      // Tab bar inner width = phone width - 32 (16px margin each side) = 388, /4 = ~97 per tab
+      // Pill center under tab 1: 16 + 97*0.5 - 12 (half pill width 24/2) = ~52
+      tl.set("#tab-pill", { left: 52 }, 0.9);
+
+      /* ============ Continuous orb breathing — full 7s ============ */
+      // Orb scale: breathe in/out continuously. Use keyframes for cycle.
+      tl.to("#orb", {
+        keyframes: [
+          { scale: 1.08, duration: 1.6, ease: "sine.inOut" },
+          { scale: 0.92, duration: 1.6, ease: "sine.inOut" },
+          { scale: 1.06, duration: 1.4, ease: "sine.inOut" },
+          { scale: 0.95, duration: 1.4, ease: "sine.inOut" }
+        ],
+        transformOrigin: "50% 50%"
+      }, 1.5);
+
+      // Orb rings drift outward subtly
+      tl.to(".orb-ring", {
+        scale: 1.05, duration: 3.0, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.12
+      }, 1.5);
+
+      // Orb label swaps via tl.set (seek-safe)
+      tl.set("#orb-label", { textContent: "INHALE" }, 1.1);
+      tl.set("#orb-label", { textContent: "HOLD" }, 2.7);
+      tl.set("#orb-label", { textContent: "EXHALE" }, 3.0);
+      tl.set("#orb-label", { textContent: "BREATHE" }, 3.4);
+
+      /* ============ Status bar clock ticks — seek-safe sets ============ */
+      // Clock goes 9:41 → 9:42 mid-scene, gives a sense of time passing
+      tl.set("#clock", { textContent: "9:41" }, 0);
+      tl.set("#clock", { textContent: "9:42" }, 3.5);
+      tl.set("#clock", { textContent: "9:43" }, 6.0);
+
+      /* ============ Page A counters — Today's stats animate in 0.8–1.6s ============ */
+      // Streak 0 → 47
+      var streakSteps = [
+        [0.80, "0"], [0.92, "12"], [1.04, "24"], [1.16, "34"], [1.28, "41"], [1.40, "45"], [1.52, "47"]
+      ];
+      streakSteps.forEach(function (p) { tl.set("#stat-streak", { textContent: p[1] }, p[0]); });
+
+      // Today minutes 0 → 12
+      var todaySteps = [
+        [0.85, "0"], [0.95, "3"], [1.05, "6"], [1.15, "8"], [1.25, "10"], [1.35, "11"], [1.45, "12"]
+      ];
+      todaySteps.forEach(function (p) { tl.set("#stat-today", { textContent: p[1] }, p[0]); });
+
+      // HR 0 → 64 bpm (resting)
+      var hrSteps = [
+        [0.90, "0"], [1.00, "22"], [1.10, "41"], [1.20, "54"], [1.30, "61"], [1.40, "64"]
+      ];
+      hrSteps.forEach(function (p) { tl.set("#stat-hr", { textContent: p[1] }, p[0]); });
+
+      // After settling, HR breathes (drift sets) — continuous motion through hold
+      var hrDrift = [
+        [2.20, "64"], [2.50, "63"], [2.80, "62"], [3.10, "62"], [3.40, "63"],
+        [3.90, "65"], [4.30, "66"], [4.70, "65"], [5.10, "64"], [5.50, "64"], [6.00, "63"], [6.50, "63"]
+      ];
+      hrDrift.forEach(function (p) { tl.set("#stat-hr", { textContent: p[1] }, p[0]); });
+
+      /* ============ Phone subtle breath/parallax — continuous ============ */
+      tl.to("#phone", {
+        keyframes: [
+          { y: -6, rotationY: 13, rotationX: 3, duration: 1.8, ease: "sine.inOut" },
+          { y: 4, rotationY: 17, rotationX: 1.5, duration: 1.8, ease: "sine.inOut" },
+          { y: -3, rotationY: 14, rotationX: 2.5, duration: 1.4, ease: "sine.inOut" },
+          { y: 0, rotationY: 15, rotationX: 2, duration: 1.4, ease: "sine.inOut" }
+        ]
+      }, 1.5);
+
+      /* ============ Tap on Sessions tab — 2.4s ============ */
+      // Tap pulse appears at tab 2 center
+      // Tab 2 center within tabbar: 16 + 97 + 97*0.5 = ~161 from left edge of tabbar (=14+16 margin) — but
+      // tap-pulse is inside .glow, so its left = phone padding (0) + tabbar offset (16) + tab2 center (97+97/2) — pill width compensates
+      // Simpler: tab2 center within glow = 16 (tabbar left) + (388/4)*1 + (388/4)/2 = 16 + 97 + 48.5 = 161.5
+      // Pulse circle is 60px → left = 161.5 - 30 = 131.5
+      // top: tabbar top = bottom 24 + 60(height) → from .glow's top (60) ... easier to position by bottom
+      tl.set("#tap-pulse", { left: 132, bottom: 24, top: "auto" }, 0);
+
+      tl.to("#tap-pulse", {
+        opacity: 1, scale: 1, duration: 0.05, ease: "none"
+      }, 2.3);
+      tl.fromTo("#tap-pulse",
+        { scale: 0.4 },
+        { scale: 1.6, opacity: 0, duration: 0.55, ease: "power2.out" },
+        2.3
+      );
+
+      // Tab pill slides from tab 1 → tab 2
+      // tab2 center = 16 + 97 + 48.5 = ~161.5 → pill left = 161.5 - 12 = 149
+      tl.to("#tab-pill", {
+        left: 149, duration: 0.45, ease: "power3.out"
+      }, 2.35);
+
+      // Tab class swaps (seek-safe via discrete set)
+      tl.set("#tab-1", { className: "tab" }, 2.35);
+      tl.set("#tab-2", { className: "tab active" }, 2.35);
+
+      /* ============ Page A → Page B transition (slide) — 2.4–3.4s ============ */
+      // Slide page A out left, slide page B in from right
+      tl.to("#page-a", {
+        x: -120, opacity: 0, duration: 0.45, ease: "power3.inOut"
+      }, 2.45);
+
+      // Make page B visible and slide it in
+      tl.fromTo("#page-b",
+        { x: 140, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+        2.55
+      );
+
+      /* ============ Feed scroll — 3.6–5.4s ============ */
+      // Each card ~70px tall + 10px gap = 80px. Scroll up by ~280px to reveal more cards.
+      tl.fromTo("#feed-track",
+        { y: 0 },
+        { y: -260, duration: 1.7, ease: "power2.inOut" },
+        3.6
+      );
+
+      // Subtle continuous scale on whichever feed card is "centered" — just keep feed alive
+      // (no individual card highlight — the scroll motion is the motion)
+
+      /* ============ Notification banner slides down — 5.5–7s ============ */
+      // Comes down from above the phone screen; "above" inside .glow is negative top relative to .glow
+      tl.fromTo("#notif",
+        { y: -120, opacity: 0, scale: 0.95 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "back.out(1.6)" },
+        5.5
+      );
+
+      // Subtle settle wobble after banner lands
+      tl.to("#notif", {
+        keyframes: [
+          { y: -2, duration: 0.4, ease: "sine.inOut" },
+          { y: 0, duration: 0.4, ease: "sine.inOut" },
+          { y: -1, duration: 0.35, ease: "sine.inOut" },
+          { y: 0, duration: 0.35, ease: "sine.inOut" }
+        ]
+      }, 6.05);
+
+      // Notification icon subtle glow pulse
+      tl.to(".notif-icon", {
+        boxShadow: "0 0 18px rgba(108,240,209,0.7)",
+        duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 2
+      }, 5.7);
+
+      /* ============ Ambient blobs drift — full 7s ============ */
+      tl.to("#blob-a", {
+        x: 60, y: 40, duration: 7, ease: "sine.inOut"
+      }, 0);
+      tl.to("#blob-b", {
+        x: -50, y: -30, duration: 7, ease: "sine.inOut"
+      }, 0);
+      tl.to("#blob-c", {
+        x: 30, y: -40, scale: 1.1, duration: 7, ease: "sine.inOut"
+      }, 0);
+
+      /* ============ Particles ambient drift — deterministic, individually wired ============ */
+      // Each particle gets a unique drift path (no Math.random — values baked in)
+      var pSpecs = [
+        ["#p1", -40, -60, 0.4, 1.0],
+        ["#p2",  30, -50, 0.5, 0.9],
+        ["#p3", -25,  35, 0.6, 1.1],
+        ["#p4",  45,  25, 0.3, 0.8],
+        ["#p5", -55,  20, 0.7, 1.2],
+        ["#p6",  20, -45, 0.5, 1.0],
+        ["#p7", -30,  55, 0.4, 0.85],
+        ["#p8",  40, -25, 0.6, 1.15],
+        ["#p9", -20, -35, 0.5, 0.95],
+        ["#p10", 35,  45, 0.4, 1.05]
+      ];
+      pSpecs.forEach(function (s) {
+        var sel = s[0], dx = s[1], dy = s[2], opa = s[3], scl = s[4];
+        tl.fromTo(sel, { opacity: 0 }, { opacity: opa, duration: 0.8, ease: "power2.out" }, 0.4);
+        tl.to(sel, {
+          x: dx, y: dy, scale: scl,
+          duration: 6.2, ease: "sine.inOut"
+        }, 0.8);
+      });
+
+      /* ============ Copy subtle continuous breath ============ */
+      tl.to("#copy-title", {
+        keyframes: [
+          { y: -3, duration: 2.5, ease: "sine.inOut" },
+          { y: 0, duration: 2.5, ease: "sine.inOut" }
+        ]
+      }, 1.8);
+
+      window.__timelines["scene-04-iphone-mockup-live"] = tl;
+    })();
+  </script>
+</body>
+</html>

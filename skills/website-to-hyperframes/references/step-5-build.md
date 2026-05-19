@@ -260,21 +260,36 @@ The Studio preview server rewrites base URLs to the project root — `../` paths
 
 ## 3. Build each composition — USE SUB-AGENTS
 
-**Before dispatching: copy the closest example scene into `compositions/` as the starting point for each beat.** The storyboard's technique-pick checklist (step-3) cited specific scene paths per beat. Do not write any beat from scratch — there is always a closer example in [`examples/`](../examples/). Copy `<example-scene>/index.html` to `compositions/beat-N-name.html`, then the sub-agent mutates it.
+**The storyboard's technique-pick checklist** (step-3) already assigned each beat a **mode** — `copy+mutate`, `recombine`, or `fresh` — and cited specific example scenes. The build process honors that mode:
 
-Quick mapping:
-- "Show a kanban / project board" → start from `examples/04-composed-ui/scene-01-kanban-board/index.html`
-- "Show chat / messaging" → start from `examples/04-composed-ui/scene-02-chat-with-typing/index.html`
-- "Show terminal / CLI / command" → start from `examples/04-composed-ui/scene-03-terminal-typeon/index.html`
-- "Show command palette / Cmd+K" → start from `examples/04-composed-ui/scene-04-command-palette/index.html`
-- "Show stats / dashboard / numbers" → start from `examples/04-composed-ui/scene-05-dashboard-counters/index.html`
-- "Show files / folder tree" → start from `examples/04-composed-ui/scene-06-file-tree-reveal/index.html`
-- "Show code editor" → start from `examples/04-composed-ui/scene-07-code-editor-typing/index.html`
-- "Show calendar / schedule" → start from `examples/04-composed-ui/scene-08-calendar-events/index.html`
-- Hero text reveal → start from `examples/01-typography/scene-01-soft-blur-in/index.html` (or pick another text effect)
-- Terminal-typed headline → start from `examples/01-typography/scene-02-typewriter-mechanical/index.html`
+- **mode: copy+mutate** → seed `compositions/beat-N-name.html` from the cited scene's `index.html`, then sub-agent mutates content + brand + data. Same scaffold, different soul. NEVER ship the scene unchanged — if the diff against the example is only renamed CSS classes and color swaps, you copied without thinking.
 
-**The non-negotiable rule:** if a beat's primary visual is a UI element that exists in `examples/04-composed-ui/`, that beat is built by copying the matching scene. Not by screenshotting a captured asset.
+- **mode: recombine** → seed `compositions/beat-N-name.html` from the closest scene as the structural base, then layer in patterns from the other cited scenes (counter logic from scene X, marker overlay from scene Y, etc.). The output should not be identifiable as any single source scene.
+
+- **mode: fresh** → don't seed from any scene. Sub-agent writes from scratch. The cited scenes are taste/technique references only — they inform easing choices, continuous-motion practice, deterministic patterns, but the markup is original to this beat.
+
+### Quick reference: which scene to start from (mode 1 + 2)
+
+If your beat's primary visual matches one of these, start from the matching scene:
+
+- Kanban / project board → `examples/04-composed-ui/scene-01-kanban-board/`
+- Chat / messaging → `examples/04-composed-ui/scene-02-chat-with-typing/`
+- Terminal / CLI / command output → `examples/04-composed-ui/scene-03-terminal-typeon/`
+- Command palette / Cmd+K → `examples/04-composed-ui/scene-04-command-palette/`
+- Stats / dashboard / KPI cards → `examples/04-composed-ui/scene-05-dashboard-counters/`
+- File tree / sidebar → `examples/04-composed-ui/scene-06-file-tree-reveal/`
+- Code editor / syntax-colored typing → `examples/04-composed-ui/scene-07-code-editor-typing/`
+- Calendar / schedule → `examples/04-composed-ui/scene-08-calendar-events/`
+- Phone mockup with app inside → `examples/07-html-in-canvas/scene-04-iphone-mockup-live/` or `examples/04-composed-ui/scene-09-phone-mockups/`
+- MacBook mockup → `examples/07-html-in-canvas/scene-05-macbook-mockup-live/`
+- Terminal + live preview split → `examples/04-composed-ui/scene-10-terminal-with-preview/`
+- Timeline / video editor UI → `examples/04-composed-ui/scene-11-timeline-editor-ui/`
+- Big counter (stat reveal) → `examples/09-counters-and-data/scene-03-counter-million-showcase/`
+- Hero text reveal → `examples/01-typography/scene-01-soft-blur-in/` (or other text-effect scene)
+- Terminal-typed headline → `examples/01-typography/scene-02-typewriter-mechanical/`
+- "Real beat" template combining 6 techniques → `examples/12-combined-vignettes/scene-03-product-launch-beat/`
+
+**The non-negotiable rule:** if a beat's primary visual is a UI element that has an example scene, the beat is built either by copy+mutate or recombine — never by screenshotting a captured asset. If neither mode 1 nor 2 fits, use mode 3 and write fresh — but never reach for a screenshot of an interface that has a scene available.
 
 **Before dispatching, also re-read DESIGN.md and STORYBOARD.md.** You wrote these files earlier in the session and you think you remember them. You don't — not the exact hex values, not the specific font families, not the button border-radius, not the Do's/Don'ts. Re-read them now so you can paste accurate brand rules and beat specs into each sub-agent prompt.
 

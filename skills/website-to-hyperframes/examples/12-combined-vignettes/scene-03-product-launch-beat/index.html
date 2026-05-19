@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-03-product-launch-beat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #050505; }
+
+    /* ============================================================
+       PRODUCT LAUNCH BEAT — 6 techniques in one 8-second hero beat.
+       Layer order (bottom -> top):
+         1) deep warm-to-cool radial gradient base
+         2) ambient floating particles (continuous drift)
+         3) radial glow pulse halo behind logo
+         4) SVG path stroke-draw logo (technique 1)
+         5) per-character soft-blur-in headline (technique 2)
+         6) per-word kinetic subtitle (technique 3)
+         7) counter callout with tl.set() ticking (technique 4)
+         8) CTA button with hand-drawn circle marker (technique 5)
+         9) scene label
+       Continuous motion (technique 6) runs the whole 8s:
+         - glow halo sine.inOut yoyo
+         - 5 floating particles drifting
+         - subtle scale-breath on the entire composition
+       ============================================================ */
+
+    #scene-03-product-launch-beat {
+      position: relative;
+      overflow: hidden;
+      /* Deep premium gradient — warm amber/orange at center fading to cool
+         indigo/black at edges. Reads as "spotlight on stage." */
+      background:
+        radial-gradient(ellipse at 50% 42%, #3a1a06 0%, #1a0e1f 38%, #08091a 72%, #040408 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* breath wrap — entire stage gets a subtle scale yoyo (technique 6c) */
+    .breath {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      transform-origin: 50% 50%;
+      will-change: transform;
+    }
+
+    /* === Layer 2: ambient floating particles ============================= */
+    .particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      will-change: transform, opacity;
+      pointer-events: none;
+    }
+    .particle.warm  { background: #f59e0b; box-shadow: 0 0 14px #f59e0b, 0 0 28px rgba(245,158,11,0.4); }
+    .particle.cool  { background: #60a5fa; box-shadow: 0 0 14px #60a5fa, 0 0 26px rgba(96,165,250,0.35); }
+    .particle.coral { background: #fb7185; box-shadow: 0 0 12px #fb7185, 0 0 24px rgba(251,113,133,0.35); }
+
+    /* === Layer 3: radial glow halo behind logo (technique 6a) =========== */
+    .glow-halo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 720px;
+      height: 720px;
+      margin: -360px 0 0 -360px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%,
+          rgba(245, 158, 11, 0.55) 0%,
+          rgba(245, 158, 11, 0.22) 22%,
+          rgba(236, 72, 153, 0.10) 45%,
+          transparent 70%);
+      filter: blur(40px);
+      will-change: transform, opacity;
+      pointer-events: none;
+      opacity: 0.6;
+      transform: translate(0, -120px) scale(1);
+    }
+
+    /* === Layer 4: SVG path stroke-draw logo (technique 1) ============== */
+    .logo-wrap {
+      position: absolute;
+      top: calc(50% - 280px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 132px;
+      height: 132px;
+      will-change: transform;
+    }
+    .logo-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      display: block;
+    }
+    .logo-path {
+      fill: none;
+      stroke: #f5f5f7;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.55));
+      /* Hide the round-linecap dot artifact at t=0 when offset == pathLength.
+         GSAP fades opacity to 1 at t=0.30s just before the draw begins. */
+      opacity: 0;
+    }
+    .logo-accent {
+      fill: none;
+      stroke: #f59e0b;
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.7));
+      opacity: 0;
+    }
+
+    /* === Layer 5: per-character soft-blur-in headline (technique 2) ==== */
+    .headline {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: "Inter", sans-serif;
+      font-size: 144px;
+      font-weight: 900;
+      letter-spacing: -0.035em;
+      line-height: 1.0;
+      color: #f5f5f7;
+      white-space: nowrap;
+      text-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+      display: inline-block;
+    }
+    .headline .char {
+      display: inline-block;
+      white-space: pre;
+      backface-visibility: hidden;
+      transform-origin: 50% 55%;
+      will-change: transform, opacity, filter;
+      /* Locked off so snapshot frame 0 shows blank state before timeline runs */
+      opacity: 0;
+      filter: blur(12px);
+      transform: translateY(24px);
+    }
+
+    /* === Layer 6: per-word kinetic subtitle (technique 3) ============== */
+    .subtitle {
+      position: absolute;
+      top: calc(50% + 110px);
+      left: 50%;
+      transform: translate(-50%, 0);
+      font-family: "Inter", sans-serif;
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: #c4cad4;
+      white-space: nowrap;
+      display: flex;
+      gap: 18px;
+    }
+    .subtitle .sub-word {
+      display: inline-block;
+      will-change: transform, opacity;
+      opacity: 0;
+    }
+    .subtitle .sub-word.accent-a { color: #fbbf24; }
+    .subtitle .sub-word.accent-b { color: #f5f5f7; }
+    .subtitle .sub-word.accent-c { color: #fb7185; }
+
+    /* === Layer 7: counter callout (technique 4) ======================== */
+    .stat {
+      position: absolute;
+      top: calc(50% + 200px);
+      left: 50%;
+      transform: translate(-50%, 0);
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      color: #8a93a0;
+      text-transform: uppercase;
+      will-change: opacity;
+      opacity: 0;
+    }
+    .stat-number {
+      font-family: "Inter", sans-serif;
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: -0.01em;
+      color: #f5f5f7;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 10px #34d399;
+      align-self: center;
+    }
+
+    /* === Layer 8: CTA button + hand-drawn marker (technique 5) ========= */
+    .cta-wrap {
+      position: absolute;
+      top: calc(50% + 280px);
+      left: 50%;
+      transform: translate(-50%, 0);
+      will-change: transform, opacity;
+      opacity: 0;
+      /* Allow the hand-drawn marker SVG to extend outside the button bounds
+         without being clipped (the circle is wider than the word "Start"). */
+      overflow: visible;
+    }
+    .cta {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 36px;
+      background: linear-gradient(180deg, #f5f5f7 0%, #e5e7eb 100%);
+      color: #0a0a0a;
+      border-radius: 999px;
+      font-family: "Inter", sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -0.005em;
+      box-shadow:
+        0 20px 50px -20px rgba(245, 158, 11, 0.5),
+        0 8px 24px -8px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    }
+    .cta-emphasis {
+      position: relative;
+      display: inline-block;
+      padding: 0 6px;
+      /* Establish a stacking context so the marker SVG can sit visually
+         above the button background without escaping the button entirely. */
+      z-index: 2;
+    }
+    .cta-arrow {
+      font-size: 24px;
+      font-weight: 700;
+      will-change: transform;
+      display: inline-block;
+    }
+    /* Hand-drawn coral circle scribed around the word "Start".
+       Sits OUTSIDE the button as a sibling so the button's white background
+       doesn't cover the coral stroke. Positioned absolutely over the "Start"
+       region; z-index above the button itself. */
+    .cta-marker {
+      position: absolute;
+      /* Match the left edge + width of the .cta-emphasis span inside the button.
+         Padding-left ~36 + the chevron region put "Start" near the left third.
+         Centered on roughly the same point — see CSS:left+width below. */
+      top: 50%;
+      left: 90px;     /* approx center of "Start" text inside button */
+      width: 130px;
+      height: 96px;
+      transform: translate(-50%, -50%) rotate(-3deg);
+      pointer-events: none;
+      overflow: visible;
+      opacity: 0;
+      z-index: 10;
+    }
+    .cta-marker path {
+      fill: none;
+      stroke: #fb7185;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 8px rgba(251, 113, 133, 0.7));
+    }
+
+    /* === scene label =================================================== */
+    .scene-label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-family: "Inter", sans-serif;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 100;
+    }
+    .scene-label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-03-product-launch-beat"
+       data-composition-id="scene-03-product-launch-beat"
+       data-start="0"
+       data-duration="8"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="breath" id="breath">
+
+      <!-- LAYER 3: radial glow halo (continuous pulse) -->
+      <div class="glow-halo" id="glow-halo"></div>
+
+      <!-- LAYER 2: ambient particles (5 floating dots) -->
+      <div class="particle warm"  id="p-1" style="top: 22%; left: 12%;"></div>
+      <div class="particle cool"  id="p-2" style="top: 78%; left: 18%;"></div>
+      <div class="particle coral" id="p-3" style="top: 32%; left: 84%;"></div>
+      <div class="particle warm"  id="p-4" style="top: 68%; left: 88%;"></div>
+      <div class="particle cool"  id="p-5" style="top: 12%; left: 64%;"></div>
+
+      <!-- LAYER 4: SVG logo (stroke-draw lightning/arrow mark)
+           Geometric lightning bolt rendered as an open path so stroke-dasharray
+           can animate the draw-on. viewBox is 100x100 so coords stay readable. -->
+      <div class="logo-wrap" id="logo-wrap">
+        <svg class="logo-svg" viewBox="0 0 100 100">
+          <!-- main bolt outline -->
+          <path class="logo-path" id="logo-path"
+                pathLength="1000"
+                d="M 56 8 L 22 56 L 46 56 L 38 92 L 78 40 L 54 40 L 64 8 Z"/>
+          <!-- accent stroke — short flourish line drawn separately for layered build -->
+          <path class="logo-accent" id="logo-accent"
+                pathLength="1000"
+                d="M 14 70 L 30 70"/>
+        </svg>
+      </div>
+
+      <!-- LAYER 5: per-character headline. Text built into DOM at author time so
+           snapshot tool can seek to any timestamp without callback mutation. -->
+      <div class="headline" id="headline">
+        <span class="char">B</span><span class="char">u</span><span class="char">i</span><span class="char">l</span><span class="char">t</span><span class="char"> </span><span class="char">d</span><span class="char">i</span><span class="char">f</span><span class="char">f</span><span class="char">e</span><span class="char">r</span><span class="char">e</span><span class="char">n</span><span class="char">t</span><span class="char">.</span>
+      </div>
+
+      <!-- LAYER 6: per-word kinetic subtitle. Three words, three different easings. -->
+      <div class="subtitle" id="subtitle">
+        <span class="sub-word accent-a" id="sw-0">Faster.</span>
+        <span class="sub-word accent-b" id="sw-1">Smarter.</span>
+        <span class="sub-word accent-c" id="sw-2">Yours.</span>
+      </div>
+
+      <!-- LAYER 7: counter callout — green live-dot + ticking number + caption -->
+      <div class="stat" id="stat">
+        <span class="stat-dot" id="stat-dot"></span>
+        <span class="stat-number" id="stat-number">0</span>
+        <span>builders shipping</span>
+      </div>
+
+      <!-- LAYER 8: CTA + hand-drawn circle marker around "Start".
+           Marker SVG is a SIBLING of the button (not a child) so the button's
+           opaque background doesn't cover the coral stroke. Positioned
+           absolutely over the "Start" region of the button. -->
+      <div class="cta-wrap" id="cta-wrap">
+        <a class="cta" id="cta">
+          <span class="cta-emphasis">Start</span>
+          <span>building</span>
+          <span class="cta-arrow" id="cta-arrow">→</span>
+        </a>
+        <svg class="cta-marker" id="cta-marker" viewBox="0 0 400 200" preserveAspectRatio="none">
+          <path id="cta-marker-path"
+                pathLength="2000"
+                stroke-dasharray="2000 2000"
+                stroke-dashoffset="2000"
+                d="
+            M 62 104
+            C 56 68, 116 36, 202 34
+            C 296 32, 350 66, 352 100
+            C 354 138, 286 170, 196 168
+            C 108 166, 54 138, 58 102
+            C 58 88, 72 76, 88 70
+          "/>
+        </svg>
+      </div>
+
+    </div>
+
+    <div class="scene-label">
+      Scene 03 &middot; <span class="accent">Product Launch Beat</span> &middot; 6 techniques combined in one 8s hero beat
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+
+      gsap.registerPlugin(CustomEase);
+
+      // === Signature easings ============================================
+      // Apple-keynote curve for the per-char headline.
+      var softEase = CustomEase.create("soft", "0.22, 1, 0.36, 1");
+      // Three distinct per-word easings for kinetic subtitle variety
+      // (technique 3 — never use one ease for everything).
+      var wordEaseA = CustomEase.create("wEaseA", "0.16, 1, 0.3, 1");
+      var wordEaseB = "back.out(1.7)";
+      var wordEaseC = "elastic.out(1, 0.6)";
+
+      var root = document.getElementById("scene-03-product-launch-beat");
+      function $(id) { return root.querySelector("#" + id); }
+
+      var tl = gsap.timeline({ paused: true });
+      var chars = root.querySelectorAll("#headline .char");
+      var subWords = root.querySelectorAll("#subtitle .sub-word");
+
+      // === t=0 INITIAL LOCK ============================================
+      // Every animated element is locked to its pre-entrance state so the
+      // snapshot tool's frame-0 capture is deterministic (before GSAP can
+      // run any tl.set tweens, CSS shows the same initial state).
+      tl.set("#logo-path",   { opacity: 0, attr: { "stroke-dasharray": "1000 1000", "stroke-dashoffset": 1000 } }, 0);
+      tl.set("#logo-accent", { opacity: 0, attr: { "stroke-dasharray": "1000 1000", "stroke-dashoffset": 1000 } }, 0);
+      tl.set("#logo-wrap", { opacity: 0, scale: 0.92, transformOrigin: "50% 50%" }, 0);
+      tl.set(chars, { opacity: 0, y: 24, filter: "blur(12px)" }, 0);
+      tl.set(subWords, { opacity: 0, y: 18 }, 0);
+      tl.set("#stat", { opacity: 0, y: 12 }, 0);
+      tl.set("#cta-wrap", { opacity: 0, y: 30 }, 0);
+      tl.set("#cta-marker", { opacity: 0, rotation: -3, transformOrigin: "50% 50%" }, 0);
+      tl.set("#cta-marker-path", { attr: { "stroke-dasharray": "2000 2000", "stroke-dashoffset": 2000 } }, 0);
+      tl.set("#glow-halo", { opacity: 0.4, scale: 0.85, transformOrigin: "50% 50%" }, 0);
+
+      // Particles start at their CSS-positioned points; set initial micro-state.
+      var particles = ["#p-1", "#p-2", "#p-3", "#p-4", "#p-5"];
+      particles.forEach(function (sel) {
+        tl.set(sel, { opacity: 0, scale: 0.7 }, 0);
+      });
+
+      // =================================================================
+      // TECHNIQUE 6 (continuous motion) — kicks off at t=0 so it runs the
+      // ENTIRE beat. Three sub-layers: glow halo pulse, particle drift,
+      // composition scale breath.
+      // =================================================================
+
+      // (6a) Glow halo: opacity + scale yoyo pulse, sine.inOut, full beat.
+      tl.to("#glow-halo", { opacity: 1, scale: 1, duration: 0.8, ease: "expo.out" }, 0);
+      tl.to("#glow-halo", {
+        scale: 1.12,
+        opacity: 0.92,
+        duration: 2.6,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 2,
+        transformOrigin: "50% 50%",
+      }, 0.8);
+
+      // (6b) Ambient particles — each drifts a unique direction + has
+      // its own opacity wiggle. Deterministic offsets, no Math.random.
+      // Floating particle metadata (px deltas + duration) — varied so the
+      // group reads as natural drift, not a synchronized formation.
+      var particleDrift = [
+        { sel: "#p-1", dx:  60, dy: -40, dur: 6.5, fade: 0.85 },
+        { sel: "#p-2", dx: -50, dy:  35, dur: 5.8, fade: 0.7  },
+        { sel: "#p-3", dx: -40, dy: -55, dur: 7.2, fade: 0.9  },
+        { sel: "#p-4", dx:  45, dy:  50, dur: 6.0, fade: 0.75 },
+        { sel: "#p-5", dx: -30, dy:  60, dur: 6.8, fade: 0.8  }
+      ];
+      particleDrift.forEach(function (p, i) {
+        var startT = 0.2 + i * 0.08;
+        // fade in
+        tl.to(p.sel, { opacity: p.fade, scale: 1, duration: 0.6, ease: "expo.out" }, startT);
+        // continuous drift across the rest of the beat
+        tl.to(p.sel, { x: p.dx, y: p.dy, duration: p.dur, ease: "sine.inOut" }, startT);
+        // subtle opacity wiggle so they "twinkle" instead of holding flat
+        tl.to(p.sel, {
+          opacity: p.fade * 0.6,
+          duration: 1.4,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 3,
+        }, startT + 0.5);
+      });
+
+      // (6c) Subtle camera breath — entire stage 1.0 -> 1.012 yoyo through beat.
+      tl.fromTo("#breath",
+        { scale: 1.0 },
+        { scale: 1.012, duration: 4.0, ease: "sine.inOut", yoyo: true, repeat: 1, transformOrigin: "50% 50%" },
+        0);
+
+      // =================================================================
+      // TECHNIQUE 1 — SVG path stroke-draw logo (t=0.30s -> 1.10s).
+      // power4.out for that confident decisive pen-snap. The main bolt
+      // path draws first; the small accent flourish draws right after.
+      // =================================================================
+      tl.to("#logo-wrap", { opacity: 1, scale: 1, duration: 0.4, ease: "expo.out" }, 0.30);
+      // 40ms opacity gate just before each stroke draws — same trick as the
+      // marker scene uses, hides the round-linecap dot at offset == pathLength.
+      tl.to("#logo-path", { opacity: 1, duration: 0.04, ease: "none" }, 0.26);
+      tl.to("#logo-path", {
+        attr: { "stroke-dashoffset": 0 },
+        duration: 0.80,
+        ease: "power4.out",
+      }, 0.30);
+      tl.to("#logo-accent", { opacity: 1, duration: 0.04, ease: "none" }, 0.81);
+      tl.to("#logo-accent", {
+        attr: { "stroke-dashoffset": 0 },
+        duration: 0.35,
+        ease: "power4.out",
+      }, 0.85);
+      // tiny "fill confirmation" pulse on the logo after the draw completes
+      tl.to("#logo-wrap", {
+        scale: 1.06,
+        duration: 0.25,
+        ease: "back.out(2)",
+        yoyo: true, repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 1.10);
+
+      // =================================================================
+      // TECHNIQUE 2 — Per-character soft-blur-in headline (t=0.80s -> 1.60s).
+      // 16 chars over ~0.8s with 18ms stagger and the Apple keynote curve.
+      // =================================================================
+      tl.to(chars, {
+        opacity: 1,
+        y: 0,
+        filter: "blur(0px)",
+        duration: 0.64,
+        stagger: 0.022,
+        ease: softEase,
+      }, 0.80);
+
+      // =================================================================
+      // TECHNIQUE 3 — Kinetic-typography subtitle (t=1.60s -> 2.40s).
+      // Each word uses a DIFFERENT easing — wEaseA (cubic-bezier), back.out,
+      // elastic.out — to demonstrate easing variety in one beat.
+      // =================================================================
+      tl.fromTo("#sw-0",
+        { opacity: 0, y: 18, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: wordEaseA },
+        1.60);
+      tl.fromTo("#sw-1",
+        { opacity: 0, y: 18, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: wordEaseB },
+        1.80);
+      tl.fromTo("#sw-2",
+        { opacity: 0, y: 18, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.65, ease: wordEaseC },
+        2.00);
+
+      // =================================================================
+      // TECHNIQUE 4 — Counter callout (t=2.40s -> 3.60s).
+      // Number animates 0 -> 12,847 via discrete tl.set() steps (NOT
+      // onUpdate — that fires during playback but NOT during tl.seek()).
+      // 25 steps over 1.2s = readable smooth count, fully seekable.
+      // =================================================================
+      tl.to("#stat", { opacity: 1, y: 0, duration: 0.45, ease: "expo.out" }, 2.40);
+
+      var counterSteps = [
+        0, 80, 240, 540, 940, 1480, 2140, 2920, 3820, 4820,
+        5920, 7080, 8240, 9320, 10260, 11020, 11620, 12080, 12420, 12640,
+        12760, 12820, 12842, 12847, 12847
+      ];
+      var cStart = 2.45;
+      var cEnd   = 3.55;
+      var cDur   = cEnd - cStart;
+      counterSteps.forEach(function (v, i) {
+        var t = cStart + (i / (counterSteps.length - 1)) * cDur;
+        tl.set("#stat-number", { textContent: v.toLocaleString() }, t);
+      });
+      // green live-dot pulse — runs from when the counter starts through end of beat
+      tl.to("#stat-dot", {
+        scale: 1.5,
+        boxShadow: "0 0 18px #34d399",
+        duration: 0.55,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 7,
+        transformOrigin: "50% 50%",
+      }, 2.60);
+      // final whip celebration when counter lands
+      tl.fromTo("#stat-number",
+        { scale: 1 },
+        { scale: 1.08, duration: 0.25, ease: "back.out(2)", transformOrigin: "50% 50%" },
+        3.55);
+      tl.to("#stat-number", { scale: 1, duration: 0.35, ease: "expo.out", transformOrigin: "50% 50%" }, 3.80);
+
+      // =================================================================
+      // TECHNIQUE 5 — CTA button + hand-drawn marker (t=3.60s -> 5.20s).
+      // Button slides up with elastic settle. After it lands, a coral
+      // hand-drawn circle scribes around the word "Start".
+      // =================================================================
+      tl.fromTo("#cta-wrap",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.85, ease: "elastic.out(1, 0.6)" },
+        3.60);
+      // arrow chevron nudges right after the button lands — feels "ready"
+      tl.fromTo("#cta-arrow",
+        { x: 0 },
+        { x: 6, duration: 0.5, ease: "sine.inOut", yoyo: true, repeat: 5 },
+        4.20);
+
+      // 40ms opacity gate just before stroke draws — hides the round-linecap
+      // dot artifact that appears at stroke-dashoffset = pathLength.
+      tl.to("#cta-marker", { opacity: 1, duration: 0.04, ease: "none" }, 4.46);
+
+      // Hand-drawn circle scribes around "Start" — power4.out pen confidence.
+      tl.to("#cta-marker-path", {
+        attr: { "stroke-dashoffset": 0 },
+        duration: 0.70,
+        ease: "power4.out",
+      }, 4.50);
+
+      // "Wet ink" oscillation — the line feels alive after it's drawn.
+      tl.to("#cta-marker", {
+        rotation: -4.4,
+        scale: 1.04,
+        duration: 0.6,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 5.25);
+
+      // =================================================================
+      // FINAL HOLD (t=5.20s -> 8.00s) — all elements stay on screen with
+      // continuous motion already running (glow pulse, particle drift,
+      // breath, dot pulse, marker oscillation). One final headline pulse.
+      // =================================================================
+
+      // Subtle headline scale breath during the hold — per-char stagger
+      // so the lift feels like a wave moving through the text, not a uniform pop.
+      tl.to(chars, {
+        y: -4,
+        duration: 1.2,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        stagger: 0.012,
+      }, 5.60);
+
+      // Final hero pulse on the entire headline at t=7.10s — punctuates the end.
+      tl.to("#headline", {
+        scale: 1.04,
+        duration: 0.35,
+        ease: "back.out(1.7)",
+        transformOrigin: "50% 50%",
+      }, 7.10);
+      tl.to("#headline", {
+        scale: 1.0,
+        duration: 0.55,
+        ease: "expo.out",
+        transformOrigin: "50% 50%",
+      }, 7.45);
+
+      // CTA also gets a small "still here" emphasis near the end
+      tl.to("#cta", {
+        scale: 1.03,
+        duration: 0.4,
+        ease: "sine.inOut",
+        yoyo: true, repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 7.10);
+
+      window.__timelines["scene-03-product-launch-beat"] = tl;
+    })();
+  </script>
+</body>
+</html>

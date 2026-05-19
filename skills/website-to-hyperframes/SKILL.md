@@ -52,11 +52,25 @@ Users say things like:
 - **One scene from `01-typography/`** — pick whichever matches your headline style (soft-blur-in / typewriter / kinetic-center-build / mask-reveal-up / variable-font / glitch-rgb-split / scramble-decrypt / per-word-emphasis).
 - **The "bar" scenes**: [`04-composed-ui/scene-01-kanban-board/index.html`](examples/04-composed-ui/scene-01-kanban-board/index.html) and [`04-composed-ui/scene-02-chat-with-typing/index.html`](examples/04-composed-ui/scene-02-chat-with-typing/index.html) — these set the quality bar for every other scene and demonstrate the narration-sync pattern.
 
-After reading: you should be able to answer "for each beat I'm planning, which example scene am I going to copy as the starting point?"
+After reading: you should be able to answer "for each beat I'm planning, which example scenes inform it, and which of the three modes am I using?"
 
-**The non-negotiable rule:** if the user's prompt would lead you to use a product screenshot of an interface (kanban, chat, dashboard, etc.) as the primary visual of any beat — STOP. Open the matching scene in `examples/04-composed-ui/` and BUILD that UI from divs instead. The library exists to make this the path of least resistance.
+### The three legitimate modes for using examples
 
-**Gate:** you've read `examples/README.md` plus at least 3 scene HTMLs and named which scenes you'll use as starting points for which beats. Don't proceed to Step 0 until this is done.
+The library is a **reference frame**, not a template gallery. Pick the right mode per beat:
+
+1. **Copy + mutate** — when a single scene is a near-exact match for what the beat needs. Lift the scaffold (markup structure, GSAP timeline shape, easing variety), then swap content + brand colors + specific data. *Example:* your beat needs to show a kanban board → start from `04-composed-ui/scene-01-kanban-board/`, replace the "Sprint 24" content with the user's actual project, swap the blue/orange/green palette to the brand's, change task names, keep the drag-and-drop animation.
+
+2. **Recombine patterns** — when no single scene fits but 2-3 scenes have the right pieces. Pull the counter pattern from `04-05`, the marker overlay from `02-02`, the gradient text from `01-12`. Compose them yourself into something new. *Example:* a beat showing "users grew 12x" needs counter (from `04-05`) + emphasis marker (from `02-02`) + radial glow ambient (from `10-02`) — none of those scenes alone fits, but their patterns combined do.
+
+3. **Author fresh, examples as reference** — when the beat is genuinely novel and no scene is close enough. The examples still shape your taste (which easings, which motion intensities, what continuous-motion practices), but you write the markup from scratch. *Example:* a beat showing a fictional product's onboarding flow that has no direct parallel — you've read 10 example scenes by now, you internalize the conventions (CSS-locked initial states, `tl.fromTo()` for entrances, 3+ easings per scene, continuous motion through holds), and you author the beat fresh.
+
+### The non-negotiable in all 3 modes
+
+**You always customize.** Examples are NEVER the finished beat. If your beat is identifiable as "scene-01-kanban-board with content swapped" — you copied without thinking. The finished beat must look like THIS brand, in THIS narrative, with THIS data. Same scaffold, different soul.
+
+**And the screenshot rule:** if the user's prompt would lead you to use a product screenshot of an interface (kanban, chat, dashboard, etc.) as the primary visual of any beat — STOP. Open the matching scene in `examples/04-composed-ui/` and use mode 1 or 2 to build that UI from divs instead. The library exists to make this the path of least resistance.
+
+**Gate:** you've read `examples/README.md` plus at least 3 scene HTMLs, AND for each beat you're planning you can name (a) which scenes inform it and (b) which of the three modes you're using. Don't proceed to Step 0 until this is done.
 
 ---
 
