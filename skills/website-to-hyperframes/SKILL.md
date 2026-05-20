@@ -40,9 +40,19 @@ Users say things like:
 
 ---
 
-## Step -1: Study the Example Library (REQUIRED before Step 0)
+## Step -1: What we're actually making (REQUIRED before Step 0)
 
-**Read:** [examples/README.md](examples/README.md) — the HyperFrames Capability Showcase. Production-grade scenes for every technique HyperFrames can do, each composed 100% from divs/SVG/HTML/CSS/GSAP — zero captured screenshots, zero slideshow shortcuts.
+You're not making *a video*. You're making something that **stops scrollers** in the first 1.5 seconds and **feels alive in every single frame** — with motion, depth, momentum, like things exist in a physical world. **Think about how to go viral.** Slow intros are for cinematic trailers; videos shipping anywhere social or feed-based need a hook that beats the 1.5-second scroll threshold.
+
+**Get everything you need yourself.** Compose the load-bearing visuals — kanban boards from cards-as-divs, logos from SVG paths, gradients from shader noise, counters via `tl.set()`, dashboards from layered panels, transitions from chromatic-split or ripple shaders. You are not limited to what was captured from the website. You can paint anything a browser can render. The 81 scenes in [`examples/`](examples/) are the bar — every one composed 100% from divs/SVG/canvas, zero captured screenshots, every frame moving.
+
+**Captured assets are accents and decorations, not the beat itself.** The brand logo on the closer. A hero illustration as a depth layer. A gradient image painted into a parallax background. The brand mark stamped onto a composed product UI. These enhance the beats you compose; they don't replace them. The most suitable combinations weave composed motion together with captured brand inflections — but composed motion is what carries the video.
+
+---
+
+### Study the Example Library (mandatory)
+
+**Read:** [examples/README.md](examples/README.md) — the HyperFrames Capability Showcase. 81 production-grade scenes for every technique HyperFrames can do, each composed 100% from divs/SVG/HTML/CSS/GSAP — zero captured screenshots, zero slideshow shortcuts.
 
 **Why this comes first:** every prior round of pipeline iteration showed agents defaulting to "screenshot + Ken Burns + voiceover" regardless of what the prompt asked for. Zero of eleven isolated component-eval runs used HTML-in-canvas, SVG path drawing, counter animations, kinetic typography, or any of HyperFrames' powerful capabilities. The skill prose has been exhausted as a lever; the lever is what you pattern-match to. These examples are that.
 

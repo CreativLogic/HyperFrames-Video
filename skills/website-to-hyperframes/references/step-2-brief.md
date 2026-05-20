@@ -48,43 +48,40 @@ Their answers modify the brand-derived baseline you built in Step 1. Don't overr
 
 ### Question 3: What do you SPECIFICALLY want to see?
 
-This is the open-ended question, but guide the user toward specificity. Frame it like this:
+This is the open-ended question, but guide the user toward specificity. Frame the options around **composed beats with brand inflection** — not around "what asset gets used where." The video's load-bearing visuals will be composed from scratch (kanban from divs, dashboards from layered panels, transitions from shaders); the captured assets are accents that decorate those composed beats with this brand's identity.
+
+Frame it like this:
 
 > "Now that I've analyzed your site, here's what I have to work with:
 >
-> - [N] product screenshots showing [describe what they actually show — be specific]
-> - [N] assets: [describe the most interesting ones — hero images, icons, illustrations, photos]
-> - [If Lottie found: "Lottie animations at [paths] showing [what they do]"]
-> - [If shaders found: "Your site uses WebGL effects — [describe: gradient wave, particle system, etc.] — I can recreate or build on these"]
-> - [If videos found: "Product videos showing [content]"]
-> - Your brand's visual language: [2-3 sentences on what makes this brand's visual style distinctive]
+> - **Brand inflection** — [2-3 sentences on what makes this brand's visual language distinctive: dominant colors, font character, mood]
+> - **Composed library** — every product UI, transition, counter, sparkline, and effect can be built from scratch using the [`examples/`](../examples/) library (81 reference scenes — kanban, chat, dashboard, terminal, shader transitions, particle fields, 3D scenes, audio-viz, etc.)
+> - **Brand accents available** — [1-2 most distinctive captured assets that earn a place: SVG logo for stroke-draw opener, hero illustration for a depth layer, gradient image for ambient wash]
+> - **Anything genuinely worth using as content** (rare) — [If the capture has something truly unique that can't be composed: a custom Lottie, real product video, a one-of-a-kind illustration — name it]
 >
-> Based on what I found, the most interesting things I could do with this specific capture:
+> Based on this, the most interesting beats I could compose for you:
 >
-> - [Capability directly tied to something found — e.g., "Your hero gradient wave animation could become a living background driving the whole video" or "The dashboard screenshot would look stunning mapped onto a 3D MacBook with your brand's dark glassmorphism treatment"]
-> - [Another specific possibility — e.g., "Your SVG logo has clean paths — I could draw it stroke by stroke as an opener"]
-> - [Another — e.g., "You have 6 product feature screenshots — these could fly in as a rapid showcase grid or be revealed one by one on rotating cards"]
-> - [If the capture has something unusual: name it specifically]
+> - [Compose-first example grounded in the brand — e.g., "Build the kanban board from cards-as-divs in your brand palette, with the captured logo stamped top-left and your hero gradient washing the background as ambient depth."]
+> - [Another — e.g., "Open with your SVG logo drawing itself stroke-by-stroke over a shader bloom that recreates your site's hero gradient — composed motion, brand colors woven in."]
+> - [Another — e.g., "Six product feature panels composed from scratch — kanban, dashboard, terminal, file tree, calendar, chat — each in your palette, with your wordmark stamped on each as identity."]
 >
-> Beyond what's in the capture, I can also search for or create additional assets — 3D models, custom shaders, stock footage — if anything would make the video stronger. Read [capabilities-overview.md](capabilities-overview.md) for the full picture of what's possible.
+> Beyond what's in the capture, I can also create additional assets — 3D models, custom shaders, illustrations, stock footage — if anything would make the video go further. The goal is something that stops scrollers and feels alive in every frame, not something that crossfades through screenshots. Read [capabilities-overview.md](capabilities-overview.md) for the full picture of what's possible.
 >
-> Do you have any specific scenes, moments, or effects you want to see? To help you think about it, here are a few directions that would work for your specific site:
+> Do you have any specific moments, beats, or effects you want to see? To help you think about it, here are a few directions that would work for your specific brand:
 >
-> [Generate 2–3 example direction prompts grounded in _this_ capture. Each one should reference something the agent actually has access to — an asset, a screenshot, a feature, an effect on the site. The goal is to model the _specificity_ of useful direction, not to suggest these specific moments.
+> [Generate 2–3 example direction prompts grounded in _this_ brand's identity. Each should describe a **composed beat** that weaves in the brand inflection (color / font / accent asset). Model the _specificity_ — name the composed reference + the brand accent that decorates it.
 >
-> Good capture-grounded examples have the form: "[do something specific] with [an asset/feature/effect that was actually captured]."
+> Good compose-first examples have the form: "[Compose X scene from examples/] in [this brand's palette/font], with [captured accent] [decorating it in this specific way]."
 >
 > Bad examples — what NOT to write here:
 >
-> - "I want the hero screenshot to come in on a rotating MacBook" (only valid if there are product UI screenshots AND the brand suggests device mockups)
-> - "Show the pricing tiers flying in one by one" (only valid if there is a pricing page in the capture)
-> - "Start with the logo drawing itself" (only valid if the captured logo is SVG with clean strokes)
->
-> The bad examples above are what an agent reaches for when it's not actually thinking about the captured site. Don't paste them — write 2–3 that come from _this_ site's screenshots, assets, copy, or distinctive elements.]
+> - "I want the hero screenshot to come in on a rotating MacBook" (asset-primary thinking — instead: "Compose the dashboard from divs and animate it inside a 3D MacBook")
+> - "Show the pricing tiers flying in one by one" (vague — instead: "Compose your 3 pricing tiers using `examples/04-composed-ui/scene-14-pricing-card-reveal/`, with your brand purple on the Pro tier")
+> - "Start with the logo drawing itself" (might be valid as an accent on a composed opener, but it can't be the whole opener — what else is happening?)]
 >
 > You don't need a complete vision — even one or two specific moments helps me build something you'll love. Or say 'surprise me' and I'll make the creative calls based on your brand."
 
-**Important:** The capabilities you mention must come from what was actually captured. If there are no product screenshots, don't mention the MacBook reveal. If there are no Lottie files, don't mention Lottie. If there are no shaders, don't mention recreating them. Every bullet should be grounded in the actual capture data — generic capability lists feel like a sales pitch, not a collaboration.
+**Important:** The directions you propose must lead with **composed beats**, with captured assets as accents. If you find yourself describing "the [asset] flying in" or "the [screenshot] mapped onto [thing]" — flip it. Lead with what gets composed and built, mention the brand accent as decoration second. Generic capability lists feel like a sales pitch; asset-primary lists feel like a slideshow.
 
 Present options:
 

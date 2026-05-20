@@ -189,27 +189,28 @@ Do NOT hand-code a Three.js device scene from scratch. The registry block handle
 
 ---
 
-## Asset Audit
+## Asset Audit (decoration only — composed beats carry the visual)
 
-Before writing any beats, audit every captured asset. Print this table:
+Audit captured assets to pick **the ones that will decorate your composed beats** — the brand logo for opener and closer, a hero illustration as a depth layer behind composed UI, a gradient image as an ambient wash, the brand wordmark stamped onto a composed product UI. **The composed builds carry the visual story; the assets garnish them.** Aim for 2-4 accent assets total across the whole video — accent count, not content count. The brand mark almost always earns a place; everything else has to justify itself.
 
-| Asset                          | Type       | Assign to Beat | Role                                  |
-| ------------------------------ | ---------- | -------------- | ------------------------------------- |
-| wave-fallback-desktop.png      | Hero image | Beat 1         | Full-bleed animated background        |
-| enterprise-accordion-hertz.png | Photo      | Beat 3         | Enterprise credibility, Ken Burns pan |
-| stripe-logo.svg                | SVG        | Beat 1, Beat 5 | Brand mark opener + closer            |
-| datavizstatic3x.png            | Data viz   | Beat 3         | Supporting visual behind stats        |
-| icon-3.svg                     | Icon       | SKIP           | Decorative, too small                 |
+Print this table — but the "Role" column should always read as "accent / decoration / brand inflection," never as "primary visual for this beat":
 
-and outline how many assets you have actually read/view from any sources or yourself.
+| Asset                          | Type       | Use it as           | Role                                        |
+| ------------------------------ | ---------- | ------------------- | ------------------------------------------- |
+| stripe-logo.svg                | SVG        | Beat 1 + Beat N     | Brand mark (opener stroke-draw, closer hold)|
+| wave-fallback-desktop.png      | Gradient   | Beat 3 bg layer     | Ambient depth wash behind composed dashboard|
+| datavizstatic3x.png            | Data viz   | SKIP                | Compose stats from `examples/09-counters-and-data/` instead |
+| enterprise-accordion-hertz.png | Photo      | SKIP                | Compose the customer-story UI from `examples/04-composed-ui/scene-15-testimonial-card/` |
+| icon-3.svg                     | Icon       | SKIP                | Decorative, too small to matter             |
 
-**Minimum utilization:**
+Mark assets `SKIP` when their composed equivalent already exists in [`examples/`](../examples/) — that's the strong default for product UI (dashboards, kanban, chat, terminal, file tree, calendar, etc.). The library covers them all.
 
-- Use as many assets as applicable for specific video request and concept
-- Brand logo appears in the first AND last beat unless the concept of the video is specific or different
-- The site's signature visual (gradient wave, hero illustration, key product UI) must appear anyhow — it's the most recognizable brand elements
-- Every beat must have a meaning in a bigger picture (full video)
-- Every beat must be visually interesting and engaging unless it's on purpose very bold and minimal
+**Composed bar:**
+
+- Every beat's primary visual comes from a composed scene (cite the matching `examples/` scene + mode in the beat's Composition + Accents section below)
+- Accents are layered on top — the brand mark, gradient washes, hero illustrations — to give the composed beat this brand's inflection
+- Every beat must feel alive in every frame (continuous motion — see Per-Beat Direction below)
+- Every beat must justify its place in the bigger picture (full video)
 
 ---
 
@@ -240,7 +241,9 @@ Use the pacing you decided at the top of this step. The beat count, duration, an
 
 **Frame-filling rule:** When describing visuals per beat, specify sizes as FRAME FILL PERCENTAGES, not pixels. "Product screenshot fills 80% of frame" not "600px wide card."
 
-**Use captured screenshots over CSS recreations.** The capture folder has real product UI — actual interfaces with real data, real colors, real chrome. You might or might not use them, but if you do, make it at full-bleed (100% frame width) with Ken Burns zoom or perspective tilt or 3D moving rotation or turn or whatever the best way you will find.
+**Compose the load-bearing visuals yourself.** Build the kanban from cards-as-divs. Draw the logo with SVG paths. Paint the gradient with shader noise. Animate the counter with `tl.set()`. The video should feel **alive in every frame** — motion that's continuous and tangible, **like things exist in a physical world**. Captured assets (brand logo, hero illustrations, gradient backgrounds, product photography) are accents you layer onto composed beats — they decorate, they don't carry. Find the most suitable combinations: composed UIs grounded in the brand's actual colors and fonts, with captured brand marks stamped in as identity, not as content. For every beat where the storyboard pull is "show the kanban / dashboard / chat / terminal," the answer is build it from [`examples/04-composed-ui/`](../examples/04-composed-ui/), not paste a screenshot.
+
+**Opener default: fast intro to stop the scrollers.** Even a cinematic video should start with a punch — a flash, a shader bloom, a logo strike, a kinetic word build, a particle burst — anything that lands inside the first 1.0–1.5 seconds. Slow intros work for prestige trailers; videos shipping anywhere social or feed-based need a hook that beats the 1.5-second scroll threshold. Plan the opener as the most ambitious beat in the storyboard, not the gentlest one.
 
 **CTA / closing beats** are consistently the weakest. Agents treat them as "logo + tagline + done." A good CTA should: make the logo entrance an event (SVG path draw, scale with overshoot, or anything awesome really), have continuous background motion, and hold only 2-3 seconds after the last spoken word — NOT 8-10 seconds of silence.
 
@@ -262,18 +265,24 @@ Which narration line plays over this beat (Also keep in mind the whole narration
 
 What the viewer sees — described cinematically, not as CSS specs. Use camera language and production motion designer vocabulary (pan, zoom, drift, settle, and more of those words). Think in layers — what's supposed to happen in the foreground, midground, background simultaneously?
 
-**For beats using captured screenshots:** specify which screenshot, how much of the frame it fills (%), and where text/labels go relative to the screenshot's safe zones (if there are any at all lol). Don't blindly center text over busy product UI or even on sides if it has something there.
+**For the rare beat where a captured asset is the primary visual** (e.g., a homepage-reveal beat where the literal site IS the subject, or a customer-photo beat where the photo is the content): specify which asset, how much of the frame it fills (%), and where text/labels go relative to its safe zones. Don't blindly center text over busy product UI. **These beats should be the exception, not the rule** — if every beat's primary visual is a captured asset, you've defaulted to the slideshow pattern the library exists to break.
 
-### Assets
+### Composition + Accents
 
-Every asset used in this beat — exact path from project root, exact usage intent. No vague references. Name the actual file from the capture and describe precisely how it's used.
+Two things, both required:
 
-Format (these are FORMAT EXAMPLES showing how to write it, not actual files to use):
+**Composed (load-bearing — what carries the beat):**
 
-- `capture/assets/<actual-filename>` — [what it is and exactly how it appears: fill %, motion, treatment, opacity, positioning]
-- `capture/assets/svgs/<actual-filename>` — [what it is and exactly how it enters and behaves]
+- Cite the matching scene from [`examples/`](../examples/) and the mode (`copy+mutate` / `recombine` / `fresh`). E.g. `examples/04-composed-ui/scene-01-kanban-board/`, mode: `copy+mutate`.
+- **Customize:** brand colors from DESIGN.md, content swap (real product data, not the example's), timing adjustments, narration-sync moments. Make this beat THIS brand's beat, not a recolored example.
 
-Write this section for the real captured files from THIS project's asset audit above, not from memory.
+**Accents (decoration only — what brand-inflects the beat):**
+
+- Optional. Most beats need 0-1 accent. Format: `capture/assets/<filename>` — how it appears: position, opacity, treatment, motion (e.g. `capture/assets/logo.svg` — top-left, 60×60, fades in at 0.4s, breathes during hold).
+- Common accent uses: brand logo stamped on composed UI, hero illustration as depth layer, gradient image as ambient bg wash, brand mark on a composed pricing card.
+- If a beat has no obvious accent need, leave this blank. The composed visual is enough.
+
+Write this section for THIS project's actual brand and the assets audited above — not from memory.
 
 ### Text Animations
 
