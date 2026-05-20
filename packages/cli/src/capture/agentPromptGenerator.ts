@@ -84,12 +84,18 @@ function buildPrompt(
       .join(", ") || "none detected";
 
   // Build the data inventory table rows
-  // Helper: find all contact sheet pages for a given base path
+  // Helper: find all contact sheet pages for a given base name. Matches the
+  // exact base file plus paginated variants only (e.g. `contact-sheet.jpg`,
+  // `contact-sheet-2.jpg`, `contact-sheet-3.jpg`). The "-NNN" suffix is digits
+  // only, so unrelated files that happen to share the prefix (notably the
+  // `contact-sheet-svgs.jpg` SVG fallback sheet in assets/) don't get mixed in.
   function contactSheetRows(dir: string, baseFile: string, label: string): string[] {
     const fullDir = join(outputDir, dir);
     if (!existsSync(fullDir)) return [];
+    const baseName = baseFile.replace(/\.jpg$/, "");
+    const paginatedRe = new RegExp(`^${baseName}(?:-\\d+)?\\.jpg$`);
     const all = readdirSync(fullDir)
-      .filter((f) => f.startsWith(baseFile.replace(".jpg", "")) && f.endsWith(".jpg"))
+      .filter((f) => paginatedRe.test(f))
       .sort();
     if (all.length === 0) return [];
     if (all.length === 1) {

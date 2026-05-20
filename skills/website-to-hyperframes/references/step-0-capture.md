@@ -35,7 +35,6 @@ Read every file below. After each one, **write a 3-4 sentence summary** of what 
    - `capture/screenshots/contact-sheet-*.jpg` — scroll screenshots grid. View FIRST. Each cell numbered with scroll percentage. List the directory if unsure how many pages exist.
    - `capture/assets/contact-sheet-*.jpg` — all downloaded raster images grid. Each cell labeled with filename.
    - `capture/assets/svgs/contact-sheet-*.jpg` — all SVGs rendered as thumbnails. Each cell labeled with filename. Check `capture/assets/` root too — some captures store SVGs there instead of `svgs/`.
-   - `capture/screenshots/full-page.png` — the entire page as one tall image. Useful for scrolling animation videos.
 
    After viewing the screenshot contact sheets, write 3-4 sentences describing the site's visual mood, layout patterns, color strategy, and overall feel. Then list, by filename, the 5-10 captured assets that look most promising for video use (logo, hero illustration, brand mark, gradient backgrounds, product art). **Open and view those promising assets individually** — the contact sheet thumbnails are too small to judge fine detail, but once you've narrowed to the 5-10 candidates, read each one carefully. Don't just trust the thumbnail.
 
@@ -51,23 +50,21 @@ Read every file below. After each one, **write a 3-4 sentence summary** of what 
 
 ### Required to check and read IF they exist
 
-6. **`capture/extracted/animations.json`** — See for yourself if the site uses scroll-triggered animations, marquees, canvas/WebGL, or named CSS animations. Just good to know.
+7. **`capture/extracted/animations.json`** — See for yourself if the site uses scroll-triggered animations, marquees, canvas/WebGL, or named CSS animations. Just good to know.
 
-7. **`capture/extracted/lottie-manifest.json`** — View each preview image at `capture/assets/lottie/previews/` to see what the animations look like. It will help you think of what you can do in the video.
+8. **`capture/extracted/lottie-manifest.json`** — View each preview image at `capture/assets/lottie/previews/` to see what the animations look like. It will help you think of what you can do in the video.
 
-8. **`capture/extracted/video-manifest.json`** — View each preview at `capture/assets/videos/previews/` to see what each video shows.
+9. **`capture/extracted/video-manifest.json`** — View each preview at `capture/assets/videos/previews/` to see what each video shows.
 
-9. **`capture/extracted/shaders.json`** — If present, this contains the actual GLSL shader code that powers the site's WebGL visual effects (gradient waves, particle systems, noise fields). Read the fragment shaders to extract: color values used in gradients, noise algorithms, blend functions. You are able to recreate similar effects in your compositions using Canvas 2D, Three.js, HTML-in-canvas or by embedding the shader patterns with a `<canvas>` + WebGL context. Absolutely read the patterns in `techniques.md`!!
+10. **`capture/extracted/shaders.json`** — If present, this contains the actual GLSL shader code that powers the site's WebGL visual effects (gradient waves, particle systems, noise fields). Read the fragment shaders to extract: color values used in gradients, noise algorithms, blend functions. You are able to recreate similar effects in your compositions using Canvas 2D, Three.js, HTML-in-canvas or by embedding the shader patterns with a `<canvas>` + WebGL context. Absolutely read the patterns in `techniques.md`!!
 
 ### Required On-demand (only when actually needed in Step 5)
 
-10. **Individual images in `capture/assets/`** — The contact sheet pages cover all assets. Only open an individual file when:
+11. **Individual images in `capture/assets/`** — The contact sheet pages cover all assets. Only open an individual file when:
     - You are placing text over a screenshot and need to check the safe zone / exact content at full resolution
     - A storyboard-assigned asset's contact sheet thumbnail is too small to judge its content
 
     Do NOT batch-view individual assets at this stage. That is what the contact sheets are for.
-
-11. **`capture/extracted/assets-catalog.json`** — If you notice there is something interesting in remote URLs assets, you are more than welcome to use them!!
 
 ### For rich captures (30+ images)
 

@@ -66,25 +66,36 @@ export async function captureScrollScreenshots(page: Page, outputDir: string): P
             /* ignore */
           }
         }
-        // Hide fixed/sticky overlays that aren't the main nav
-        const fixed = document.querySelectorAll<HTMLElement>("*");
-        for (const el of fixed) {
-          const style = window.getComputedStyle(el);
-          if (
-            (style.position === "fixed" || style.position === "sticky") &&
-            style.zIndex !== "auto" &&
-            parseInt(style.zIndex) > 100 &&
-            el.tagName !== "HEADER" &&
-            el.tagName !== "NAV" &&
-            !el.closest("header") &&
-            !el.closest("nav")
-          ) {
-            const rect = el.getBoundingClientRect();
-            // Only hide overlays that cover a significant portion of the viewport
-            if (rect.height > 80 && rect.width > window.innerWidth * 0.3) {
-              el.style.display = "none";
+        // Hide fixed/sticky overlays that aren't the main nav. Scanning every
+        // element with querySelectorAll('*') + getComputedStyle is O(n) DOM
+        // calls and can dominate evaluate() time on large pages. Narrow the
+        // candidate set with a TreeWalker that early-exits on viewport-sized
+        // rect checks (cheap) before reaching the expensive getComputedStyle.
+        const SCAN_CAP = 5000;
+        const minWidth = window.innerWidth * 0.3;
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+        let visited = 0;
+        let node = walker.nextNode();
+        while (node && visited < SCAN_CAP) {
+          visited++;
+          const el = node as HTMLElement;
+          const rect = el.getBoundingClientRect();
+          // Cheap viewport-size filter first — eliminates the vast majority of
+          // tiny / hidden / off-screen elements without touching getComputedStyle.
+          if (rect.height > 80 && rect.width > minWidth) {
+            const tag = el.tagName;
+            if (tag !== "HEADER" && tag !== "NAV" && !el.closest("header") && !el.closest("nav")) {
+              const style = window.getComputedStyle(el);
+              if (
+                (style.position === "fixed" || style.position === "sticky") &&
+                style.zIndex !== "auto" &&
+                parseInt(style.zIndex) > 100
+              ) {
+                el.style.display = "none";
+              }
             }
           }
+          node = walker.nextNode();
         }
       })
       .catch(() => {});

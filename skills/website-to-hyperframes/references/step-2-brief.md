@@ -112,9 +112,9 @@ Only ask if not already specified by the user:
 
 ### "Surprise me" / minimal direction
 
-Default to the safe path that matches the brand and according to what is the video for (this is the minimum requirement users supposed to tell like where does the video goes to, or what audience or occasion or context is it for...):
+When the user gives no creative direction, default to what the brand's visual identity and the video's purpose suggest. The minimum context you need before defaulting: **where the video is going** (social feed / landing page / pitch deck / TV ad) and **who it's for** (developers / consumers / enterprise / general audience). If either is missing, ask once — "where will this run, and who's the audience?" — then proceed.
 
-But still write an ambitious storyboard. "Surprise me" means "impress me", not "play it safe." Go bold.
+With that minimum in hand, still write an ambitious storyboard. "Surprise me" means "impress me," not "play it safe." Go bold.
 
 ### Specific direction
 

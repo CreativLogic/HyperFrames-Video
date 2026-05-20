@@ -117,7 +117,7 @@ export const fontRules: Array<(ctx: LintContext) => HyperframeLintFinding[]> = [
           "declarations with captured .woff2 files instead.",
         fixHint:
           "Replace the Google Fonts <link> or @import with @font-face { font-family: '...'; " +
-          "src: url('../capture/assets/fonts/Font.woff2'); } pointing to captured font files.",
+          "src: url('capture/assets/fonts/Font.woff2'); } pointing to captured font files.",
       });
     }
     return findings;
@@ -142,7 +142,7 @@ export const fontRules: Array<(ctx: LintContext) => HyperframeLintFinding[]> = [
         "These are not in the auto-resolved font list, so the renderer cannot supply them automatically. " +
         "Text will fall back to a generic font, producing incorrect typography in the video.",
       fixHint:
-        "Add @font-face { font-family: '...'; src: url('../capture/assets/fonts/...woff2'); } " +
+        "Add @font-face { font-family: '...'; src: url('capture/assets/fonts/...woff2'); } " +
         "for each font family, pointing to the captured .woff2 files.",
     });
     return findings;
