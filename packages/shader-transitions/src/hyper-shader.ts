@@ -903,7 +903,11 @@ export function init(config: HyperShaderConfig): GsapTimeline {
 
   const programs = new Map<string, WebGLProgram>();
   for (const t of transitions) {
-    if (!t.shader) continue; // CSS-only transitions have no WebGL program
+    // Strict undefined check — an explicit empty string from a vanilla-JS
+    // caller (the IIFE bundle is hand-loaded via <script> tags) should NOT
+    // be silently coerced into a CSS crossfade. The shader registry will
+    // throw a clear "unknown shader" error for it.
+    if (t.shader === undefined) continue;
     if (!programs.has(t.shader)) {
       try {
         programs.set(t.shader, createProgram(gl, getFragSource(t.shader)));
@@ -1302,11 +1306,19 @@ export function init(config: HyperShaderConfig): GsapTimeline {
     const toId = scenes[i + 1];
     if (!fromId || !toId) continue;
 
-    // CSS-only transition when shader is omitted — uses the fallback opacity
-    // crossfade path. No WebGL program or texture prewarming needed.
-    const isCssFallback = !t.shader;
-    const prog = isCssFallback ? null : (programs.get(t.shader!) ?? null);
-    if (!isCssFallback && !prog) continue; // shader requested but not compiled
+    // shader omitted → CSS crossfade. shader present but program failed to
+    // compile (logged above) → degrade gracefully to CSS crossfade so the
+    // opacity timeline still runs and scene progression isn't broken. Both
+    // paths land in the always-ready prog=null cache.
+    const requestedShader = t.shader !== undefined;
+    const compiledProg = requestedShader ? (programs.get(t.shader!) ?? null) : null;
+    const isCssFallback = !requestedShader || compiledProg === null;
+    if (requestedShader && compiledProg === null) {
+      console.warn(
+        `[HyperShader] Shader "${t.shader}" failed to compile — falling back to CSS crossfade.`,
+      );
+    }
+    const prog = isCssFallback ? null : compiledProg;
 
     const dur = t.duration ?? DEFAULT_DURATION;
     const ease = t.ease ?? DEFAULT_EASE;
@@ -1322,7 +1334,7 @@ export function init(config: HyperShaderConfig): GsapTimeline {
       frames: [],
       cacheKey: "",
       dirty: !isCssFallback,
-      ready: isCssFallback, // CSS fallback needs no prewarming
+      ready: isCssFallback,
       fallback: isCssFallback,
       persisted: isCssFallback,
       textureReady: false,
@@ -2274,16 +2286,13 @@ function initEngineMode(
     const rawH = Number(root?.getAttribute("data-height"));
     const compWidth = Number.isFinite(rawW) && rawW > 0 ? rawW : 1920;
     const compHeight = Number.isFinite(rawH) && rawH > 0 ? rawH : 1080;
-    // Page-side compositing only handles WebGL shader transitions. CSS
-    // crossfades are driven by GSAP opacity timelines elsewhere, so filter
-    // them out — passing them in would break the compositor's required
-    // `shader` field and produce a dead transition window with no rendering.
-    const shaderTransitions = transitions.filter(
-      (t): t is TransitionConfig & { shader: ShaderName } => !!t.shader,
-    );
+    // Pass the full transitions array so transition[i] still pairs with
+    // scenes[i]/scenes[i+1]. The compositor itself skips entries with
+    // `shader === undefined` while preserving the index↔scene mapping.
+    // (CSS crossfades remain driven by the GSAP opacity timeline.)
     installPageSideCompositor({
       scenes,
-      transitions: shaderTransitions,
+      transitions,
       bgColor,
       accentColors,
       width: compWidth,
