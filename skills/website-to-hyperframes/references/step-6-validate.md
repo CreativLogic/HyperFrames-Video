@@ -18,9 +18,45 @@ Score each item 1–5. If any item scores below 3, fix it before continuing. **D
 [ ] Brand assets actually visible         → for each beat, name which captured SVG / illustration / screenshot is on screen and at what timestamp. If a beat shows zero captured assets, justify why.
 [ ] Audio duration matches video ±0.5s    → paste both numbers
 [ ] animation-map.json generated          → run `node <repo-root>/skills/hyperframes/scripts/animation-map.mjs <project-dir>`; confirm every beat has events listed and no bbox/flag warnings
+[ ] w2h-verify report                     → run `node <repo-root>/skills/website-to-hyperframes/scripts/w2h-verify.mjs <project-dir>`; paste the FULL output (every row, every percent) verbatim into your final user-facing summary — see "w2h-verify — the source of truth" below
 [ ] Audio + motion verification done      → see "Audio + motion verification" below; played the full preview, confirmed SFX lands at storyboard timestamps
 [ ] Critic sub-agent run                  → paste its single biggest quality gap finding, verbatim
 ```
+
+### w2h-verify — the source of truth
+
+The skill ran for months on agents reading "REQUIRED" and skipping anyway. The verify script ends that — it computes facts the agent cannot fudge:
+
+- **Asset usage %** (assets referenced in compositions ÷ assets captured)
+- **Shader transitions consistency** (shaders declared in STORYBOARD.md vs shaders present in index.html)
+- **SFX timestamp drift** (storyboard `t=X.Xs` vs index.html `data-start=X.X`)
+- **animation-map.json existence**
+- **Rendered MP4 existence**
+- **Required artifacts present** (STORYBOARD.md, DESIGN.md, SCRIPT.md, index.html)
+
+Run it as the LAST gate in your DoD pass, after fixing everything else:
+
+```bash
+node <repo-root>/skills/website-to-hyperframes/scripts/w2h-verify.mjs <project-dir>
+```
+
+(Locate the repo root from a project subdirectory: `find / -path '*/skills/website-to-hyperframes/scripts/w2h-verify.mjs' -maxdepth 12 2>/dev/null | head -1`.)
+
+**The script's output is the deliverable.** Paste the entire report — the table, the percentages, the FAIL lines — verbatim into your final user-facing summary, in the "What I verified" / "What I did NOT verify" section. The user will read it directly. You don't get to summarize, simplify, or omit rows.
+
+**If any row says FAIL:**
+
+- Either fix the underlying issue and re-run until the row says PASS
+- Or include the FAIL row verbatim in your final summary's "What I did NOT verify" section with a one-sentence explanation of why you chose not to fix it
+
+**Forbidden:**
+
+- Hand-writing your own verification summary that doesn't match the script's output
+- Cherry-picking which rows to include
+- Replacing percentages with adjectives ("most assets used" instead of "8%")
+- Running the script, seeing FAIL, and not mentioning it
+
+The script's exit code is 0 (all pass) or 1 (one or more fail). If you ship with exit=1, the user knows from the report exactly what they're getting.
 
 ### Per-beat file read
 
