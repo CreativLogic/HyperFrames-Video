@@ -135,7 +135,13 @@ export async function pageScreenshotCapture(page: Page, options: CaptureOptions)
     format: isPng ? "png" : "jpeg",
     quality: isPng ? undefined : (options.quality ?? 80),
     fromSurface: true,
-    captureBeyondViewport: false,
+    // The explicit clip rect already constrains output to exact viewport
+    // dimensions. The additional viewport-boundary clipping from
+    // captureBeyondViewport:false is redundant and introduces intermittent
+    // 1-2px edge bleed: Chrome's compositor occasionally rounds the
+    // viewport boundary inward under load, exposing the body background
+    // at the bottom/right edge of the captured frame.
+    captureBeyondViewport: true,
     optimizeForSpeed: !isPng,
     clip,
   });

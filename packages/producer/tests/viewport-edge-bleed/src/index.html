@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #ff00ff; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 480px);
+    grid-template-rows: repeat(3, 360px);
+    width: 1920px;
+    height: 1080px;
+  }
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: bold 48px system-ui;
+    color: rgba(255,255,255,0.9);
+  }
+  .cell:nth-child(odd)  { background: #1a1a2e; }
+  .cell:nth-child(even) { background: #16213e; }
+</style>
+</head>
+<body>
+  <div id="root" data-composition-id="viewport-edge-bleed" data-width="1920" data-height="1080" data-start="0" data-duration="2">
+    <div class="grid">
+      <div class="cell">1</div><div class="cell">2</div><div class="cell">3</div><div class="cell">4</div>
+      <div class="cell">5</div><div class="cell">6</div><div class="cell">7</div><div class="cell">8</div>
+      <div class="cell">9</div><div class="cell">10</div><div class="cell">11</div><div class="cell">12</div>
+    </div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+  </script>
+</body>
+</html>

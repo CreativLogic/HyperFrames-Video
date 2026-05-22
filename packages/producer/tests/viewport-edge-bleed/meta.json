@@ -1,0 +1,13 @@
+{
+  "name": "viewport-edge-bleed",
+  "description": "Regression test for CDP screenshot viewport edge clipping. A red grid fills the viewport edge-to-edge; any body background bleed at the edges drops PSNR sharply against the golden baseline.",
+  "tags": ["regression", "capture"],
+  "minPsnr": 38,
+  "maxFrameFailures": 0,
+  "minAudioCorrelation": 0,
+  "maxAudioLagWindows": 1,
+  "renderConfig": {
+    "fps": 30,
+    "workers": 1
+  }
+}
