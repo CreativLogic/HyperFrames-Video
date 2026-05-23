@@ -7,15 +7,9 @@
 import { getAnonymousId, hasShownNotice, isOptedOut, markNoticeShown } from "./config";
 import { getBrowserSystemMeta } from "./system";
 
-// HeyGen's PostHog project key — write-only, safe to embed in client code.
-// OSS builds can override via `VITE_HYPERFRAMES_POSTHOG_KEY` at build time,
-// or set it to an empty string to disable telemetry entirely.
-const POSTHOG_API_KEY =
-  (import.meta.env.VITE_HYPERFRAMES_POSTHOG_KEY as string | undefined) ??
-  "phc_zjjbX0PnWxERXrMHhkEJWj9A9BhGVLRReICgsfTMmpx";
-const POSTHOG_HOST =
-  (import.meta.env.VITE_HYPERFRAMES_POSTHOG_HOST as string | undefined) ??
-  "https://us.i.posthog.com";
+// Write-only PostHog project key, safe to embed in client code.
+const POSTHOG_API_KEY = "phc_zjjbX0PnWxERXrMHhkEJWj9A9BhGVLRReICgsfTMmpx";
+const POSTHOG_HOST = "https://us.i.posthog.com";
 const FLUSH_INTERVAL_MS = 1_000;
 
 type EventProperties = Record<string, string | number | boolean | undefined>;
@@ -41,15 +35,24 @@ function isApiKeyConfigured(): boolean {
 // VITE_HYPERFRAMES_NO_TELEMETRY mirrors the CLI's HYPERFRAMES_NO_TELEMETRY=1
 // opt-out so HeyGen's own dev/CI builds can suppress telemetry from the studio
 // bundle the same way. Vite injects it at build time. Accepts "1" or "true".
+// `import.meta.env` may be undefined in non-Vite bundlers (Next.js Turbopack).
 function isBuildTimeOptOut(): boolean {
-  const v = import.meta.env.VITE_HYPERFRAMES_NO_TELEMETRY as string | undefined;
-  return v === "1" || v === "true";
+  try {
+    const v = import.meta.env.VITE_HYPERFRAMES_NO_TELEMETRY as string | undefined;
+    return v === "1" || v === "true";
+  } catch {
+    return false;
+  }
 }
 
 // `import.meta.env.DEV` is true under `vite dev` / `vite preview`. Auto-suppress
 // so developers running `hyperframes preview` don't pollute production telemetry.
 function isViteDevMode(): boolean {
-  return import.meta.env.DEV === true;
+  try {
+    return import.meta.env.DEV === true;
+  } catch {
+    return false;
+  }
 }
 
 export function shouldTrack(): boolean {
