@@ -27,7 +27,7 @@ function formatFilterNumber(value: number): string {
 }
 
 function escapeExpressionCommas(expression: string): string {
-  return expression.replace(/,/g, "\\,");
+  return expression.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
 }
 
 function buildVolumeExpression(track: AudioTrack): string {

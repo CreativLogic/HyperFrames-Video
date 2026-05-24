@@ -8,6 +8,7 @@ import {
   compileForRender,
   detectRenderModeHints,
   detectShaderTransitionUsage,
+  discoverAudioVolumeAutomationFromTimeline,
   inlineExternalScripts,
   recompileWithResolutions,
 } from "./htmlCompiler.js";
@@ -793,5 +794,74 @@ describe("text-rendering rule injection", () => {
     const compiled = await compileForRender(projectDir, join(projectDir, "index.html"), projectDir);
 
     expect(compiled.html.replace(/\s+/g, "")).toContain("text-rendering:geometricPrecision");
+  });
+});
+
+describe("discoverAudioVolumeAutomationFromTimeline", () => {
+  it("samples video-derived audio volume without firing GSAP callbacks", async () => {
+    class TestAudioElement {}
+    class TestVideoElement {
+      id = "bg-video";
+      dataset = { start: "0", duration: "1", volume: "0" };
+      volume = 0;
+    }
+
+    const video = new TestVideoElement();
+    const seekCalls: { time: number; suppressEvents: boolean | undefined }[] = [];
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    const previousAudioElement = globalThis.HTMLAudioElement;
+    const previousVideoElement = globalThis.HTMLVideoElement;
+
+    globalThis.window = {
+      __timelines: {
+        root: {
+          totalTime: (time: number, suppressEvents?: boolean) => {
+            seekCalls.push({ time, suppressEvents });
+            video.volume = Math.min(1, Math.max(0, time));
+          },
+        },
+      },
+    } as any;
+    globalThis.document = {
+      querySelector: (selector: string) =>
+        selector === "[data-composition-id]"
+          ? { getAttribute: (name: string) => (name === "data-composition-id" ? "root" : null) }
+          : null,
+      getElementById: (id: string) => (id === "bg-video" ? video : null),
+    } as any;
+    globalThis.HTMLAudioElement = TestAudioElement as any;
+    globalThis.HTMLVideoElement = TestVideoElement as any;
+
+    try {
+      const page = {
+        evaluate: async (fn: (arg: unknown) => unknown, arg: unknown) => fn(arg),
+      } as any;
+
+      const result = await discoverAudioVolumeAutomationFromTimeline(
+        page,
+        ["bg-video-audio"],
+        1,
+        2,
+      );
+
+      expect(result).toEqual([
+        {
+          id: "bg-video-audio",
+          keyframes: [
+            { time: 0, volume: 0 },
+            { time: 0.5, volume: 0.5 },
+            { time: 1, volume: 1 },
+          ],
+        },
+      ]);
+      expect(seekCalls.length).toBeGreaterThan(0);
+      expect(seekCalls.every((call) => call.suppressEvents === true)).toBe(true);
+    } finally {
+      globalThis.window = previousWindow;
+      globalThis.document = previousDocument;
+      globalThis.HTMLAudioElement = previousAudioElement;
+      globalThis.HTMLVideoElement = previousVideoElement;
+    }
   });
 });

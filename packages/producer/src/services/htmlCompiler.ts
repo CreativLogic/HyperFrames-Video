@@ -1155,9 +1155,9 @@ export async function discoverAudioVolumeAutomationFromTimeline(
 
       const seekTl = (t: number) => {
         if (typeof tl.totalTime === "function") {
-          tl.totalTime(t, false);
+          tl.totalTime(t, true);
         } else if (typeof tl.seek === "function") {
-          tl.seek(t, false);
+          tl.seek(t, true);
         }
       };
 

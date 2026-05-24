@@ -88,6 +88,22 @@ export interface ProbeStageResult {
   browserProbeMs: number;
 }
 
+export function hasScriptedAudioVolumeAutomation(html: string, audioCount: number): boolean {
+  if (audioCount <= 0) return false;
+
+  const scriptBodies = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((match) => match[1] ?? "")
+    .join("\n");
+  if (!scriptBodies) return false;
+
+  return (
+    /\.\s*volume\s*=/i.test(scriptBodies) ||
+    /\b(?:gsap|tl|timeline|tween)\s*\.\s*(?:to|fromTo|set)\s*\([\s\S]{0,2000}\bvolume\s*:/i.test(
+      scriptBodies,
+    )
+  );
+}
+
 export async function runProbeStage(input: ProbeStageInput): Promise<ProbeStageResult> {
   const {
     projectDir,
@@ -109,10 +125,10 @@ export async function runProbeStage(input: ProbeStageInput): Promise<ProbeStageR
 
   const probeStart = Date.now();
   const hasAutoStartVideos = compiled.html.includes("data-hf-auto-start");
-  const hasScriptedAudio =
-    composition.audios.length > 0 &&
-    /<script\b/i.test(compiled.html) &&
-    /\b(?:volume|data-volume)\b/i.test(compiled.html);
+  const hasScriptedAudio = hasScriptedAudioVolumeAutomation(
+    compiled.html,
+    composition.audios.length,
+  );
   const needsBrowser =
     composition.duration <= 0 ||
     compiled.unresolvedCompositions.length > 0 ||
