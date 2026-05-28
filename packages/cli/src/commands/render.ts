@@ -49,6 +49,7 @@ import { bytesToMb } from "../telemetry/system.js";
 import { VERSION } from "../version.js";
 import { isDevMode } from "../utils/env.js";
 import { buildDockerRunArgs } from "../utils/dockerRunArgs.js";
+import { normalizeErrorMessage } from "../utils/errorMessage.js";
 import type { RenderJob } from "@hyperframes/producer";
 import {
   normalizeResolutionFlag,
@@ -863,7 +864,7 @@ function handleRenderError(
   docker: boolean,
   hint: string,
 ): never {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = normalizeErrorMessage(error);
   trackRenderError({
     fps: fpsToNumber(options.fps),
     quality: options.quality,
