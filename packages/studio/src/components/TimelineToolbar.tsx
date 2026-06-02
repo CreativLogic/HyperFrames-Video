@@ -110,7 +110,7 @@ function useKeyframeToggle(session?: DomEditSessionSlice) {
     const elDuration = Number.parseFloat(sel.dataAttributes?.duration ?? "1") || 1;
     const pct =
       elDuration > 0
-        ? Math.max(0, Math.min(100, Math.round(((currentTime - elStart) / elDuration) * 100)))
+        ? Math.max(0, Math.min(100, Math.round(((currentTime - elStart) / elDuration) * 1000) / 10))
         : 0;
     state = kfAnim.keyframes.keyframes.some((k) => Math.abs(k.percentage - pct) <= 1)
       ? "active"
@@ -126,7 +126,7 @@ function useKeyframeToggle(session?: DomEditSessionSlice) {
           const elDuration = Number.parseFloat(sel.dataAttributes?.duration ?? "1") || 1;
           const pct =
             elDuration > 0
-              ? Math.max(0, Math.min(100, Math.round(((t - elStart) / elDuration) * 100)))
+              ? Math.max(0, Math.min(100, Math.round(((t - elStart) / elDuration) * 1000) / 10))
               : 0;
           const existing = kfAnim.keyframes.keyframes.find(
             (k) => Math.abs(k.percentage - pct) <= 1,

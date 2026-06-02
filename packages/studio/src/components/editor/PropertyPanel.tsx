@@ -239,7 +239,7 @@ export const PropertyPanel = memo(function PropertyPanel({
     const parsed = parsePxMetricValue(nextValue);
     if (parsed == null) return;
     if (gsapKeyframes && gsapAnimId && onAddKeyframe) {
-      const pct = Math.max(0, Math.min(100, Math.round(currentPct)));
+      const pct = Math.max(0, Math.min(100, Math.round(currentPct * 10) / 10));
       onAddKeyframe(gsapAnimId, pct, axis, parsed);
       return;
     }

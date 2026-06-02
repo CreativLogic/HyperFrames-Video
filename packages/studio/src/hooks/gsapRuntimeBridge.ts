@@ -95,7 +95,7 @@ function computeCurrentPercentage(selection: DomEditSelection): number {
   const elDuration = Number.parseFloat(selection.dataAttributes?.duration ?? "1") || 1;
   const currentTime = usePlayerStore.getState().currentTime;
   return elDuration > 0
-    ? Math.max(0, Math.min(100, Math.round(((currentTime - elStart) / elDuration) * 100)))
+    ? Math.max(0, Math.min(100, Math.round(((currentTime - elStart) / elDuration) * 1000) / 10))
     : 0;
 }
 
