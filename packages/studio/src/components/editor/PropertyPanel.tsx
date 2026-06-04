@@ -354,6 +354,46 @@ export const PropertyPanel = memo(function PropertyPanel({
               onCommit={(next) => commitManualRotation(next.replace("°", ""))}
             />
           </div>
+          {element.capabilities.canApplyManualSize && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] text-neutral-500 uppercase tracking-wider">Size</span>
+              <div className="flex rounded-md overflow-hidden border border-neutral-700">
+                <button
+                  type="button"
+                  className={`px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    !isFitContent
+                      ? "bg-neutral-700 text-neutral-200"
+                      : "bg-transparent text-neutral-500 hover:text-neutral-300"
+                  }`}
+                  onClick={() => {
+                    if (isFitContent) {
+                      const bcr = element.element.getBoundingClientRect();
+                      onSetStyle("width", `${Math.round(bcr.width) || 100}px`);
+                      onSetStyle("height", `${Math.round(bcr.height) || 100}px`);
+                    }
+                  }}
+                >
+                  Fixed
+                </button>
+                <button
+                  type="button"
+                  className={`px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    isFitContent
+                      ? "bg-neutral-700 text-neutral-200"
+                      : "bg-transparent text-neutral-500 hover:text-neutral-300"
+                  }`}
+                  onClick={() => {
+                    if (!isFitContent) {
+                      onSetStyle("width", "fit-content");
+                      onSetStyle("height", "fit-content");
+                    }
+                  }}
+                >
+                  Fit
+                </button>
+              </div>
+            </div>
+          )}
           <div className="mt-3">
             <MetricField
               label="Z-index"
@@ -362,33 +402,6 @@ export const PropertyPanel = memo(function PropertyPanel({
               onCommit={(next) => onSetStyle("z-index", next)}
             />
           </div>
-          {element.capabilities.canApplyManualSize && (
-            <div className="mt-3">
-              <button
-                type="button"
-                className={`w-full rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                  isFitContent
-                    ? "bg-studio-accent/20 text-studio-accent border border-studio-accent/30"
-                    : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-750 hover:text-neutral-300"
-                }`}
-                onClick={() => {
-                  if (isFitContent) {
-                    const bcr = element.element.getBoundingClientRect();
-                    const w = Math.round(bcr.width) || 100;
-                    const h = Math.round(bcr.height) || 100;
-                    onSetStyle("width", `${w}px`);
-                    onSetStyle("height", `${h}px`);
-                  } else {
-                    onSetStyle("width", "fit-content");
-                    onSetStyle("height", "fit-content");
-                  }
-                }}
-                title={isFitContent ? "Switch to fixed size" : "Size to fit content"}
-              >
-                {isFitContent ? "Fit Content ✓" : "Fit Content"}
-              </button>
-            </div>
-          )}
         </Section>
 
         {STUDIO_GSAP_PANEL_ENABLED &&
