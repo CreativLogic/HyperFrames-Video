@@ -332,7 +332,11 @@ export async function safeFetch(url: string, init?: RequestInit): Promise<Respon
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
       if (!loc) return res;
-      current = new URL(loc, current).toString();
+      try {
+        current = new URL(loc, current).toString();
+      } catch {
+        return null; // malformed Location header
+      }
       continue;
     }
     return res;
