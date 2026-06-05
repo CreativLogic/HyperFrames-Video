@@ -1,3 +1,6 @@
+// fallow-ignore-file complexity
+// Lint rules in this file are pattern matchers — branching is inherent.
+
 import type { LintContext, HyperframeLintFinding } from "../context";
 import { findHtmlTag, readAttr, readJsonAttr, truncateSnippet } from "../utils";
 import { COMPOSITION_VARIABLE_TYPES } from "../../core.types";

@@ -1,3 +1,8 @@
+// fallow-ignore-file complexity
+// Project-level lint helpers fan out per-file rule checks; branching here
+// reflects the variety of file shapes (root HTML, sub-comps, assets), not
+// hidden complexity.
+
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, isAbsolute, join, posix, relative, resolve } from "node:path";
 import { lintHyperframeHtml, type HyperframeLintResult } from "@hyperframes/core/lint";

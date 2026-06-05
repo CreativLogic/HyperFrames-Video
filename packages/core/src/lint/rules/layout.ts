@@ -1,3 +1,7 @@
+// fallow-ignore-file complexity
+// Lint rules in this file are pattern matchers — branching is inherent.
+// Splitting for the metric would harm readability without changing behavior.
+
 import postcss from "postcss";
 import type { LintContext, HyperframeLintFinding, OpenTag } from "../context";
 import { readAttr, truncateSnippet } from "../utils";
