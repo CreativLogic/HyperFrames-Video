@@ -14,6 +14,15 @@ import {
   resolveBrowserGpuMode,
 } from "./browserManager.js";
 
+vi.mock("./systemMemory.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./systemMemory.js")>();
+  return { ...actual, getSystemTotalMb: vi.fn(() => 32768) };
+});
+
+import { getSystemTotalMb } from "./systemMemory.js";
+
+const mockGetSystemTotalMb = vi.mocked(getSystemTotalMb);
+
 describe("buildChromeArgs browser GPU mode", () => {
   const base = { width: 1920, height: 1080 };
 
@@ -306,5 +315,59 @@ describe("browser pool", () => {
 
     // The acquire should still resolve (the launch completed before drain closed it)
     await acquirePromise.catch(() => {});
+  });
+});
+
+describe("memory-adaptive Chrome flags", () => {
+  const base = { width: 1920, height: 1080 };
+
+  afterEach(() => {
+    mockGetSystemTotalMb.mockReturnValue(32768);
+  });
+
+  function heapFlag(args: string[]): number | null {
+    const flag = args.find((a) => a.includes("--max-old-space-size="));
+    if (!flag) return null;
+    return parseInt(flag.match(/--max-old-space-size=(\d+)/)?.[1] ?? "", 10);
+  }
+
+  function gpuBudget(args: string[]): number {
+    const flag = args.find((a) => a.startsWith("--force-gpu-mem-available-mb="))!;
+    return parseInt(flag.split("=")[1]!, 10);
+  }
+
+  it("does not set heap limit above 8 GB", () => {
+    mockGetSystemTotalMb.mockReturnValue(16384);
+    expect(heapFlag(buildChromeArgs(base))).toBeNull();
+  });
+
+  it("scales heap to total/8 on 8 GB systems", () => {
+    mockGetSystemTotalMb.mockReturnValue(8192);
+    expect(heapFlag(buildChromeArgs(base))).toBe(1024);
+  });
+
+  it("scales heap to total/8 on 6 GB systems", () => {
+    mockGetSystemTotalMb.mockReturnValue(6144);
+    expect(heapFlag(buildChromeArgs(base))).toBe(768);
+  });
+
+  it("uses 256 MB heap floor below 4 GB", () => {
+    mockGetSystemTotalMb.mockReturnValue(3072);
+    expect(heapFlag(buildChromeArgs(base))).toBe(256);
+  });
+
+  it("scales GPU budget to total/4 on 8 GB systems", () => {
+    mockGetSystemTotalMb.mockReturnValue(8192);
+    expect(gpuBudget(buildChromeArgs(base))).toBe(2048);
+  });
+
+  it("scales GPU budget to total/2 above threshold", () => {
+    mockGetSystemTotalMb.mockReturnValue(16384);
+    expect(gpuBudget(buildChromeArgs(base))).toBe(8192);
+  });
+
+  it("uses 512 MB GPU budget below 4 GB", () => {
+    mockGetSystemTotalMb.mockReturnValue(3072);
+    expect(gpuBudget(buildChromeArgs(base))).toBe(512);
   });
 });

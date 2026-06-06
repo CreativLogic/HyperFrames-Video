@@ -512,14 +512,14 @@ function getGpuMemBudgetMb(): number {
 
   const total = getSystemTotalMb();
   if (total < 4096) return 512;
-  if (total <= LOW_MEMORY_TOTAL_MB_THRESHOLD) return 1024;
+  if (total <= LOW_MEMORY_TOTAL_MB_THRESHOLD) return Math.floor(total / 4);
   return Math.min(Math.floor(total / 2), 16384);
 }
 
 function getLowMemoryFlags(): string[] {
   const total = getSystemTotalMb();
   if (total > LOW_MEMORY_TOTAL_MB_THRESHOLD) return [];
-  const heapMb = total < 4096 ? 256 : 512;
+  const heapMb = total < 4096 ? 256 : Math.floor(total / 8);
   return [`--js-flags=--max-old-space-size=${heapMb}`];
 }
 
