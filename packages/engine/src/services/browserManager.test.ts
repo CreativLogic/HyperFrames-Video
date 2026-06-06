@@ -19,7 +19,7 @@ vi.mock("./systemMemory.js", async (importOriginal) => {
   return { ...actual, getSystemTotalMb: vi.fn(() => 32768) };
 });
 
-import { getSystemTotalMb } from "./systemMemory.js";
+import { getSystemTotalMb, LOW_MEMORY_TOTAL_MB_THRESHOLD } from "./systemMemory.js";
 
 const mockGetSystemTotalMb = vi.mocked(getSystemTotalMb);
 
@@ -336,14 +336,14 @@ describe("memory-adaptive Chrome flags", () => {
     return parseInt(flag.split("=")[1]!, 10);
   }
 
-  it("does not set heap limit above 8 GB", () => {
-    mockGetSystemTotalMb.mockReturnValue(16384);
+  it("does not set heap limit above threshold", () => {
+    mockGetSystemTotalMb.mockReturnValue(LOW_MEMORY_TOTAL_MB_THRESHOLD + 1);
     expect(heapFlag(buildChromeArgs(base))).toBeNull();
   });
 
-  it("scales heap to total/8 on 8 GB systems", () => {
-    mockGetSystemTotalMb.mockReturnValue(8192);
-    expect(heapFlag(buildChromeArgs(base))).toBe(1024);
+  it("scales heap to total/8 at threshold", () => {
+    mockGetSystemTotalMb.mockReturnValue(LOW_MEMORY_TOTAL_MB_THRESHOLD);
+    expect(heapFlag(buildChromeArgs(base))).toBe(Math.floor(LOW_MEMORY_TOTAL_MB_THRESHOLD / 8));
   });
 
   it("scales heap to total/8 on 6 GB systems", () => {
@@ -351,19 +351,29 @@ describe("memory-adaptive Chrome flags", () => {
     expect(heapFlag(buildChromeArgs(base))).toBe(768);
   });
 
+  it("uses proportional heap at 4 GB boundary", () => {
+    mockGetSystemTotalMb.mockReturnValue(4096);
+    expect(heapFlag(buildChromeArgs(base))).toBe(512);
+  });
+
   it("uses 256 MB heap floor below 4 GB", () => {
     mockGetSystemTotalMb.mockReturnValue(3072);
     expect(heapFlag(buildChromeArgs(base))).toBe(256);
   });
 
-  it("scales GPU budget to total/4 on 8 GB systems", () => {
-    mockGetSystemTotalMb.mockReturnValue(8192);
-    expect(gpuBudget(buildChromeArgs(base))).toBe(2048);
+  it("scales GPU budget to total/4 at threshold", () => {
+    mockGetSystemTotalMb.mockReturnValue(LOW_MEMORY_TOTAL_MB_THRESHOLD);
+    expect(gpuBudget(buildChromeArgs(base))).toBe(Math.floor(LOW_MEMORY_TOTAL_MB_THRESHOLD / 4));
+  });
+
+  it("uses proportional GPU budget at 4 GB boundary", () => {
+    mockGetSystemTotalMb.mockReturnValue(4096);
+    expect(gpuBudget(buildChromeArgs(base))).toBe(1024);
   });
 
   it("scales GPU budget to total/2 above threshold", () => {
-    mockGetSystemTotalMb.mockReturnValue(16384);
-    expect(gpuBudget(buildChromeArgs(base))).toBe(8192);
+    mockGetSystemTotalMb.mockReturnValue(LOW_MEMORY_TOTAL_MB_THRESHOLD * 2);
+    expect(gpuBudget(buildChromeArgs(base))).toBe(LOW_MEMORY_TOTAL_MB_THRESHOLD);
   });
 
   it("uses 512 MB GPU budget below 4 GB", () => {
