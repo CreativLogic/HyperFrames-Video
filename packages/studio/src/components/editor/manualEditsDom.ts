@@ -32,7 +32,6 @@ import {
 } from "./manualEditsTypes";
 import { roundRotationAngle } from "./manualEditsParsing";
 import { applyStudioMotionFromDom } from "./studioMotion";
-import { gsapAnimatesProperty } from "./gsapAnimatesProperty";
 
 /* ── Gesture tracking ─────────────────────────────────────────────── */
 let studioManualEditGestureId = 0;
@@ -527,12 +526,68 @@ function reapplyPathOffsets(doc: Document): void {
     const x = el.style.getPropertyValue(STUDIO_OFFSET_X_PROP);
     const y = el.style.getPropertyValue(STUDIO_OFFSET_Y_PROP);
     if (x || y) {
-      applyStudioPathOffset(el, {
-        x: Number.parseFloat(x) || 0,
-        y: Number.parseFloat(y) || 0,
-      });
+      applyStudioPathOffset(
+        el,
+        {
+          x: Number.parseFloat(x) || 0,
+          y: Number.parseFloat(y) || 0,
+        },
+        { updateBase: false },
+      );
     }
   }
+}
+
+function gsapAnimatesProperty(el: HTMLElement, ...props: string[]): boolean {
+  const win = el.ownerDocument.defaultView as
+    | (Window & {
+        __timelines?: Record<
+          string,
+          {
+            getChildren?: (
+              deep: boolean,
+            ) => Array<{ targets?: () => Element[]; vars?: Record<string, unknown> }>;
+          }
+        >;
+      })
+    | null;
+  if (!win?.__timelines) return false;
+  const propSet = new Set(props);
+  for (const tl of Object.values(win.__timelines)) {
+    if (!tl?.getChildren) continue;
+    try {
+      for (const child of tl.getChildren(true)) {
+        if (!child.targets || !child.vars) continue;
+        let targetsEl = false;
+        for (const t of child.targets()) {
+          if (t === el || (el.id && t.id === el.id)) {
+            targetsEl = true;
+            break;
+          }
+        }
+        if (!targetsEl) continue;
+        const vars = child.vars;
+        for (const p of propSet) {
+          if (p in vars) return true;
+        }
+        if (vars.keyframes && typeof vars.keyframes === "object") {
+          const kfEntries = Array.isArray(vars.keyframes)
+            ? (vars.keyframes as unknown[])
+            : Object.values(vars.keyframes as Record<string, unknown>);
+          for (const kfVal of kfEntries) {
+            if (kfVal && typeof kfVal === "object") {
+              for (const p of propSet) {
+                if (p in (kfVal as Record<string, unknown>)) return true;
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      /* */
+    }
+  }
+  return false;
 }
 
 function reapplyBoxSizes(doc: Document): void {

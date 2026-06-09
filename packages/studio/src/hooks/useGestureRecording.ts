@@ -88,6 +88,8 @@ export function useGestureRecording() {
     element: HTMLElement;
     startTime: number;
     maxSeekTime: number;
+    savedVisibility: string;
+    savedTranslate: string;
   } | null>(null);
 
   const rafIdRef = useRef(0);
@@ -167,6 +169,8 @@ export function useGestureRecording() {
             startTime: win.__player?.getTime() ?? 0,
             maxSeekTime:
               elementEndTime != null && elementEndTime < tlDuration ? elementEndTime : tlDuration,
+            savedVisibility: element.style.visibility,
+            savedTranslate: element.style.getPropertyValue("translate"),
           };
         }
       } catch {
@@ -318,6 +322,11 @@ export function useGestureRecording() {
   const stopRecording = useCallback((): GestureSample[] => {
     if (!isRecordingRef.current) return [];
     isRecordingRef.current = false;
+    if (runtimeRef.current) {
+      const { element: el, savedVisibility, savedTranslate } = runtimeRef.current;
+      el.style.visibility = savedVisibility;
+      el.style.setProperty("translate", savedTranslate || "");
+    }
     runtimeRef.current = null;
     cleanupRef.current?.();
     cleanupRef.current = null;
