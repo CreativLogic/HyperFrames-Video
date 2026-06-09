@@ -1,0 +1,13 @@
+{
+  "name": "css-inherited-color",
+  "description": "Regression guard for CSS color inheritance in rendered output. Verifies that text relying on inherited color from a parent element is visible after GSAP tl.from() completes and clears inline styles.",
+  "tags": ["regression", "css-inheritance"],
+  "minPsnr": 30,
+  "maxFrameFailures": 0,
+  "minAudioCorrelation": 0,
+  "maxAudioLagWindows": 1,
+  "renderConfig": {
+    "fps": 30,
+    "workers": 1
+  }
+}

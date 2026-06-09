@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin: 0; background: #111; width: 1920px; height: 1080px; font-family: system-ui, sans-serif; }
+  .root { position: absolute; inset: 0; color: #e8e8e8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; }
+  .inherited { font-size: 80px; font-weight: 700; }
+  .explicit { font-size: 80px; font-weight: 700; color: #e8e8e8; }
+  .label { font-size: 32px; opacity: 0.6; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+</head>
+<body>
+  <div id="root" data-composition-id="css-inherited-color"
+       data-width="1920" data-height="1080"
+       data-start="0" data-duration="3">
+    <div class="root" data-start="0" data-duration="3">
+      <div class="label">Inherited color (no inline color):</div>
+      <div class="inherited" id="inherited-text">INHERITED COLOR</div>
+      <div class="label" style="color: #e8e8e8;">Explicit color (inline color):</div>
+      <div class="explicit" id="explicit-text">EXPLICIT COLOR</div>
+    </div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    tl.from("#inherited-text", { opacity: 0, y: 34, duration: 0.5, ease: "power2.out" }, 0);
+    tl.from("#explicit-text", { opacity: 0, y: 34, duration: 0.5, ease: "power2.out" }, 0.2);
+    window.__timelines["css-inherited-color"] = tl;
+  </script>
+</body>
+</html>

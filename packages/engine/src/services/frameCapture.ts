@@ -1237,6 +1237,11 @@ async function prepareFrameForCapture(
     if (window.__hf && typeof window.__hf.seek === "function") {
       window.__hf.seek(t);
     }
+    // Force a synchronous layout flush so the compositor resolves all pending
+    // CSS cascade changes (including inherited properties like `color`) before
+    // the screenshot. Without this, GSAP's inline style cleanup after seek
+    // can leave inherited values unresolved in headless capture mode.
+    void document.body.offsetHeight;
     return !!(window as unknown as { __hf_page_composite_pending?: boolean })
       .__hf_page_composite_pending;
   }, quantizedTime);
