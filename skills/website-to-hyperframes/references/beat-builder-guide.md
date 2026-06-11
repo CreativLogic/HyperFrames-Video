@@ -133,7 +133,9 @@ Fix ALL errors. Zero errors required.
 npx tsx packages/cli/src/cli.ts snapshot . --frames 3
 ```
 
-**READ the contact sheet** (`snapshots/contact-sheet.jpg`). For each frame:
+**VIEW the contact sheet cell-by-cell** (`snapshots/contact-sheet.jpg`). Not a glance — look at EVERY frame your snapshot produced, in order. For each frame, write one short sentence naming what you see (subject, position, motion state, visible text). If you find yourself summarizing the contact sheet as a whole, stop and go back to frame-by-frame.
+
+For each frame, the questions:
 
 - Is content visible? (not black, blank, or loading)
 - Is text readable, properly positioned, correct font/color?
