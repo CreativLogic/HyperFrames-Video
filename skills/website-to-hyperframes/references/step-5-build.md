@@ -27,7 +27,7 @@ hyperframes sfx add <id>                                # → assets/sfx/<id>.mp
 
 `sfx add` writes the clip to `assets/sfx/` and prints its analysis (peak time, onset/tail, loudness) — use it to trim and anchor per the global doc. If `HEYGEN_API_KEY` isn't set, `sfx` prints how to get a free key; ask the user for one or build without SFX — don't silently drop them.
 
-**Background music** (optional, storyboard-driven). If `STORYBOARD.md`'s Global Direction names a music bed, search and download it the same way with `hyperframes music search` / `music add` — output lands in `assets/music/<id>.<ext>`. Volume hierarchy is different from SFX (BGM `0.4–0.6` under VO; `0.7–0.9` pure-music) and there's no auto-ducking; see [`background-music.md`](background-music.md) for when music helps vs hurts, manual ducking patterns, and the one-bed-per-video rule.
+**Background music** (already on disk from Step 3 Music Fetch). If `STORYBOARD.md`'s Global Direction has a `**Music file:**` line, the track was fetched and analyzed in Step 3 — it's already at `assets/music/<id>.<ext>`. **Do NOT re-fetch or re-search here.** Just wire the file as a BGM `<audio>` element on track lane 11 with `data-volume` per the storyboard's `**Music direction:**` line. If there's no `**Music file:**` line (Step 2 said no music), skip the music wire-up cleanly — assembler emits no BGM lane. Volume hierarchy: BGM `0.4–0.6` under VO; `0.7–0.9` if pure-music. No auto-ducking; see [`background-music.md`](background-music.md) for manual ducking patterns and the one-bed-per-video rule.
 
 ## Known landmines — read before writing each beat composition
 

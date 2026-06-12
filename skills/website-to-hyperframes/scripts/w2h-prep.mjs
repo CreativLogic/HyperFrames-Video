@@ -536,6 +536,36 @@ function main() {
       }
     : undefined;
 
+  // Detect BGM: prefer storyboard's `**Music file:** <path>` line (Step 3's
+  // Music Fetch sub-step writes this), fall back to auto-detect from
+  // `assets/music/` (one-bed-per-video rule means a single file is the norm).
+  // assemble-index.mjs reads `bgm_path` and emits the BGM <audio> on track 11.
+  let bgmPath;
+  const storyboardPath = join(projectDir, "STORYBOARD.md");
+  if (existsSync(storyboardPath)) {
+    const sb = readFileSync(storyboardPath, "utf-8");
+    const m = sb.match(/^\s*\*\*Music file:\*\*\s*(\S[^\s\n]*)/m);
+    if (m) bgmPath = m[1];
+  }
+  if (!bgmPath) {
+    const musicDir = join(projectDir, "assets", "music");
+    if (existsSync(musicDir)) {
+      const musicFiles = readdirSync(musicDir)
+        .filter((f) => /\.(mp3|wav|flac|m4a|ogg)$/i.test(f))
+        .sort();
+      if (musicFiles.length === 1) {
+        bgmPath = `assets/music/${musicFiles[0]}`;
+      } else if (musicFiles.length > 1) {
+        // Multiple candidates — pick the first alphabetically but warn so the
+        // orchestrator can disambiguate via STORYBOARD.md's `**Music file:**`.
+        bgmPath = `assets/music/${musicFiles[0]}`;
+        console.warn(
+          `! w2h-prep: ${musicFiles.length} music files in assets/music/ but no \`**Music file:**\` line in STORYBOARD.md. Using ${musicFiles[0]}; add an explicit line to disambiguate.`,
+        );
+      }
+    }
+  }
+
   const spec = {
     total_duration_s: totalDuration,
     total_scenes: flatScenes.length,
@@ -549,6 +579,7 @@ function main() {
     captions_enabled: existsSync(join(projectDir, "compositions/captions.html")),
     sfx: [],
     ...(voice ? { voice } : {}),
+    ...(bgmPath ? { bgm_path: bgmPath } : {}),
     // shader_transitions auto-derived from STORYBOARD.md "Shader Transitions"
     // block (PHASE C(b)). Canonical line format:
     //   - between beat-X and beat-Y: shader=<name>[, duration=<n>]
@@ -594,6 +625,9 @@ function main() {
   }
   if (voice) {
     console.log(`  + voice (${voice.path}, ${voice.duration_s}s)`);
+  }
+  if (bgmPath) {
+    console.log(`  + bgm_path (${bgmPath})`);
   }
   if (shaderTransitions) {
     const namedCount = shaderTransitions.transitions.filter((t) => t.shader).length;

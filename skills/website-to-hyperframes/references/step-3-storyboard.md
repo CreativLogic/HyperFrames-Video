@@ -59,6 +59,58 @@ If the user said "dark cinematic feel" — that's SLOW, not fast. If they said "
 
 ---
 
+## Music Fetch (only if Step 2 Q5 said yes — do this BEFORE writing per-beat timing)
+
+If Step 2 Q5 picked "Yes, music bed" (or auto-decide chose yes), **fetch the track now, before timing any beats.** Music has structure (builds, peaks, drops, fills) that the video's rhythm should honor — a build at 22s wants beat N to land at 22s, not at 18s. Search → pick → analyze → THEN write beat timing. Doing this after the storyboard is the wrong order: you'd end up with beats that don't align to the track's structural moments.
+
+Skip this section entirely if Step 2 said no music (the storyboard's Global Direction has no `**Music file:**` line and Step 5 skips the music wire-up cleanly).
+
+**1. Describe the mood in one line.** Informed by Step 2 brief style + video type + Arc choice. Search by feel + function, not by filename:
+
+- e.g. `"moody ambient pad with slow build for a brand reel"`
+- e.g. `"upbeat lo-fi reel bed under voice"`
+- e.g. `"tense synth drone rising for product launch"`
+- e.g. `"warm acoustic guitar cozy"` / `"epic cinematic orchestral swell"` / `"minimal piano introspective"`
+
+See [`background-music.md`](background-music.md) "Search prompts that work" for more shapes.
+
+**2. Search the catalog.** Pull 5 candidates:
+
+```bash
+npx tsx packages/cli/src/cli.ts music search "<your mood line>" --limit 5
+```
+
+Returns `id`, `name`, `description`, `duration`, `score` per candidate.
+
+**3. Pick a track.** In collaborative mode: present the top 3-5 candidates to the user (one line each: `id` + `name` + `duration` + first ~80 chars of description) and ask them to pick. In auto mode: pick the highest-score candidate whose `duration` is ≥ the planned video duration (so the track covers the whole video without looping).
+
+**4. Download + analyze.** This is the load-bearing step:
+
+```bash
+npx tsx packages/cli/src/cli.ts music add <chosen-id>
+```
+
+This writes the track to `assets/music/<id>.<ext>` AND prints the analysis — LUFS / true peak / **peak time** / onset / tail / **loudness sparkline** (e.g. `shape ▁▂▅█▇▃▁`). The sparkline shows energy contour over time — read it to know WHERE the track builds, drops, breaks. Each block roughly maps to `t ≈ (i + 0.5) / length × duration`.
+
+**5. Record in the storyboard's Global Direction** (the template above). Three lines:
+
+```markdown
+**Music file:** assets/music/<id>.<ext>
+**Music direction:** <mood + volume rule, e.g. "moody ambient pad sits at 0.45 under VO, lifts to 0.75 for the 2s pre-CTA stretch">
+**Music structure:** sparkline=▁▂▅█▇▃▁ · peak=Xs · duration=Ds · suggested-trim=<head>s-<tail>s
+```
+
+**6. Time beats against the structure** (when you write the per-beat sequence below):
+
+- If the music has a build at 22s → schedule a hero/reveal/peak beat to land at 22s.
+- If the music drops at 35s → that's a CTA-friendly silence; schedule the CTA there.
+- If the music is even/ambient with no notable peaks → treat it as a bed; time beats against VO + visual rhythm instead.
+- If the music has a clear intro (first N seconds quiet, sparkline starts at `▁▁`), VO start timing can wait for the intro to settle — e.g. VO starts at the first `▂` block.
+
+In Step 5, the music is already on disk — beat workers read `**Music file:**` from STORYBOARD.md Global Direction and the orchestrator embeds it as the BGM lane (track 11) without re-fetching.
+
+---
+
 ## Technique-pick checklist (REQUIRED, do this BEFORE writing beat copy)
 
 For every beat you plan, name **2–4 techniques** it will use. A beat with one technique is a slideshow frame — if you can't name two, redesign that beat.
@@ -135,7 +187,9 @@ Every STORYBOARD.md starts with global settings:
 **Audio:** [TTS provider] voiceover + [music yes/no, from Step 2 Q5] + SFX
 **VO direction:** [voice character — e.g., "mid-age male, calm confident delivery,
 Apple keynote register — economy of words, silence between sentences is a feature"]
-**Music direction:** [only if Step 2 Q5 said yes — one line of mood/feel for `hyperframes music search`, plus volume rule. e.g., "moody ambient pad with slow build, sits at ~0.45 under VO, lifts to ~0.75 in the 2s pre-CTA stretch where there's no narration"]
+**Music file:** [only if music = yes — path to the track fetched in Music Fetch below, e.g., `assets/music/a3f5b2e1.mp3`]
+**Music direction:** [only if music = yes — one line of mood/volume rule, e.g., "moody ambient pad, sits at ~0.45 under VO, lifts to ~0.75 in the 2s pre-CTA stretch"]
+**Music structure:** [only if music = yes — copied verbatim from `music add` analysis: `sparkline=▁▂▅█▇▃▁ · peak=Xs · duration=Ds · suggested-trim=<head>s-<tail>s`. Use this to time beats against the track's builds/drops.]
 **Style basis:** DESIGN.md (brand colors, fonts, components from the captured site)
 ```
 

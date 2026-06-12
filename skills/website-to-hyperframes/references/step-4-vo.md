@@ -109,11 +109,15 @@ The final beat timings (real-audio-derived `start` and `duration`) live in STORY
 
 ---
 
-## Music (storyboard-driven, decided in Step 2)
+## Music (already fetched in Step 3 — verify timing only)
 
-Music is a Step-2 user-preference question (see step-2-brief.md Question 5) — **do NOT ask the user about music at this step**, the decision is already locked in the brief. If Step 2 said yes, the storyboard's Global Direction names a mood (`**Music direction:** moody ambient pad, slow build, sits at ~0.45 under VO`); Step 5 fetches it via `hyperframes music search` + `music add` against the HeyGen catalog (free, same key as `sfx`).
+Music is decided in Step 2 (yes/no/auto), fetched and analyzed in Step 3's Music Fetch sub-step (which writes `**Music file:**`, `**Music direction:**`, and `**Music structure:**` into STORYBOARD.md's Global Direction). **Do NOT re-fetch or re-ask here.** By the time you reach Step 4, the track is already on disk at `assets/music/<id>.<ext>` and the storyboard's beat timing already accounts for the track's peaks/drops.
 
-If the user supplies their own track instead of using the catalog, note its file path in STORYBOARD.md's Global Direction as `**Music file:** path/to/track.mp3` and Step 5 wires that directly without a fetch. If Step 2 said no music, no Music line appears in Global Direction and Step 5 skips the fetch cleanly.
+What Step 4 does for music: **align VO timing against music structure if relevant.** If the track has a quiet intro before the first build, VO can start at the first build (typically 1-3s in). Note this in STORYBOARD.md's `**Narration start:**` field so Step 5 wires the VO `<audio>` `data-start` to match.
+
+If the user supplied their own track (rather than the catalog), the Step 3 fetch step recorded that file path instead. Either way, Step 5 wires whatever `**Music file:**` points to as the BGM lane.
+
+If Step 2 said no music, none of this applies — there's no `**Music file:**` line in Global Direction and Step 5 skips the music wire-up cleanly.
 
 See [`background-music.md`](background-music.md) for the full model: when music helps vs hurts, the volume hierarchy under VO (`0.4–0.6` vs `0.7–0.9` pure-music), manual ducking patterns since there's no auto-ducking, and the one-bed-per-video rule.
 
