@@ -402,13 +402,41 @@ function emitInferenceJson(projectDir, tokens) {
   return inferencePath;
 }
 
+// ─── Narration start (voice offset into composition timeline) ────────────
+// step-3-storyboard.md instructs the agent to write
+// `**Narration start:** <n>s [optional parenthetical]` in STORYBOARD.md
+// Global Direction when narration starts after t=0 (e.g. 0.8s after a hero
+// intro settles, or to align with a music intro). assemble-index reads
+// `voice.start_s` and emits the narration <audio> with data-start=<n>.
+// Default 0 if absent / unparseable.
+
+function parseNarrationStart(projectDir) {
+  const storyboardPath = join(projectDir, "STORYBOARD.md");
+  if (!existsSync(storyboardPath)) return 0;
+  const sb = readFileSync(storyboardPath, "utf-8");
+  const m = sb.match(/^\s*\*\*Narration start:\*\*\s*(-?\d+(?:\.\d+)?)\s*s?\b/im);
+  if (!m) return 0;
+  const v = Number(m[1]);
+  if (!isFinite(v) || v < 0) return 0;
+  return v;
+}
+
 // ─── transcript.json → per-scene words ────────────────────────────────────
 // captions.mjs reads `assets/voice/<sid>_words.json` for each scene that
 // claims a wordsPath. Format: [{text, start, end}, ...] in SCENE-LOCAL
 // seconds. Partition global transcript by each scene's [start_s,
 // start_s+duration_s) window, normalize timestamps by subtracting start_s.
+//
+// `voiceStartS` shifts transcript timestamps from AUDIO-TIME (start=0 = first
+// audio sample) into COMPOSITION-TIME (start=0 = first frame of video) BEFORE
+// partition. Scene start_s values are composition-time (cumulative beat
+// duration from t=0), so the partition window only matches correctly once
+// transcript timestamps have been shifted by voice.start_s. Without this,
+// any project with narration-start > 0 captions-desyncs by exactly that
+// offset (or misses words entirely when the first word of a scene falls
+// before the next scene boundary in audio-time but after it in comp-time).
 
-function splitTranscriptPerScene(projectDir, scenes) {
+function splitTranscriptPerScene(projectDir, scenes, voiceStartS = 0) {
   const transcriptPath = join(projectDir, "transcript.json");
   if (!existsSync(transcriptPath)) {
     return new Map(scenes.map((s) => [s.id, ""]));
@@ -434,10 +462,13 @@ function splitTranscriptPerScene(projectDir, scenes) {
     const sceneEnd = sceneStart + s.duration_s;
     const sceneWords = [];
     for (const w of words) {
-      const wStart = typeof w.start === "number" ? w.start : null;
-      const wEnd = typeof w.end === "number" ? w.end : null;
+      const wStartAudio = typeof w.start === "number" ? w.start : null;
+      const wEndAudio = typeof w.end === "number" ? w.end : null;
       const wText = w.text != null ? String(w.text) : "";
-      if (wStart == null || wEnd == null || !wText) continue;
+      if (wStartAudio == null || wEndAudio == null || !wText) continue;
+      // Shift audio-time → composition-time (sceneStart is composition-time).
+      const wStart = wStartAudio + voiceStartS;
+      const wEnd = wEndAudio + voiceStartS;
       // Word belongs to this scene if its onset falls inside the scene window.
       if (wStart >= sceneStart && wStart < sceneEnd) {
         sceneWords.push({
@@ -499,8 +530,15 @@ function main() {
   // manually before invoking assemble-index — same contract as before.
   const shaderTransitions = parseShaderTransitions(projectDir, flatScenes, tokens.canvas, tokens.brandPrimary);
 
+  // Narration start time (composition-time seconds; default 0). The same value
+  // is used to (a) shift transcript timestamps from audio-time → composition-
+  // time before per-scene partition, and (b) emit voice.start_s for the
+  // assemble-index narration <audio> data-start. Both MUST agree or captions
+  // desync against the audio.
+  const narrationStart = parseNarrationStart(projectDir);
+
   // transcript.json → per-scene words splits.
-  const wordsPaths = splitTranscriptPerScene(projectDir, flatScenes);
+  const wordsPaths = splitTranscriptPerScene(projectDir, flatScenes, narrationStart);
 
   // Build the groups[] shape captions.mjs (and downstream gates) consume.
   // Single group is the w2h norm — no Tier-A bridges, no cap=2 grouping.
@@ -527,11 +565,15 @@ function main() {
   const voicePath = ["narration.wav", "narration.mp3"]
     .map((f) => ({ rel: f, abs: join(projectDir, f) }))
     .find((p) => existsSync(p.abs));
+  // voice.start_s: narration's composition-time offset (from `**Narration
+  // start:**` in STORYBOARD.md, default 0). voice.duration_s spans the
+  // remainder of the video after that offset — capped at totalDuration so it
+  // never overruns.
   const voice = voicePath
     ? {
         path: voicePath.rel,
-        start_s: 0,
-        duration_s: totalDuration,
+        start_s: narrationStart,
+        duration_s: Number(Math.max(0, totalDuration - narrationStart).toFixed(3)),
         volume: 1,
       }
     : undefined;
