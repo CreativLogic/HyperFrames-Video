@@ -358,7 +358,6 @@ export function StudioApp() {
     resetErrors: resetConsoleErrors,
   } = useConsoleErrorCapture(previewIframe);
   const dragOverlay = useDragOverlay(fileManager.handleImportFiles);
-
   // Gesture recording
   const handleToggleRecordingRef = useRef<() => void>(() => {});
   const domEditSessionRef = useRef(domEditSession);
