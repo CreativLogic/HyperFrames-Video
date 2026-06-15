@@ -97,7 +97,12 @@ describe("sdkCutoverPersist", () => {
     ({
       getElement: vi.fn().mockReturnValue(hasEl ? { inlineStyles: {} } : null),
       dispatch: vi.fn(),
-      serialize: vi.fn().mockReturnValue("<html></html>"),
+      // Distinct before/after so the no-op guard (after === before → fall back)
+      // treats this as a real change; "after" matches the write assertions.
+      serialize: vi
+        .fn()
+        .mockReturnValueOnce("<html>before</html>")
+        .mockReturnValue("<html></html>"),
       batch: vi.fn((fn: () => void) => fn()),
     }) as unknown as Parameters<typeof sdkCutoverPersist>[4];
 
@@ -311,7 +316,11 @@ describe("sdkDeletePersist", () => {
     ({
       getElement: vi.fn().mockReturnValue(hasEl ? { id: "hf-abc" } : null),
       removeElement: vi.fn(),
-      serialize: vi.fn().mockReturnValue("<html>after</html>"),
+      serialize: vi
+        .fn()
+        .mockReturnValueOnce("<html>before-snap</html>")
+        .mockReturnValue("<html>after</html>"),
+      batch: vi.fn((fn: () => void) => fn()),
     }) as unknown as Parameters<typeof sdkDeletePersist>[3];
 
   it("returns false when session is null", async () => {
@@ -383,6 +392,7 @@ describe("sdkTimingPersist", () => {
         .fn()
         .mockReturnValueOnce("<html>before</html>")
         .mockReturnValue("<html>after</html>"),
+      batch: vi.fn((fn: () => void) => fn()),
     }) as unknown as Parameters<typeof sdkTimingPersist>[3];
 
   it("returns false when session is null", async () => {
@@ -459,6 +469,7 @@ describe("sdkGsapTweenPersist", () => {
         .fn()
         .mockReturnValueOnce("<html>before</html>")
         .mockReturnValue("<html>after</html>"),
+      batch: vi.fn((fn: () => void) => fn()),
     }) as unknown as Parameters<typeof sdkGsapTweenPersist>[2];
 
   it("returns false when session is null", async () => {
@@ -566,6 +577,7 @@ describe("sdkGsapKeyframePersist", () => {
         .fn()
         .mockReturnValueOnce("<html>before</html>")
         .mockReturnValue("<html>after</html>"),
+      batch: vi.fn((fn: () => void) => fn()),
     }) as unknown as Parameters<typeof sdkGsapKeyframePersist>[4];
 
   it("returns false when session is null", async () => {

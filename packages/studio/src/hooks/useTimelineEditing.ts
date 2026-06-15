@@ -55,6 +55,8 @@ interface UseTimelineEditingOptions {
   isRecordingRef?: React.RefObject<boolean>;
   /** Stage 7 §3.2: SDK session for routing timing ops through setTiming. */
   sdkSession?: Composition | null;
+  /** Resync the SDK session after a server-authoritative timeline write. */
+  forceReloadSdkSession?: () => void;
 }
 
 // ── Hook ──
@@ -73,6 +75,7 @@ export function useTimelineEditing({
   uploadProjectFiles,
   isRecordingRef,
   sdkSession,
+  forceReloadSdkSession,
 }: UseTimelineEditingOptions) {
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
@@ -92,19 +95,24 @@ export function useTimelineEditing({
       }
       const pid = projectIdRef.current;
       if (!pid) return Promise.resolve();
-      const queued = editQueueRef.current.then(() =>
-        persistTimelineEdit({
-          projectId: pid,
-          element,
-          activeCompPath,
-          label,
-          buildPatches,
-          writeProjectFile,
-          recordEdit,
-          domEditSaveTimestampRef,
-          pendingTimelineEditPathRef,
-        }),
-      );
+      const queued = editQueueRef.current
+        .then(() =>
+          persistTimelineEdit({
+            projectId: pid,
+            element,
+            activeCompPath,
+            label,
+            buildPatches,
+            writeProjectFile,
+            recordEdit,
+            domEditSaveTimestampRef,
+            pendingTimelineEditPathRef,
+          }),
+        )
+        .then(() => {
+          // Server wrote the file; resync the stale in-memory SDK doc.
+          forceReloadSdkSession?.();
+        });
       editQueueRef.current = queued.catch((error) => {
         console.error(`[Timeline] Failed to persist: ${label}`, error);
       });
@@ -118,6 +126,7 @@ export function useTimelineEditing({
       pendingTimelineEditPathRef,
       showToast,
       isRecordingRef,
+      forceReloadSdkSession,
     ],
   );
 
@@ -148,7 +157,13 @@ export function useTimelineEditing({
           targetPath,
           { start: updates.start, trackIndex: updates.track },
           sdkSession,
-          { editHistory: { recordEdit }, writeProjectFile, reloadPreview, domEditSaveTimestampRef },
+          {
+            editHistory: { recordEdit },
+            writeProjectFile,
+            reloadPreview,
+            domEditSaveTimestampRef,
+            compositionPath: activeCompPath,
+          },
           { label: "Move timeline clip", coalesceKey: `timeline-move:${element.hfId}` },
         ).then((handled) => {
           if (!handled) return enqueueEdit(element, "Move timeline clip", buildMovePatches);
@@ -212,7 +227,13 @@ export function useTimelineEditing({
           targetPath,
           { start: updates.start, duration: updates.duration },
           sdkSession,
-          { editHistory: { recordEdit }, writeProjectFile, reloadPreview, domEditSaveTimestampRef },
+          {
+            editHistory: { recordEdit },
+            writeProjectFile,
+            reloadPreview,
+            domEditSaveTimestampRef,
+            compositionPath: activeCompPath,
+          },
           { label: "Resize timeline clip", coalesceKey: `timeline-resize:${element.hfId}` },
         ).then((handled) => {
           if (!handled) return enqueueEdit(element, "Resize timeline clip", buildResizePatches);
@@ -289,6 +310,7 @@ export function useTimelineEditing({
             timelineElements.filter((te) => (te.key ?? te.id) !== (element.key ?? element.id)),
           );
         usePlayerStore.getState().setSelectedElementId(null);
+        forceReloadSdkSession?.();
         reloadPreview();
         showToast(`Deleted ${label}. Use Undo to restore it.`, "info");
       } catch (error) {
@@ -305,6 +327,7 @@ export function useTimelineEditing({
       domEditSaveTimestampRef,
       reloadPreview,
       isRecordingRef,
+      forceReloadSdkSession,
     ],
   );
 
@@ -373,6 +396,7 @@ export function useTimelineEditing({
           recordEdit,
         });
 
+        forceReloadSdkSession?.();
         reloadPreview();
       } catch (error) {
         const message =
@@ -389,6 +413,7 @@ export function useTimelineEditing({
       domEditSaveTimestampRef,
       reloadPreview,
       isRecordingRef,
+      forceReloadSdkSession,
     ],
   );
 
