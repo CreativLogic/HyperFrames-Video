@@ -187,6 +187,7 @@ export function StudioApp() {
     pendingTimelineEditPathRef,
     uploadProjectFiles: fileManager.uploadProjectFiles,
     isRecordingRef: isGestureRecordingRef,
+    sdkSession: sdkHandle.session,
   });
   const {
     activeBlockParams,
@@ -357,7 +358,6 @@ export function StudioApp() {
     resetErrors: resetConsoleErrors,
   } = useConsoleErrorCapture(previewIframe);
   const dragOverlay = useDragOverlay(fileManager.handleImportFiles);
-
   // Gesture recording
   const handleToggleRecordingRef = useRef<() => void>(() => {});
   const domEditSessionRef = useRef(domEditSession);
