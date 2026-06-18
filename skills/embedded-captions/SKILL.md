@@ -165,37 +165,30 @@ each loop costs seconds. Render once, when the previews pass.
 
 ---
 
-## The DNA registry — ten visual languages (replaces the template catalog)
+## DNA registries — where each engine's looks live
 
-Both modes draw from **[dna/](dna/README.md)** — six art-directed visual languages that
-**parameterize per scene** (accent sampled from the footage, contact shadow along the
-measured light direction, depth-match blur, RMS-coupled hero amplitude):
+Every identity in [CATALOG.md](CATALOG.md) is backed by one **DNA file** — its complete
+visual language (type, palette logic, motion grammar, hero orchestration), **parameterized
+per scene** (accent sampled from the footage, contact shadow along the measured light,
+depth-match blur, RMS-coupled hero amplitude). The 48 DNAs live in **two registries, one
+per engine** — you never browse DNAs to route: pick the IDENTITY in CATALOG.md and its
+engine + registry are derived by lookup.
 
-| DNA             | Register       | Scene fit                                       | Voice                                                                                              |
-| --------------- | -------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **cream**       | premium-warm   | dark/mid warm scenes                            | Inter + warm cream + screen; glowing emergence hero (successor of cinematic-cream)                 |
-| **ink**         | premium        | **bright scenes (luma > 150)**                  | near-black multiply — type printed ON the wall; the bright-scene answer                            |
-| **editorial**   | editorial-luxe | introspective / fashion / poetic                | Bodoni Moda, lowercase-italic hero — magazine elegance                                             |
-| **keynote**     | tech-premium   | product / launch                                | opaque white Inter 800, dead-center stillness                                                      |
-| **documentary** | formal         | interview / serious                             | burn-in reveals, no hero — gravitas IS the style                                                   |
-| **loud**        | loud           | hype / sport / social                           | Anton + scene-sampled accent, single-unit slam + ripple; body ANNOUNCES in front (`bodyLayer: fg`) |
-| **neon**        | loud-cyber     | cyberpunk / nightlife / tech-noir (dark scenes) | electric-cyan signage, ignition flicker, the hero powers ON like a sign                            |
-| **glitch**      | loud-cyber     | digital / hacker / AI                           | RGB-split echoes snap together on landing; machine-percussive timing                               |
-| **chrome**      | loud-luxe      | Y2K / fashion-tech / music                      | liquid-metal gradient hero + one sheen sweep during the hold                                       |
-| **velocity**    | loud-sport     | sport / auto / fitness                          | every word arrives along its motion vector (streak+skew), hero passes with speed trails            |
-
-Pick by `safe-zones.json` (`heroAnchor.bandLuma`, `palette.temperature`) × content
-register — [dna/README.md](dna/README.md) has the decision rule. Authoring:
-`cinematic.json` takes `"dna": "<name>"`.
+- **Cinematic** → the 10 column-flow languages in **[dna/](dna/README.md)**: `cream` `ink`
+  `editorial` `keynote` `documentary` `loud` `neon` `glitch` `chrome` `velocity`.
+  `dna/README.md` holds the full table + the `bandLuma × register` decision rule; authoring:
+  `cinematic.json` takes `"dna": "<name>"`.
+- **Theme** → the 38 themed constitutions in **[themes/](themes/README.md)**: `anchor`
+  `ordnance` `terminal` … (incl. the verbatim-rail `anchor`, which replaced the retired
+  Standard mode); authoring: `theme.json` takes `"dna": "<name>"`.
 
 The engine generates the **hero three-act** from the DNA (no authoring needed):
 co-visible captions dim (setup) → per-letter entrance with amplitude ∝ spoken loudness
 (impact) → breathe + glow until exit (afterglow).
 
-(Legacy: `plan.template:"cinematic-cream"` maps to `dna:"cream"` automatically.
-The retired 54-template library lives outside the skill at
-`~/Downloads/embedded-captions-archive/standard-templates-54/`; `_motion.md` remains
-in-skill as the motion-verb reference catalog.)
+(Legacy: `plan.template:"cinematic-cream"` maps to `dna:"cream"` automatically. The retired
+54-template library lives at `~/Downloads/embedded-captions-archive/standard-templates-54/`;
+`_motion.md` remains in-skill as the motion-verb reference catalog.)
 
 ---
 
