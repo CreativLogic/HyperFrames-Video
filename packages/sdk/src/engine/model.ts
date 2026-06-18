@@ -141,10 +141,15 @@ function toKebab(prop: string): string {
 interface StyleDeclarationScan {
   depth: number;
   quote: "'" | '"' | null;
+  skip: boolean;
 }
 
-function advanceStyleDeclarationScan(scan: StyleDeclarationScan, ch: string): void {
+function advanceStyleDeclarationScan(scan: StyleDeclarationScan, ch: string, next: string): void {
   if (scan.quote) {
+    if (ch === "\\" && next) {
+      scan.skip = true;
+      return;
+    }
     if (ch === scan.quote) scan.quote = null;
     return;
   }
@@ -158,15 +163,19 @@ function advanceStyleDeclarationScan(scan: StyleDeclarationScan, ch: string): vo
 
 function splitStyleDeclarations(style: string): string[] {
   const declarations: string[] = [];
-  const scan: StyleDeclarationScan = { depth: 0, quote: null };
+  const scan: StyleDeclarationScan = { depth: 0, quote: null, skip: false };
   let start = 0;
   for (let i = 0; i < style.length; i++) {
+    if (scan.skip) {
+      scan.skip = false;
+      continue;
+    }
     const ch = style[i] ?? "";
     if (ch === ";" && scan.depth === 0 && scan.quote === null) {
       declarations.push(style.slice(start, i));
       start = i + 1;
     } else {
-      advanceStyleDeclarationScan(scan, ch);
+      advanceStyleDeclarationScan(scan, ch, style[i + 1] ?? "");
     }
   }
   declarations.push(style.slice(start));

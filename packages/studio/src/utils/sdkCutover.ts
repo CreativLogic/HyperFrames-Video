@@ -68,6 +68,14 @@ function elementTag(element: unknown): string | null {
   return typeof tag === "string" ? tag.toLowerCase() : null;
 }
 
+// Tags that are non-HTML namespace elements in a linkedom-parsed HTML body.
+// Mirrors the engine's `isHTMLElementTarget` (model.ts) which uses `instanceof
+// HTMLElement` — that runtime check catches the same set, but we can't use it
+// here because `target` is a plain SDK object, not a DOM Element. If linkedom
+// (or a future parser) surfaces additional foreign-content elements as
+// non-HTMLElement, add them here.
+const NON_HTML_CHILD_TAGS = new Set(["svg", "math"]);
+
 function shouldDeclineTextCutoverForTarget(target: unknown, ops: PatchOperation[]): boolean {
   if (!hasTextContentOp(ops)) return false;
   const children = targetChildren(target);
@@ -78,7 +86,7 @@ function shouldDeclineTextCutoverForTarget(target: unknown, ops: PatchOperation[
   // here. Let the server path remain authoritative for them.
   if (children.length > 1) return true;
   const tag = elementTag(children[0]);
-  return tag === "svg" || tag === "math";
+  return tag !== null && NON_HTML_CHILD_TAGS.has(tag);
 }
 
 export function shouldUseSdkCutover(

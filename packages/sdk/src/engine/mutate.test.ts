@@ -402,6 +402,14 @@ describe("setElementStyles key normalization", () => {
     expect(el.getAttribute("style")).toContain("background: url(data:image/svg+xml;utf8");
     expect(el.getAttribute("style")).toContain("color: blue");
   });
+
+  it("handles escaped quotes inside CSS string values", () => {
+    const el = elWith("color: red");
+    el.setAttribute("style", 'content: "a\\";b"; color: red');
+    setElementStyles(el, { color: "blue" });
+    expect(getElementStyles(el).content).toBe('"a\\";b"');
+    expect(getElementStyles(el).color).toBe("blue");
+  });
 });
 
 // ─── setVariableValue ─────────────────────────────────────────────────────────

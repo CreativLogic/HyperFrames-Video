@@ -73,6 +73,34 @@ const cases: Array<{ name: string; source: string; ops: PatchOperation[] }> = [
     source: shell('<a data-hf-id="hf-target" href="https://example.com">Old</a>'),
     ops: [{ type: "html-attribute", property: "aria-label", value: "Primary link" }],
   },
+  {
+    name: "sets shorthand over existing longhands (inset over top/right/bottom/left)",
+    source: shell(
+      '<div data-hf-id="hf-target" style="top: 10px; right: 10px; bottom: 10px; left: 10px; opacity: 1">Old</div>',
+    ),
+    ops: [{ type: "inline-style", property: "inset", value: "0" }],
+  },
+  {
+    name: "sets longhand over existing shorthand (top over inset)",
+    source: shell('<div data-hf-id="hf-target" style="inset: 0; opacity: 1">Old</div>'),
+    ops: [{ type: "inline-style", property: "top", value: "10px" }],
+  },
+  {
+    name: "mixed-type batch: inline-style + text-content in one op list",
+    source: shell('<div data-hf-id="hf-target" style="color: red">Old</div>'),
+    ops: [
+      { type: "inline-style", property: "color", value: "blue" },
+      { type: "text-content", property: "text", value: "New" },
+    ],
+  },
+  {
+    name: "mixed-type batch: inline-style + attribute in one op list",
+    source: shell('<div data-hf-id="hf-target" style="opacity: 0.5" data-mode="default">Old</div>'),
+    ops: [
+      { type: "inline-style", property: "opacity", value: "1" },
+      { type: "attribute", property: "mode", value: "hero" },
+    ],
+  },
 ];
 
 describe("SDK cutover DOM serialization parity", () => {
