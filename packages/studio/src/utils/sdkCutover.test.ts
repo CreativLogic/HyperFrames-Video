@@ -205,6 +205,27 @@ describe("sdkCutoverPersist", () => {
     });
   });
 
+  it.each([
+    { name: "multi-child targets", children: [{ id: "a" }, { id: "b" }] },
+    { name: "single non-html children", children: [{ id: "a", tag: "svg" }] },
+  ])("declines text-content cutover for $name", async ({ children }) => {
+    const deps = makeDeps();
+    const session = makeSession(true);
+    (session!.getElement as ReturnType<typeof vi.fn>).mockReturnValue({ children });
+    const sel = { hfId: "hf-abc" } as never;
+    const result = await sdkCutoverPersist(
+      sel,
+      [textOp("Hello world")],
+      "before",
+      "/comp.html",
+      session,
+      deps,
+    );
+    expect(result).toBe(false);
+    expect(session!.dispatch).not.toHaveBeenCalled();
+    expect(deps.writeProjectFile).not.toHaveBeenCalled();
+  });
+
   it("dispatches setAttribute for attribute op with data- prefix", async () => {
     const deps = makeDeps();
     const session = makeSession(true);

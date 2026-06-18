@@ -52,6 +52,35 @@ function mapsToReservedAttr(op: PatchOperation): boolean {
   return name !== null && RESERVED_CUTOVER_ATTRS.has(name.toLowerCase());
 }
 
+function hasTextContentOp(ops: PatchOperation[]): boolean {
+  return ops.some((op) => op.type === "text-content");
+}
+
+function targetChildren(target: unknown): unknown[] | null {
+  if (!target || typeof target !== "object" || !("children" in target)) return null;
+  const children = (target as { children?: unknown }).children;
+  return Array.isArray(children) ? children : null;
+}
+
+function elementTag(element: unknown): string | null {
+  if (!element || typeof element !== "object" || !("tag" in element)) return null;
+  const tag = (element as { tag?: unknown }).tag;
+  return typeof tag === "string" ? tag.toLowerCase() : null;
+}
+
+function shouldDeclineTextCutoverForTarget(target: unknown, ops: PatchOperation[]): boolean {
+  if (!hasTextContentOp(ops)) return false;
+  const children = targetChildren(target);
+  if (!children) return false;
+  // Legacy patch-element replaces the whole element for multi-child targets and
+  // for single non-HTML children. The SDK text patch stream stores a scalar
+  // inverse, so those shapes cannot be made both byte-identical and undo-safe
+  // here. Let the server path remain authoritative for them.
+  if (children.length > 1) return true;
+  const tag = elementTag(children[0]);
+  return tag === "svg" || tag === "math";
+}
+
 export function shouldUseSdkCutover(
   flagEnabled: boolean,
   hasSession: boolean,
@@ -185,7 +214,9 @@ export async function sdkCutoverPersist(
   if (!sdkSession) return false;
   const hfId = selection.hfId;
   if (!hfId) return false;
-  if (!sdkSession.getElement(hfId)) return false;
+  const target = sdkSession.getElement(hfId);
+  if (!target) return false;
+  if (shouldDeclineTextCutoverForTarget(target, ops)) return false;
   if (wrongCompositionFile(deps, targetPath)) return false;
   try {
     const before = sdkSession.serialize();
