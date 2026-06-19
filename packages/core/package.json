@@ -26,6 +26,10 @@
       "import": "./src/beats/index.ts",
       "types": "./src/beats/index.ts"
     },
+    "./slideshow": {
+      "import": "./src/slideshow/index.ts",
+      "types": "./src/slideshow/index.ts"
+    },
     "./lint": {
       "import": "./src/lint/index.ts",
       "types": "./src/lint/index.ts"
@@ -136,6 +140,10 @@
       "./lint": {
         "import": "./dist/lint/index.js",
         "types": "./dist/lint/index.d.ts"
+      },
+      "./slideshow": {
+        "import": "./dist/slideshow/index.js",
+        "types": "./dist/slideshow/index.d.ts"
       },
       "./compiler": {
         "import": "./dist/compiler/index.js",

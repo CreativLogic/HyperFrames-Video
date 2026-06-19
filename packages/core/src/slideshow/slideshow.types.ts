@@ -1,0 +1,52 @@
+// packages/core/src/slideshow/slideshow.types.ts
+
+/** Raw author-facing shapes parsed from the JSON island. */
+export interface SlideshowManifest {
+  slides: SlideRef[];
+  slideSequences?: SlideSequence[];
+}
+
+export interface SlideRef {
+  sceneId: string;
+  startTime?: number;
+  endTime?: number;
+  notes?: string;
+  fragments?: number[];
+  hotspots?: SlideHotspot[];
+  // Reserved — TTS deferred. Parsed and carried, never consumed.
+  ttsScript?: string;
+  ttsAudioUrl?: string;
+  ttsDurationMs?: number;
+}
+
+export interface SlideHotspot {
+  id: string;
+  label: string;
+  target: string; // references a SlideSequence.id
+  region?: { x: number; y: number; w: number; h: number }; // % of slide
+}
+
+export interface SlideSequence {
+  id: string;
+  label: string;
+  slides: SlideRef[];
+}
+
+/** A slide with its time range resolved from the matching scene. */
+export interface ResolvedSlide extends SlideRef {
+  start: number;
+  end: number;
+  fragments: number[]; // always present, sorted, defaulted to []
+  hotspots: SlideHotspot[]; // always present, defaulted to []
+}
+
+export interface ResolvedSlideSequence {
+  id: string;
+  label: string;
+  slides: ResolvedSlide[];
+}
+
+export interface ResolvedSlideshow {
+  slides: ResolvedSlide[];
+  sequences: Record<string, ResolvedSlideSequence>; // keyed by sequence id
+}

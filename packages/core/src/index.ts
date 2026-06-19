@@ -37,6 +37,18 @@ export type {
   WaveformData,
 } from "./core.types";
 
+export type {
+  SlideshowManifest,
+  SlideRef,
+  SlideHotspot,
+  SlideSequence,
+  ResolvedSlide,
+  ResolvedSlideSequence,
+  ResolvedSlideshow,
+} from "./slideshow/slideshow.types";
+
+export { parseSlideshowManifest, resolveSlideshow } from "./slideshow/parseSlideshow";
+
 export {
   CANVAS_DIMENSIONS,
   VALID_CANVAS_RESOLUTIONS,
