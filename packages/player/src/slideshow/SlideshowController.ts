@@ -157,8 +157,7 @@ export class SlideshowController {
     const slide = this.currentSlide;
     if (!slide) return;
     const hasMoreFragments = this.frame.fragmentIndex + 1 < slide.fragments.length;
-    const atEnd = this.player.currentTime >= slide.end - EPS;
-    if (hasMoreFragments && !atEnd) {
+    if (hasMoreFragments) {
       // Reveal the next fragment (play-to-hold). onTime() advances fragmentIndex at the hold.
       const nextTarget = this.nextStop(slide, this.frame.fragmentIndex);
       this.playTo(nextTarget);
@@ -193,7 +192,8 @@ export class SlideshowController {
   }
 
   enterBranch(sequenceId: string): void {
-    if (!this.show.sequences[sequenceId]) return;
+    const seq = this.show.sequences[sequenceId];
+    if (!seq || seq.slides.length === 0) return;
     this.stack.push({ sequenceId, slideIndex: 0, fragmentIndex: -1 });
     this.enterSlide(0);
   }
@@ -211,5 +211,26 @@ export class SlideshowController {
     if (this.stack.length <= 1) return;
     this.stack = [this.stack[0]];
     this.resumeSlide(this.frame.slideIndex, this.frame.fragmentIndex);
+  }
+
+  /**
+   * Jump to an absolute position without animation (audience mirroring).
+   * Re-roots the stack to the target sequence, then restores slide+fragment
+   * statically via resumeSlide.
+   */
+  syncTo(sequenceId: string, slideIndex: number, fragmentIndex: number): void {
+    const base = this.stack[0];
+    if (!base) return;
+    if (this.frame.sequenceId !== sequenceId) {
+      this.stack = [base];
+      if (sequenceId !== MAIN) {
+        const seq = this.show.sequences[sequenceId];
+        if (!seq || seq.slides.length === 0) return;
+        this.stack.push({ sequenceId, slideIndex: 0, fragmentIndex: -1 });
+      }
+    }
+    const slides = this.slidesOf(this.frame.sequenceId);
+    if (slideIndex < 0 || slideIndex >= slides.length) return;
+    this.resumeSlide(slideIndex, fragmentIndex);
   }
 }

@@ -25,6 +25,7 @@ interface ControllerLike {
   readonly canPrev?: boolean;
   readonly canNext?: boolean;
   goToSlide?(index: number): void;
+  syncTo?(sequenceId: string, slideIndex: number, fragmentIndex: number): void;
   enterBranch?(id: string): void;
   back?(): void;
   backToMain?(): void;
@@ -83,6 +84,18 @@ export class HyperframesSlideshow extends HTMLElement {
   /** Whether audio is currently muted. Reflects `data-hf-muted` attribute. */
   get muted(): boolean {
     return this._muted;
+  }
+
+  /** Mode resolves from the `mode` attribute, falling back to the URL query
+   *  (?mode=audience) so the audience window opened by present() is detected. */
+  private resolveMode(): string | null {
+    const attr = this.getAttribute("mode");
+    if (attr) return attr;
+    try {
+      return new URLSearchParams(location.search).get("mode");
+    } catch {
+      return null;
+    }
   }
 
   connectedCallback(): void {
@@ -157,12 +170,11 @@ export class HyperframesSlideshow extends HTMLElement {
   }
 
   private initChannel(): void {
-    const mode = this.getAttribute("mode");
+    const mode = this.resolveMode();
     if (mode === "audience") {
       this.channel = new SlideshowChannel("audience", (msg) => {
         if (!this.controller) return;
-        if (msg.sequenceId !== "main") return; // V1: non-main branch gracefully ignored
-        this.controller.goToSlide?.(msg.slideIndex);
+        this.controller.syncTo?.(msg.sequenceId, msg.slideIndex, msg.fragmentIndex);
       });
     } else {
       this.channel = new SlideshowChannel("presenter", () => {
@@ -210,6 +222,12 @@ export class HyperframesSlideshow extends HTMLElement {
         console.warn("[hyperframes-slideshow] manifest errors:", errors);
       }
       const cleaned = dropInvalidSlides(resolved);
+      if (cleaned.slides.length === 0 && manifest.slides.length > 0) {
+        console.error(
+          "[hyperframes-slideshow] no main-line slides resolved — the scene timeline may not have loaded in time, or sceneIds/timing are invalid:",
+          errors,
+        );
+      }
 
       const port: PlayerPort = {
         seek: (t) => playerEl.seek(t),
@@ -240,13 +258,13 @@ export class HyperframesSlideshow extends HTMLElement {
     this.controller = c;
     this.offChange = c.onChange(() => {
       // Presenter posts position to channel on every change
-      if (this.getAttribute("mode") !== "audience" && this.channel) {
+      if (this.resolveMode() !== "audience" && this.channel) {
         this.channel.postPosition(c.position);
       }
       this.render();
     });
     // Post initial position if presenter
-    if (this.getAttribute("mode") !== "audience" && this.channel) {
+    if (this.resolveMode() !== "audience" && this.channel) {
       this.channel.postPosition(c.position);
     }
     this.render();
@@ -264,10 +282,26 @@ export class HyperframesSlideshow extends HTMLElement {
     ) {
       return;
     }
-    if (e.key === "ArrowRight" || e.key === " ") {
+    const active = document.activeElement;
+    const focused = active === this || this.contains(active);
+    // Arrows act even when nothing is focused (active === body/null) so a freshly
+    // loaded deck responds without a click; Space/Backspace have strong page-level
+    // defaults (scroll / history) so they only act when the deck actually has focus.
+    const ambient = focused || active === document.body || active === null;
+    if (e.key === "ArrowRight") {
+      if (!ambient) return;
       this.controller.next();
       e.preventDefault();
-    } else if (e.key === "ArrowLeft" || e.key === "Backspace") {
+    } else if (e.key === "ArrowLeft") {
+      if (!ambient) return;
+      this.controller.prev();
+      e.preventDefault();
+    } else if (e.key === " ") {
+      if (!focused) return;
+      this.controller.next();
+      e.preventDefault();
+    } else if (e.key === "Backspace") {
+      if (!focused) return;
       this.controller.prev();
       e.preventDefault();
     }
@@ -276,7 +310,7 @@ export class HyperframesSlideshow extends HTMLElement {
   // fallow-ignore-next-line complexity
   private onMessage = (e: MessageEvent): void => {
     // Audience mode is driven by BroadcastChannel; ignore embed postMessage nav.
-    if (this.getAttribute("mode") === "audience") return;
+    if (this.resolveMode() === "audience") return;
     const data = e.data as { type?: unknown; slideIndex?: unknown } | null;
     if (!data || !this.controller) return;
     if (data.type === "next") {
@@ -539,31 +573,40 @@ function waitForScenes(
   timeoutMs: number,
   isCancelled: () => boolean = () => false,
 ): Promise<{ id: string; start: number; duration: number }[]> {
-  const scenes = readScenes(player);
-  if (scenes.length > 0) return Promise.resolve(scenes);
+  const initial = readScenes(player);
+  if (initial.length > 0) return Promise.resolve(initial);
 
   const maxIterations = Math.ceil(timeoutMs / 100);
 
   return new Promise((resolve) => {
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     let iterations = 0;
-    const poll = (): void => {
-      if (isCancelled()) {
-        resolve([]);
-        return;
-      }
-      const current = readScenes(player);
-      if (current.length > 0) {
-        resolve(current);
-        return;
-      }
-      iterations += 1;
-      if (iterations >= maxIterations) {
-        resolve([]);
-        return;
-      }
-      setTimeout(poll, 100);
+
+    const finish = (val: { id: string; start: number; duration: number }[]): void => {
+      if (done) return;
+      done = true;
+      if (timer !== null) clearTimeout(timer);
+      player.removeEventListener("scenes", onScenes);
+      resolve(val);
     };
-    setTimeout(poll, 100);
+    const onScenes = (): void => {
+      if (isCancelled()) return finish([]);
+      const s = readScenes(player);
+      if (s.length > 0) finish(s);
+    };
+    const poll = (): void => {
+      if (done) return;
+      if (isCancelled()) return finish([]);
+      const cur = readScenes(player);
+      if (cur.length > 0) return finish(cur);
+      iterations += 1;
+      if (iterations >= maxIterations) return finish([]);
+      timer = setTimeout(poll, 100);
+    };
+
+    player.addEventListener("scenes", onScenes);
+    timer = setTimeout(poll, 100);
   });
 }
 
