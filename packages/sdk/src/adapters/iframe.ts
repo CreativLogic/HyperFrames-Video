@@ -126,7 +126,7 @@ export function mapPointToImagePixel(
 
   // For fill (or unrecognized values): the natural image is stretched to the
   // box; direct linear mapping.
-  if (fit === "fill" || (fit !== "cover" && fit !== "contain" && fit !== "none")) {
+  if (fit !== "cover" && fit !== "contain" && fit !== "none") {
     if (rect.width === 0 || rect.height === 0) return null;
     const px = Math.floor((lx / rect.width) * natural.width);
     const py = Math.floor((ly / rect.height) * natural.height);
@@ -146,6 +146,7 @@ export function mapPointToImagePixel(
 
   // cover: scale uniformly so the image covers the box; may clip edges.
   // contain: scale uniformly so the image fits within the box; may letterbox.
+  if (natural.width === 0 || natural.height === 0) return null;
   const scaleX = rect.width / natural.width;
   const scaleY = rect.height / natural.height;
   const scale = fit === "cover" ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
@@ -197,7 +198,7 @@ function parseObjectPosition(
   // Resolve a single token into a pixel offset along the given axis.
   // `available` is the "slack" (box dimension - content dimension).
   // fallow-ignore-next-line complexity
-  function resolveToken(token: string, available: number, _isX: boolean): number {
+  function resolveToken(token: string, available: number): number {
     if (token === "left" || token === "top") return 0;
     if (token === "right" || token === "bottom") return available;
     if (token === "center") return available / 2;
@@ -217,20 +218,28 @@ function parseObjectPosition(
   const availX = box.width - content.width;
   const availY = box.height - content.height;
 
+  const isVert = (t: string) => t === "top" || t === "bottom";
+  const isHoriz = (t: string) => t === "left" || t === "right";
+
   if (parts.length === 1) {
     const tokenX = parts[0] ?? "50%";
     // Single value: if it's a vertical keyword the x defaults to center
-    if (tokenX === "top" || tokenX === "bottom") {
-      return { x: availX / 2, y: resolveToken(tokenX, availY, false) };
+    if (isVert(tokenX)) {
+      return { x: availX / 2, y: resolveToken(tokenX, availY) };
     }
-    return { x: resolveToken(tokenX, availX, true), y: availY / 2 };
+    return { x: resolveToken(tokenX, availX), y: availY / 2 };
   }
 
-  const t0 = parts[0] ?? "50%";
-  const t1 = parts[1] ?? "50%";
+  // Keyword pairs may be given vertical-first ("bottom left"); normalize so the
+  // first token addresses the x-axis and the second the y-axis.
+  let xToken = parts[0] ?? "50%";
+  let yToken = parts[1] ?? "50%";
+  if (isVert(xToken) || isHoriz(yToken)) {
+    [xToken, yToken] = [yToken, xToken];
+  }
   return {
-    x: resolveToken(t0, availX, true),
-    y: resolveToken(t1, availY, false),
+    x: resolveToken(xToken, availX),
+    y: resolveToken(yToken, availY),
   };
 }
 
@@ -275,6 +284,21 @@ function isOpacityVisible(el: Element, win: Window & typeof globalThis): boolean
 export const _imgCanvasCache = new Map<string, OffscreenCanvas | null>();
 
 /**
+ * Bounded cap so a long session can't accumulate one full-resolution
+ * OffscreenCanvas per image src indefinitely.
+ * ponytail: FIFO eviction, upgrade to LRU if cache hit-rate matters.
+ */
+const _IMG_CANVAS_CACHE_MAX = 64;
+
+function cacheCanvas(src: string, value: OffscreenCanvas | null): void {
+  if (!_imgCanvasCache.has(src) && _imgCanvasCache.size >= _IMG_CANVAS_CACHE_MAX) {
+    const oldest = _imgCanvasCache.keys().next().value;
+    if (oldest !== undefined) _imgCanvasCache.delete(oldest);
+  }
+  _imgCanvasCache.set(src, value);
+}
+
+/**
  * Sample the alpha at (clientX, clientY) for an <img> element.
  *
  * Returns true (opaque) when:
@@ -302,13 +326,29 @@ function imageAlphaOpaqueAt(
   const src = img.currentSrc || img.src;
   if (!src) return true;
 
+  // object-fit/object-position lay the image out within the CONTENT box, not
+  // the border box that getBoundingClientRect() returns. Inset by border +
+  // padding so the mapping is correct for an <img> that has a border or padding.
   const rect = img.getBoundingClientRect();
   const style = win.getComputedStyle(img);
+  const borderL = parseFloat(style.borderLeftWidth) || 0;
+  const borderT = parseFloat(style.borderTopWidth) || 0;
+  const borderR = parseFloat(style.borderRightWidth) || 0;
+  const borderB = parseFloat(style.borderBottomWidth) || 0;
+  const padL = parseFloat(style.paddingLeft) || 0;
+  const padT = parseFloat(style.paddingTop) || 0;
+  const padR = parseFloat(style.paddingRight) || 0;
+  const padB = parseFloat(style.paddingBottom) || 0;
   const objectFit = style.objectFit || "fill";
   const objectPosition = style.objectPosition || "50% 50%";
 
   const mapped = mapPointToImagePixel(
-    { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+    {
+      left: rect.left + borderL + padL,
+      top: rect.top + borderT + padT,
+      width: rect.width - borderL - borderR - padL - padR,
+      height: rect.height - borderT - borderB - padT - padB,
+    },
     { width: img.naturalWidth, height: img.naturalHeight },
     objectFit,
     objectPosition,
@@ -328,18 +368,15 @@ function imageAlphaOpaqueAt(
       const ctx = oc.getContext("2d");
       if (!ctx) {
         // OffscreenCanvas 2D unavailable — treat as opaque.
-        _imgCanvasCache.set(src, null);
+        cacheCanvas(src, null);
         return true;
       }
       ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
-      // Attempt a pixel read immediately to detect taint at draw time.
-      // Some browsers taint lazily (on getImageData), so we also guard below.
-      ctx.getImageData(0, 0, 1, 1);
-      _imgCanvasCache.set(src, oc);
+      cacheCanvas(src, oc);
       canvas = oc;
     } catch {
       // SecurityError from tainted canvas — record null and fall back opaque.
-      _imgCanvasCache.set(src, null);
+      cacheCanvas(src, null);
       return true;
     }
   }
@@ -350,16 +387,28 @@ function imageAlphaOpaqueAt(
   try {
     const ctx = canvas.getContext("2d");
     if (!ctx) return true;
+    // The mapped-pixel read also surfaces lazy canvas taint (SecurityError),
+    // so no separate taint probe is needed.
     const data = ctx.getImageData(mapped.px, mapped.py, 1, 1);
     return alphaIsOpaque(data);
   } catch {
     // Taint discovered on getImageData — update cache and fall back opaque.
-    _imgCanvasCache.set(src, null);
+    cacheCanvas(src, null);
     return true;
   }
 }
 
 // ─── IframePreviewAdapter ─────────────────────────────────────────────────────
+
+/**
+ * The hit-test z-stack at (x, y): the full elementsFromPoint stack, or a
+ * single-element fallback for hosts that lack elementsFromPoint.
+ */
+function hitStack(doc: Document, x: number, y: number): Element[] {
+  if (typeof doc.elementsFromPoint === "function") return doc.elementsFromPoint(x, y);
+  const top = doc.elementFromPoint(x, y);
+  return top ? [top] : [];
+}
 
 type SelectionHandler = (ids: string[]) => void;
 
@@ -398,23 +447,25 @@ class IframePreviewAdapter implements PreviewAdapter {
     const win = this.iframe.contentWindow as (Window & typeof globalThis) | null;
     if (!win) return null;
 
-    const stack = doc.elementsFromPoint(x, y);
-    const isVisible = (el: Element) => isOpacityVisible(el, win);
+    const stack = hitStack(doc, x, y);
 
     for (const candidate of stack) {
-      // Check opacity visibility first — skip entirely invisible branches.
+      // One opacity walk per candidate (candidate → root). An opacity:0 element
+      // is skipped, so the click falls through to the layer painted behind it.
       if (!isOpacityVisible(candidate, win)) continue;
 
       // Image-alpha check: if this is an <img>, verify the pixel is opaque.
-      if (candidate instanceof win.HTMLImageElement) {
+      if (win.HTMLImageElement && candidate instanceof win.HTMLImageElement) {
         if (!imageAlphaOpaqueAt(candidate, x, y, win)) {
           // Transparent pixel — fall through to the next element in the stack.
           continue;
         }
       }
 
-      // Resolve the nearest hf element from this candidate.
-      const result = resolveNearestHfElement(candidate, isVisible);
+      // The candidate's whole ancestor chain is already known visible (the walk
+      // above covers it, and the hf node is on that chain), so the resolver
+      // needs no second visibility walk.
+      const result = resolveNearestHfElement(candidate, () => true);
       if (result !== null) return result;
     }
 

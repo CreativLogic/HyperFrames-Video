@@ -469,7 +469,8 @@ describe("mapPointToImagePixel", () => {
   });
 
   describe("cover", () => {
-    // 200×100 box, 100×100 natural → scale = max(2, 1) = 2 (letterbox on x)
+    // 200×100 box, 100×100 natural → scale = max(2, 1) = 2 (cover clips Y;
+    // the 200×200 rendered image overflows top/bottom — cover never letterboxes)
     // rendered: 200×200; centered by default (50% 50%)
     // imgTop = (100 - 200)/2 = -50; imgLeft = (200-200)/2 = 0
     const coverRect = { left: 0, top: 0, width: 200, height: 100 };
@@ -526,6 +527,70 @@ describe("mapPointToImagePixel", () => {
     const n = { width: 200, height: 200 };
     // Point to the left of the CSS box
     expect(mapPointToImagePixel(r, n, "cover", "50% 50%", { x: 49, y: 100 })).toBeNull();
+  });
+
+  describe("none", () => {
+    // object-fit:none draws the image at natural size, positioned in the box.
+    // box 100×100, natural 50×50, "50% 50%" → availX=availY=50, offset=25.
+    const r = { left: 0, top: 0, width: 100, height: 100 };
+    const n = { width: 50, height: 50 };
+
+    it("none: box center maps to image center", () => {
+      // click (50,50): px=floor(50-25)=25, py=25
+      expect(mapPointToImagePixel(r, n, "none", "50% 50%", { x: 50, y: 50 })).toEqual({
+        px: 25,
+        py: 25,
+      });
+    });
+
+    it("none: point inside the box but outside the natural-size image → null", () => {
+      // image occupies 25..75; click at (10,10) is left/above it
+      expect(mapPointToImagePixel(r, n, "none", "50% 50%", { x: 10, y: 10 })).toBeNull();
+    });
+  });
+
+  describe("object-position", () => {
+    // contain so object-position has an effect on the vertical axis.
+    // box 200×100, natural 400×100 → scale 0.5, rendered 200×50; availX=0, availY=50.
+    const r = { left: 0, top: 0, width: 200, height: 100 };
+    const n = { width: 400, height: 100 };
+
+    it("'left top' aligns the image to the top of the box", () => {
+      expect(mapPointToImagePixel(r, n, "contain", "left top", { x: 0, y: 0 })).toEqual({
+        px: 0,
+        py: 0,
+      });
+    });
+
+    it("reversed keyword pair 'top left' resolves identically to 'left top'", () => {
+      const reversed = mapPointToImagePixel(r, n, "contain", "top left", { x: 0, y: 0 });
+      const canonical = mapPointToImagePixel(r, n, "contain", "left top", { x: 0, y: 0 });
+      expect(reversed).toEqual(canonical);
+      expect(reversed).toEqual({ px: 0, py: 0 });
+    });
+
+    it("'bottom left' (vertical-first) and 'left bottom' both align bottom-left", () => {
+      // bottom → imgTop=availY=50; bottom edge click y=100 → ry=50 → py=floor(50/0.5)=100→clamp 99
+      const vh = mapPointToImagePixel(r, n, "contain", "bottom left", { x: 0, y: 100 });
+      const hv = mapPointToImagePixel(r, n, "contain", "left bottom", { x: 0, y: 100 });
+      expect(vh).toEqual(hv);
+      expect(vh).toEqual({ px: 0, py: 99 });
+    });
+
+    it("supports pixel object-position values", () => {
+      // "0px 10px" → imgTop=10; click (0,10) → ry=0 → py=0
+      expect(mapPointToImagePixel(r, n, "contain", "0px 10px", { x: 0, y: 10 })).toEqual({
+        px: 0,
+        py: 0,
+      });
+    });
+  });
+
+  it("cover/contain returns null for a zero-dimension natural image", () => {
+    const r = { left: 0, top: 0, width: 200, height: 100 };
+    expect(
+      mapPointToImagePixel(r, { width: 0, height: 100 }, "cover", "50% 50%", { x: 10, y: 10 }),
+    ).toBeNull();
   });
 });
 
@@ -707,5 +772,26 @@ describe("WS-G: z-stack fallthrough via mock elementsFromPoint", () => {
       const result = createIframePreviewAdapter(iframe).elementAtPoint(50, 50);
       expect(result).toBeNull();
     });
+  });
+
+  it("survives a window without HTMLImageElement and a doc without elementsFromPoint", () => {
+    const div = fakeEl({ "data-hf-id": "hf-div" }, "DIV");
+    const fakeIframe = (doc: unknown, win: unknown) =>
+      ({ contentDocument: doc, contentWindow: win }) as unknown as HTMLIFrameElement;
+    const expected = { id: "hf-div", tag: "div" };
+
+    // No HTMLImageElement on the window — `instanceof` must not throw.
+    const noCtor = fakeIframe(
+      { elementsFromPoint: () => [div] },
+      { getComputedStyle: () => ({ opacity: "1" }) },
+    );
+    expect(createIframePreviewAdapter(noCtor).elementAtPoint(50, 50)).toEqual(expected);
+
+    // No elementsFromPoint on the doc — fall back to elementFromPoint.
+    const noStack = fakeIframe(
+      { elementFromPoint: () => div },
+      { HTMLImageElement: FakeHTMLImageElement, getComputedStyle: () => ({ opacity: "1" }) },
+    );
+    expect(createIframePreviewAdapter(noStack).elementAtPoint(50, 50)).toEqual(expected);
   });
 });
