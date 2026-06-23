@@ -22,9 +22,11 @@ Workflow: Step 0 setup → `hyperframes.json` + `assets/bgm.mp3`; Step 1 analyze
 
 ## Step 0: Setup, BGM, and inputs
 
-Goal: Create the HyperFrames project, set the music as the source, and note any user-supplied media.
+Goal: Establish the music source, create the HyperFrames project, and note any user-supplied media.
 
-Initialize only if `hyperframes.json` is missing. Name `<project>` from the brief in kebab-case, such as `midnight-drive-loop` — never a timestamp. The **music is the spine**: copy it to `assets/bgm.mp3` (extract the audio from a video first if the user handed you one). If the user supplied images or videos, stage them so frames can weave them in on the beat grid; if not, typography carries the whole video.
+The **music is the spine** — establish one track before anything else. This skill is tuned for **fast, high-energy BGM**: a strong beat grid drives the cuts (calm tracks work, but pace by phrase rather than beat). If the user gave you audio — a music file, or a video to pull the audio from — use it. If not, generate one: choose the mood from the user's description (e.g. "driving synthwave", "trap beat", "upbeat corporate") and produce a track via `/hyperframes-media` (`references/bgm.md` — HeyGen retrieval when credentialed, else local Lyria / MusicGen; ElevenLabs or another generator also works). Either way the track lands at `assets/bgm.mp3`. Stage any user-supplied images or videos so frames can weave them in on the beat grid; otherwise typography carries the whole video.
+
+Initialize only if `hyperframes.json` is missing. Name `<project>` from the brief in kebab-case, such as `midnight-drive-loop` — never a timestamp.
 
 ```bash
 npx hyperframes init "videos/<project>" --non-interactive --skip-skills --example=blank
